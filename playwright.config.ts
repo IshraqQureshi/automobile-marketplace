@@ -1,5 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Node's built-in .env loader (20.6+) — tests need NEXT_PUBLIC_SUPABASE_ANON_KEY
+// to call the local Supabase API directly for fixture setup.
+try {
+  process.loadEnvFile(".env.local");
+} catch {
+  // .env.local may not exist in CI, where real env vars are injected instead.
+}
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,

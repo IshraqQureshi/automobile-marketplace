@@ -1,0 +1,30 @@
+import { z } from "zod";
+
+// Password minimum matches supabase/config.toml's auth.minimum_password_length.
+// Keep these in sync — Supabase is the actual enforcement point; this is
+// only for fast client/server-side feedback before the request round-trips.
+const PASSWORD_MIN_LENGTH = 6;
+
+export const signUpSchema = z.object({
+  fullName: z.string().trim().min(1, "Full name is required").max(200),
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
+});
+
+export const signInSchema = z.object({
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export type SignUpInput = z.infer<typeof signUpSchema>;
+export type SignInInput = z.infer<typeof signInSchema>;
+
+export interface AuthActionState {
+  status: "idle" | "error" | "confirmation_required";
+  message?: string;
+  fieldErrors?: Partial<Record<string, string>>;
+}
+
+// Kept out of actions.ts: a "use server" module may only export async
+// functions, not plain values.
+export const initialAuthActionState: AuthActionState = { status: "idle" };
