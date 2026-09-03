@@ -31,10 +31,15 @@ create policy showrooms_select_public_or_owner_or_admin
   on public.showrooms for select
   using (status = 'APPROVED' or owner_user_id = auth.uid() or public.is_admin());
 
+-- status/verified must start at their safe defaults regardless of what a
+-- client sends — otherwise a registrant could self-approve at signup time,
+-- e.g. INSERT ... (status, verified) VALUES ('APPROVED', true). The
+-- prevent_showroom_self_approval trigger only guards UPDATE; INSERT needs
+-- its own check since there's no OLD row to compare against here.
 create policy showrooms_insert_own
   on public.showrooms for insert
   to authenticated
-  with check (owner_user_id = auth.uid());
+  with check (owner_user_id = auth.uid() and status = 'PENDING' and verified = false);
 
 create policy showrooms_update_owner_or_admin
   on public.showrooms for update
@@ -58,10 +63,18 @@ create policy showroom_documents_select_owner_or_admin
   to authenticated
   using (public.owns_showroom(showroom_id) or public.is_admin());
 
+-- status/reviewed_by/reviewed_at must start unreviewed — otherwise an owner
+-- could self-approve their own document at upload time.
 create policy showroom_documents_insert_owner
   on public.showroom_documents for insert
   to authenticated
-  with check (public.owns_showroom(showroom_id) and uploaded_by = auth.uid());
+  with check (
+    public.owns_showroom(showroom_id)
+    and uploaded_by = auth.uid()
+    and status = 'PENDING'
+    and reviewed_by is null
+    and reviewed_at is null
+  );
 
 create policy showroom_documents_update_admin_only
   on public.showroom_documents for update
@@ -246,10 +259,16 @@ create policy appointments_select_customer_or_showroom_or_admin
   to authenticated
   using (customer_id = auth.uid() or public.owns_showroom(showroom_id) or public.is_admin());
 
+-- status must start PENDING — otherwise a customer could self-confirm a
+-- booking, skipping the showroom's confirm/decline step entirely. This is
+-- distinct from the deliberately-broad UPDATE policy below (which governs
+-- who may change status after creation, deferred to APT-007/008/009/010) —
+-- this is about what a customer may set at creation time, which isn't
+-- covered by that scope decision at all.
 create policy appointments_insert_customer
   on public.appointments for insert
   to authenticated
-  with check (customer_id = auth.uid());
+  with check (customer_id = auth.uid() and status = 'PENDING');
 
 create policy appointments_update_customer_or_showroom_or_admin
   on public.appointments for update
@@ -346,10 +365,20 @@ create policy vehicle_imports_select_owner_or_admin
   to authenticated
   using (public.owns_showroom(showroom_id) or public.is_admin());
 
+-- status/row-counts must start at their unprocessed defaults — otherwise a
+-- showroom could fabricate a "successful" import without ever actually
+-- processing a file. Real processing happens via the service-role client,
+-- which bypasses RLS entirely.
 create policy vehicle_imports_insert_owner
   on public.vehicle_imports for insert
   to authenticated
-  with check (public.owns_showroom(showroom_id) and uploaded_by = auth.uid());
+  with check (
+    public.owns_showroom(showroom_id)
+    and uploaded_by = auth.uid()
+    and status = 'PENDING'
+    and successful_rows = 0
+    and failed_rows = 0
+  );
 
 create policy vehicle_imports_update_admin_only
   on public.vehicle_imports for update

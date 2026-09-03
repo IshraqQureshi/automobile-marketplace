@@ -120,9 +120,39 @@ describe("RLS authorization (integration)", () => {
       expect(error).toBeNull();
       expect(data?.id).toBe(customerA.id);
     });
+
+    it("a user cannot reactivate their own account after an admin deactivates it (code review finding #4)", async () => {
+      const { error: deactivateErr } = await admin.from("profiles").update({ is_active: false }).eq("id", customerA.id);
+      expect(deactivateErr).toBeNull();
+
+      const { error: selfReactivateErr } = await customerA.client.from("profiles").update({ is_active: true }).eq("id", customerA.id);
+      expect(selfReactivateErr).not.toBeNull();
+
+      const { data: after } = await admin.from("profiles").select("is_active").eq("id", customerA.id).single();
+      expect(after?.is_active).toBe(false);
+
+      // Restore for the rest of the suite.
+      await admin.from("profiles").update({ is_active: true }).eq("id", customerA.id);
+    });
   });
 
   describe("showrooms", () => {
+    it("a registrant cannot self-approve at insert time (code review finding #1)", async () => {
+      const { data, error } = await customerB.client
+        .from("showrooms")
+        .insert({
+          owner_user_id: customerB.id,
+          business_name: `Self-Approved ${testId}`,
+          phone: "0700000099",
+          email: `selfapprove-${testId}@example.com`,
+          status: "APPROVED",
+          verified: true,
+        })
+        .select();
+      expect(error).not.toBeNull();
+      expect(data).toBeNull();
+    });
+
     it("anon can see an APPROVED showroom", async () => {
       const { data, error } = await anon.from("showrooms").select().eq("id", showroomAId);
       expect(error).toBeNull();
@@ -207,6 +237,22 @@ describe("RLS authorization (integration)", () => {
       const { data, error } = await adminUser.client.from("showroom_documents").select().eq("id", documentId);
       expect(error).toBeNull();
       expect(data).toHaveLength(1);
+    });
+
+    it("an owner cannot self-approve their own document at insert time (code review finding #2)", async () => {
+      const { data, error } = await ownerA.client
+        .from("showroom_documents")
+        .insert({
+          showroom_id: showroomAId,
+          document_type: "business_license",
+          storage_path: `${showroomAId}/self-approved.pdf`,
+          uploaded_by: ownerA.id,
+          status: "APPROVED",
+          reviewed_by: ownerA.id,
+        })
+        .select();
+      expect(error).not.toBeNull();
+      expect(data).toBeNull();
     });
   });
 
@@ -367,6 +413,23 @@ describe("RLS authorization (integration)", () => {
       appointmentId = data.id;
     });
 
+    it("a customer cannot self-confirm a booking at insert time (code review finding #3)", async () => {
+      const { data, error } = await customerA.client
+        .from("appointments")
+        .insert({
+          booking_reference: `BK-RLS-SELFCONFIRM-${testId}`,
+          customer_id: customerA.id,
+          showroom_id: showroomAId,
+          appointment_date: "2026-12-16",
+          start_time: "11:00",
+          end_time: "11:30",
+          status: "CONFIRMED",
+        })
+        .select();
+      expect(error).not.toBeNull();
+      expect(data).toBeNull();
+    });
+
     it("a different customer cannot see another customer's appointment", async () => {
       const { data, error } = await customerB.client.from("appointments").select().eq("id", appointmentId);
       expect(error).toBeNull();
@@ -459,6 +522,23 @@ describe("RLS authorization (integration)", () => {
       const { data, error } = await ownerB.client.from("vehicle_imports").select().eq("id", importId);
       expect(error).toBeNull();
       expect(data).toEqual([]);
+    });
+
+    it("a showroom cannot fabricate a successful import at insert time (code review finding #5)", async () => {
+      const { data, error } = await ownerA.client
+        .from("vehicle_imports")
+        .insert({
+          showroom_id: showroomAId,
+          uploaded_by: ownerA.id,
+          file_name: "fake-success.csv",
+          status: "COMPLETED",
+          total_rows: 100,
+          successful_rows: 100,
+          failed_rows: 0,
+        })
+        .select();
+      expect(error).not.toBeNull();
+      expect(data).toBeNull();
     });
   });
 
