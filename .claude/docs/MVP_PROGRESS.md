@@ -24,7 +24,7 @@
 | Area               | Development | QA | PR | Production |
 | ------------------ | ----------- | -- | -- | ---------- |
 | Foundation         | 🟢          | ⬜  | 🟢  | ⬜          |
-| Authentication     | ⬜           | ⬜  | ⬜  | ⬜          |
+| Authentication     | 🟢          | ⬜  | 🟢  | ⬜          |
 | Showrooms          | ⬜           | ⬜  | ⬜  | ⬜          |
 | Vehicles           | ⬜           | ⬜  | ⬜  | ⬜          |
 | Marketplace        | ⬜           | ⬜  | ⬜  | ⬜          |
@@ -52,12 +52,12 @@
 
 ## Authentication
 
-* [ ] Registration
-* [ ] Login
-* [ ] Logout
-* [ ] Password reset
-* [ ] Session handling
-* [ ] User roles
+* [x] Registration (AUTH-001 — email/password, `/login` sign-up tab, real E2E-verified)
+* [x] Login (AUTH-002 — email/password; Google OAuth wired but untestable without real credentials, see blocker)
+* [x] Logout
+* [ ] Password reset (not in AUTH-001/002 scope — "Forgot password?" link is a UI placeholder only)
+* [x] Session handling (proxy.ts refresh from FND-002; protected-route redirect verified)
+* [x] User roles (CUSTOMER auto-assigned via FND-003's handle_new_user trigger — verified via E2E)
 
 ## UI Foundation
 
@@ -87,10 +87,10 @@
 
 * [x] Application runs locally (`npm run dev` serves the app shell; verified via `curl`)
 * [x] Supabase connected (FND-002 — local instance running, Auth/Storage connectivity verified via real integration tests, no schema yet)
-* [ ] Authentication works (AUTH-001/002 — not started)
+* [x] Authentication works (AUTH-001/002 — registration/login/logout/protected-route redirect all E2E-verified; Google OAuth wired but blocked on real credentials, see B-005)
 * [x] Tests execute successfully (typecheck, lint, `npm test` (11/11), `npm run build`, and `npm run test:e2e` all verified passing)
 
-**Status:** 🟡 In Progress — FND-001/FND-002/FND-003/FND-004 complete, AUTH-001/AUTH-002 remain for Day 1 gate to fully close
+**Status:** 🟢 Day 1 Gate CLOSED — FND-001/FND-002/FND-003/FND-004/AUTH-001/AUTH-002 all complete and verified
 
 ---
 
@@ -465,6 +465,7 @@ Regression Test
 | B-002 | ~~Figma/Figma Make access not yet confirmed available~~ | Resolved 2026-09-04: Figma Make view-only link isn't fetchable (JS-rendered SPA), but client supplied 7 static screen exports in `/design` (homepage, car-detail, showroom-detail, login-page, register-as-a-showroom, register-individual-seller, ready-to-sell). Screens not covered by an export must be built following the same branding (teal `#2f6f68`-ish primary, dark navy/charcoal nav+footer, serif display headlines, sans-serif body) per user instruction 2026-09-04. | Client / Frontend Agent | 🟢 Resolved |
 | B-003 | Original client requirements review found the Proposal doc (`Automotive_Marketplace_Proposal (2).docx`) is missing body content for Sections 10, 12–14, 16–17 (Monetization, Tech Stack, Hosting, Cost, Dev Phases, Assumptions) — headings exist in the TOC but no text follows in the extracted document | Cannot independently verify the client's own document specifies Next.js/Supabase/Vercel; currently relying on `CLAUDE.md`/Scope doc only | Client (re-supply complete doc if available) | ⬜ Not started |
 | B-004 | ~~`main` branch protection (required PR review) couldn't be satisfied — GitHub blocks an account from approving its own PR, and this repo currently has one collaborator~~ | Resolved 2026-09-04: branch protection removed by repo owner to unblock merging PR #1. Still enforced in practice: no direct commits to `main` for feature work (git-pr workflow followed manually); Code Review Agent verdicts recorded as PR comments instead of formal GitHub approvals. Revisit real branch protection (PR required, 0 approvals) once decided whether to add a second collaborator or accept comment-based review as the standing process. | Client / repo owner | 🟢 Resolved (process, not tooling) |
+| B-005 | No real Google OAuth credentials (client ID/secret) available for AUTH-002 | `supabase/config.toml` has `auth.external.google` wired and `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID`/`_SECRET` are ready in `.env.example`, but empty — email/password auth works fully, but the "Continue with Google" button fails at click-time until real credentials exist. See `.env.example` for the Google Cloud Console setup needed (redirect URI: `http://127.0.0.1:54321/auth/v1/callback` for local dev). | Client (create a Google Cloud OAuth 2.0 Client ID) | ⬜ Not started |
 
 ---
 
@@ -500,6 +501,10 @@ Record important scope or architectural decisions here.
 | 2026-09-04 | FND-004: `vehicles`/`vehicle_media` public-visibility policies require the parent showroom to be `APPROVED`, not just the row's own `status = 'ACTIVE'` | Caught before testing even started, while reasoning through test fixtures — a vehicle from a still-pending showroom must not be publicly visible |
 | 2026-09-04 | FND-004: `is_admin()` extended to recognize `auth.role() = 'service_role'` | The service-role JWT has no `sub` claim, so `auth.uid()` is NULL for it — this silently blocked the admin client itself from the `prevent_showroom_self_approval` trigger, since ordinary triggers don't get the `BYPASSRLS` treatment RLS policies do |
 | 2026-09-04 | FND-004: 5 INSERT-time privilege-escalation bugs fixed (2 BLOCKER: showrooms/showroom_documents self-approval at insert; 2 HIGH: appointments self-confirmation, profiles self-reactivation after admin deactivation; 1 MEDIUM: vehicle_imports fabricated success) | Code review found these by checking every `WITH CHECK` clause against every column, not just the ownership condition — none of the original 81 tests probed field-level boundaries on INSERT |
+| 2026-09-04 | AUTH-001/002: base design tokens (teal `#2f6f68`-ish brand color, dark `--color-ink` bg, serif display font stack) established in `globals.css`, first used on `/login` | Approximated from `/design/login-page.png` (no Figma Dev Mode access — B-002); MKT-001 and later pages reuse these same tokens rather than re-deriving them |
+| 2026-09-04 | AUTH-001/002: homepage stats row ("12,400+ cars listed", "800+ dealers", "47 cities") from the login design was deliberately omitted from the built page | Those are placeholder mockup numbers, not real data — a fresh MVP launch has ~0 real listings; showing fabricated stats would be actively misleading, not just an approximation |
+| 2026-09-04 | AUTH-001/002: full Brands/Model/Type footer link lists from the design were omitted; a minimal copyright-only footer was built instead | No real vehicle taxonomy/category data exists yet to back those links — building them now would mean hardcoding fake navigation, deferred to when MKT-001 has real data |
+| 2026-09-04 | AUTH-002: `auth.external.google` added to `supabase/config.toml` (enabled, env-var credentials) even though no real Google OAuth credentials exist yet | Verified `supabase start` tolerates empty credential env vars without breaking the rest of the local stack; keeps the config ready to activate the moment real credentials are supplied (B-005), rather than needing a second migration/config PR later |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
