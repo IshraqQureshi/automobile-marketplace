@@ -23,7 +23,7 @@
 
 | Area               | Development | QA | PR | Production |
 | ------------------ | ----------- | -- | -- | ---------- |
-| Foundation         | 🟡          | ⬜  | ⬜  | ⬜          |
+| Foundation         | 🟡          | ⬜  | 🟢  | ⬜          |
 | Authentication     | ⬜           | ⬜  | ⬜  | ⬜          |
 | Showrooms          | ⬜           | ⬜  | ⬜  | ⬜          |
 | Vehicles           | ⬜           | ⬜  | ⬜  | ⬜          |
@@ -38,7 +38,7 @@
 
 ## Project Foundation
 
-* [x] Repository setup (git initialized, `.gitignore`, baseline commit on `main`, `feature/project-init` branch)
+* [x] Repository setup (git initialized, `.gitignore`, pushed to [github.com/IshraqQureshi/automobile-marketplace](https://github.com/IshraqQureshi/automobile-marketplace))
 * [x] Next.js setup (Next.js 16, App Router)
 * [x] TypeScript configuration (strict mode, `noUncheckedIndexedAccess`, `@/*` path alias)
 * [x] Tailwind CSS installed (v4) — no brand tokens yet; design tokens land with MKT-001 against `/design` references
@@ -71,10 +71,10 @@
 
 ## Testing Infrastructure
 
-* [x] Unit testing configured (Vitest — 3 passing tests in `src/lib/utils.test.ts`)
+* [x] Unit testing configured (Vitest — 9 passing tests across `src/lib/utils.test.ts` and `src/lib/env.test.ts`)
 * [ ] Integration testing configured (needs FND-002/FND-003 — real DB/RLS to test against)
 * [x] E2E framework configured (Playwright — smoke test in `e2e/smoke.spec.ts` verified passing against a production build)
-* [ ] CI checks configured (no CI pipeline defined yet — no remote repo configured)
+* [ ] CI checks configured (no GitHub Actions workflow yet — remote repo exists, CI pipeline itself not set up)
 
 ## Claude Engineering System
 
@@ -450,7 +450,7 @@ Regression Test
 
 | PR | Feature | Review | Tests | Status | Merged |
 | -- | ------- | ------ | ----- | ------ | ------ |
-| [#1](https://github.com/IshraqQureshi/automobile-marketplace/pull/1) | FND-001 (`feature/project-init` → `main`) | ⬜ Not yet reviewed by Code Review Agent | 🟢 typecheck/lint/unit/E2E/build all passing | PR_OPEN | ⬜ |
+| [#1](https://github.com/IshraqQureshi/automobile-marketplace/pull/1) | FND-001 (`feature/project-init` → `main`) | 🟢 APPROVED by Code Review Agent (2 MEDIUM findings, both fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (9/9)/E2E/build all passing | MERGED | 🟢 (squash, `e653976`) |
 
 ---
 
@@ -461,6 +461,7 @@ Regression Test
 | B-001 | Meta Business Manager verification + WhatsApp Cloud API template approval not yet started | NTF-002 is now P0; Meta approval lead time is outside dev control and could block Day 5 if not started Day 1 | Client (access) + Full-Stack Agent (integration) | ⬜ Not started |
 | B-002 | ~~Figma/Figma Make access not yet confirmed available~~ | Resolved 2026-09-04: Figma Make view-only link isn't fetchable (JS-rendered SPA), but client supplied 7 static screen exports in `/design` (homepage, car-detail, showroom-detail, login-page, register-as-a-showroom, register-individual-seller, ready-to-sell). Screens not covered by an export must be built following the same branding (teal `#2f6f68`-ish primary, dark navy/charcoal nav+footer, serif display headlines, sans-serif body) per user instruction 2026-09-04. | Client / Frontend Agent | 🟢 Resolved |
 | B-003 | Original client requirements review found the Proposal doc (`Automotive_Marketplace_Proposal (2).docx`) is missing body content for Sections 10, 12–14, 16–17 (Monetization, Tech Stack, Hosting, Cost, Dev Phases, Assumptions) — headings exist in the TOC but no text follows in the extracted document | Cannot independently verify the client's own document specifies Next.js/Supabase/Vercel; currently relying on `CLAUDE.md`/Scope doc only | Client (re-supply complete doc if available) | ⬜ Not started |
+| B-004 | ~~`main` branch protection (required PR review) couldn't be satisfied — GitHub blocks an account from approving its own PR, and this repo currently has one collaborator~~ | Resolved 2026-09-04: branch protection removed by repo owner to unblock merging PR #1. Still enforced in practice: no direct commits to `main` for feature work (git-pr workflow followed manually); Code Review Agent verdicts recorded as PR comments instead of formal GitHub approvals. Revisit real branch protection (PR required, 0 approvals) once decided whether to add a second collaborator or accept comment-based review as the standing process. | Client / repo owner | 🟢 Resolved (process, not tooling) |
 
 ---
 
