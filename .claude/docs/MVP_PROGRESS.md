@@ -452,6 +452,7 @@ Regression Test
 | -- | ------- | ------ | ----- | ------ | ------ |
 | [#1](https://github.com/IshraqQureshi/automobile-marketplace/pull/1) | FND-001 (`feature/project-init` → `main`) | 🟢 APPROVED by Code Review Agent (2 MEDIUM findings, both fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (9/9)/E2E/build all passing | MERGED | 🟢 (squash, `e653976`) |
 | [#2](https://github.com/IshraqQureshi/automobile-marketplace/pull/2) | FND-002 (`feature/supabase-integration` → `main`) | 🟢 APPROVED by Code Review Agent (2 MEDIUM + 1 LOW, all fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (11/11, incl. real Auth/Storage integration tests)/E2E/build all passing | MERGED | 🟢 (squash, `2ba69c4`) |
+| [#3](https://github.com/IshraqQureshi/automobile-marketplace/pull/3) | FND-003 (`feature/database-schema` → `main`) | 🟢 APPROVED by Code Review Agent (1 HIGH + 2 LOW, all fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (28/28, incl. 17 real schema/constraint/trigger tests)/E2E/build/`supabase db reset` all passing | MERGED | 🟢 (squash, `b39172b`) |
 
 ---
 
@@ -492,6 +493,8 @@ Record important scope or architectural decisions here.
 | 2026-09-04 | `main` branch protection removed by repo owner | Unblocked merging PR #1 given the self-approval limitation (B-004) |
 | 2026-09-04 | FND-002: migrated `middleware.ts` to Next.js 16's `proxy.ts` convention via the official `@next/codemod` | `middleware.ts` printed a deprecation warning on build; not worth shipping new code against a convention already being replaced |
 | 2026-09-04 | FND-002: `.env.local` populated from local Supabase (`npx supabase status`), not the linked remote project | Matches "local development" scope for FND-002; production/staging Supabase credentials are a deployment-time concern, not Day 1 |
+| 2026-09-04 | FND-003: RLS, storage buckets/policies, and `system_settings` seed data deferred to FND-004 (not included in the schema PR) | Matches `FEATURE_IMPLEMENTATION_PLAN.md`'s dependency graph (FND-003 → FND-004) and its own release-blocking gate for RLS |
+| 2026-09-04 | FND-003: `validate_appointment_vehicle_showroom` and `set_vehicle_inquiry_showroom` triggers made `security definer` | Code review caught that, without it, these triggers' internal lookups would silently misbehave once FND-004 enables RLS (would run under the calling user's row visibility instead of an unrestricted view) |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
