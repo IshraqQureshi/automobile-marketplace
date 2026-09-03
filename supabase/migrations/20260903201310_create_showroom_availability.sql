@@ -1,4 +1,10 @@
 -- showroom_availability: showroom appointment availability windows.
+--
+-- Overlapping windows for the same showroom+day are NOT prevented at the
+-- database level (DATABASE.md phrases this as "should be prevented or
+-- normalized", not a hard requirement — a real overlap-exclusion constraint
+-- needs btree_gist and is more machinery than FND-003's schema-only scope
+-- justifies). APT-001 application logic must validate this when it lands.
 
 create table public.showroom_availability (
   id uuid primary key default gen_random_uuid(),
