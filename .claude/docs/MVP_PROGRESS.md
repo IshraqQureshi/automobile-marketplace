@@ -450,7 +450,7 @@ Regression Test
 
 | PR | Feature | Review | Tests | Status | Merged |
 | -- | ------- | ------ | ----- | ------ | ------ |
-| —  | FND-001 (`feature/project-init` branch, commit `25b6ae5`) | ⬜ Not reviewed — no remote configured yet, PR cannot be opened | 🟢 typecheck/lint/unit/E2E/build all passing | PR_OPEN (local only) | ⬜ |
+| —  | FND-001 (`feature/project-init` branch, pushed to `origin`) | ⬜ Not yet reviewed — PR not opened yet, see https://github.com/IshraqQureshi/automobile-marketplace/pull/new/feature/project-init | 🟢 typecheck/lint/unit/E2E/build all passing | TESTING | ⬜ |
 
 ---
 
