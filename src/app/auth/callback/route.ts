@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 /**
  * Shared callback for both OAuth (Google) and email-confirmation links —
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
+    logger.error("OAuth/email-confirmation code exchange failed", error);
   }
 
   return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);

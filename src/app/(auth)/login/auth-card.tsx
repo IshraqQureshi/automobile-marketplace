@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -106,14 +107,53 @@ function SignUpForm() {
         {state.fieldErrors?.email && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.email}</p>}
       </div>
       <div>
+        <label htmlFor="signup-phone" className="mb-1 block text-sm font-medium text-neutral-700">
+          Phone number
+        </label>
+        <div className="flex gap-2">
+          <span className="flex items-center rounded-md border border-neutral-300 bg-neutral-50 px-3 text-sm text-neutral-500">
+            +254
+          </span>
+          <Input
+            id="signup-phone"
+            name="phone"
+            type="tel"
+            inputMode="numeric"
+            placeholder="7xx xxx xxx"
+            autoComplete="tel-national"
+            required
+            className="flex-1"
+          />
+        </div>
+        {state.fieldErrors?.phone && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.phone}</p>}
+      </div>
+      <div>
         <label htmlFor="signup-password" className="mb-1 block text-sm font-medium text-neutral-700">
           Password
         </label>
         <Input id="signup-password" name="password" type="password" autoComplete="new-password" required />
         {state.fieldErrors?.password && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.password}</p>}
       </div>
+      <div>
+        <label className="flex items-start gap-2 text-sm text-neutral-600">
+          <input type="checkbox" name="termsAccepted" value="true" required className="mt-0.5" />
+          <span>
+            I agree to the{" "}
+            <Link href="/terms" target="_blank" className="text-brand hover:underline">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" target="_blank" className="text-brand hover:underline">
+              Privacy Policy
+            </Link>
+          </span>
+        </label>
+        {state.fieldErrors?.termsAccepted && (
+          <p className="mt-1 text-sm text-red-600">{state.fieldErrors.termsAccepted}</p>
+        )}
+      </div>
       <Button type="submit" disabled={pending}>
-        {pending ? "Creating account…" : "Create your account"}
+        {pending ? "Creating account…" : "Create account"}
       </Button>
     </form>
   );
@@ -153,7 +193,7 @@ export function AuthCard() {
       ) : (
         <>
           <h1 className="font-display text-2xl font-semibold text-neutral-900">Create your account</h1>
-          <p className="mt-1 text-sm text-neutral-500">Join HarakaGari to save cars and book viewings.</p>
+          <p className="mt-1 text-sm text-neutral-500">Join HarakaGari and find your perfect car today.</p>
         </>
       )}
 

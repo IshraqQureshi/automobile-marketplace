@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
 /**
- * Design tokens approximated from the static design exports in /design
- * (no Figma Dev Mode access — see MVP_PROGRESS.md blocker B-002). Exact
- * hex/spacing values are estimates from the screenshots, not measured —
- * refine during visual QA once real design-token access exists.
+ * Design tokens approximated from the static design exports in /design and
+ * the real logo/brand asset in /real-assets (no Figma Dev Mode access — see
+ * MVP_PROGRESS.md blocker B-002). Exact hex/spacing values are visual
+ * estimates, not measured — refine during visual QA once real design-token
+ * access exists.
  */
 @theme {
-  --color-brand: #2f6f68;
-  --color-brand-dark: #234f4a;
+  --color-brand: #0e6b73;
+  --color-brand-dark: #0a4f55;
+  --color-accent: #f5a623;
   --color-ink: #0e1917;
   --font-display: ui-serif, Georgia, Cambria, "Times New Roman", serif;
 }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/features/auth/actions";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 export const metadata: Metadata = {
   title: "My Account — HarakaGari",
@@ -23,15 +24,27 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   }
 
   const { error } = await searchParams;
-  const { data: profile } = await supabase.from("profiles").select("full_name, role").eq("id", user.id).single();
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("full_name, phone, role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError) {
+    // Genuinely unexpected — the handle_new_user trigger guarantees a
+    // profile row exists for every auth user. Worth a real log entry, not
+    // a silent fallback to "unknown".
+    logger.error("Failed to load profile for authenticated user", profileError, { userId: user.id });
+  }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+    <main className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="font-display text-2xl font-semibold text-neutral-900">
         Welcome{profile?.full_name ? `, ${profile.full_name}` : ""}
       </h1>
       <p className="text-sm text-neutral-500">
-        {user.email} — role: {profile?.role ?? "unknown"}
+        {user.email}
+        {profile?.phone ? ` · ${profile.phone}` : ""} — role: {profile?.role ?? "unknown"}
       </p>
       {error === "sign_out_failed" && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">

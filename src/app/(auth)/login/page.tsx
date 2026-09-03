@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AuthCard } from "./auth-card";
@@ -12,6 +12,7 @@ const HOW_IT_WORKS = [
   { step: "01", title: "Find a Car", description: "Explore cars from showrooms and dealers on our platform." },
   { step: "02", title: "Book a Visit", description: "Book an appointment directly with your selected showroom." },
   { step: "03", title: "Buy & Lock", description: "Purchase your selected vehicle and register your transaction with us." },
+  { step: "04", title: "Upload & Earn", description: "Buy through our platform. Submit your purchase. Get rewarded." },
 ] as const;
 
 export default async function LoginPage() {
@@ -25,19 +26,16 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-neutral-200 px-6 py-4">
-        <Link href="/" className="font-display text-xl font-semibold text-neutral-900">
-          HarakaGari
-        </Link>
-      </header>
+    <div className="grid lg:grid-cols-2">
+      <main className="flex items-center justify-center px-6 py-16">
+        <AuthCard />
+      </main>
 
-      <div className="grid flex-1 lg:grid-cols-2">
-        <main className="flex items-center justify-center px-6 py-16">
-          <AuthCard />
-        </main>
+      <aside className="relative hidden overflow-hidden lg:block">
+        <Image src="/login-hero.jpeg" alt="" fill priority className="object-cover" sizes="50vw" />
+        <div className="from-ink via-ink/85 absolute inset-0 bg-gradient-to-br to-brand-dark/80" />
 
-        <aside className="bg-ink hidden flex-col justify-center gap-10 px-12 py-16 text-white lg:flex">
+        <div className="relative flex h-full flex-col justify-center gap-10 px-12 py-16 text-white">
           <div>
             <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-medium tracking-wide text-brand">
               POWERED BY ARRESA
@@ -77,12 +75,8 @@ export default async function LoginPage() {
               ))}
             </ol>
           </div>
-        </aside>
-      </div>
-
-      <footer className="bg-ink px-6 py-6 text-center text-xs text-white/50">
-        © {new Date().getFullYear()} HarakaGari by Arresa. All rights reserved.
-      </footer>
+        </div>
+      </aside>
     </div>
   );
 }
