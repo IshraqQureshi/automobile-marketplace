@@ -1,0 +1,15 @@
+alter table public.profiles enable row level security;
+alter table public.showrooms enable row level security;
+alter table public.showroom_documents enable row level security;
+alter table public.vehicles enable row level security;
+alter table public.vehicle_media enable row level security;
+alter table public.favorites enable row level security;
+alter table public.vehicle_inquiries enable row level security;
+alter table public.showroom_availability enable row level security;
+alter table public.appointments enable row level security;
+alter table public.appointment_vehicles enable row level security;
+alter table public.notifications enable row level security;
+alter table public.manual_payments enable row level security;
+alter table public.vehicle_imports enable row level security;
+alter table public.activity_logs enable row level security;
+alter table public.system_settings enable row level security;

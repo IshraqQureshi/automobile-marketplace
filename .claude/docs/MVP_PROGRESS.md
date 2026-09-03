@@ -23,7 +23,7 @@
 
 | Area               | Development | QA | PR | Production |
 | ------------------ | ----------- | -- | -- | ---------- |
-| Foundation         | 🟡          | ⬜  | 🟢  | ⬜          |
+| Foundation         | 🟢          | ⬜  | 🟢  | ⬜          |
 | Authentication     | ⬜           | ⬜  | ⬜  | ⬜          |
 | Showrooms          | ⬜           | ⬜  | ⬜  | ⬜          |
 | Vehicles           | ⬜           | ⬜  | ⬜  | ⬜          |
@@ -45,7 +45,7 @@
 * [x] Supabase configuration (FND-002 — typed clients, session-refresh proxy, connectivity verified against local Supabase — see PR #2)
 * [x] Environment configuration (`.env.example`, zod-validated `src/lib/env.ts`; no secrets committed)
 * [x] Database foundation (FND-003 — 15 tables, enums, constraints, indexes, triggers; RLS/storage/seed data intentionally deferred to FND-004 — see PR #3)
-* [ ] Seed/test data (deferred to FND-004, alongside RLS/storage per `DATABASE_MIGRATION_PLAN.md`'s sequence)
+* [x] Seed/test data (FND-004 — 36 approved `system_settings` values seeded — see PR #4)
 * [ ] Error handling (ongoing per-feature)
 * [ ] Logging
 * [x] Git workflow (feature branch created; no direct commits to `main` for feature work)
@@ -72,7 +72,7 @@
 ## Testing Infrastructure
 
 * [x] Unit testing configured (Vitest — 9 passing tests across `src/lib/utils.test.ts` and `src/lib/env.test.ts`)
-* [x] Integration testing configured (Vitest — connectivity tests plus 17 real schema/constraint/trigger tests in `schema.integration.test.ts`; RLS-authorization integration tests land with FND-004)
+* [x] Integration testing configured (Vitest — connectivity + 17 schema/constraint/trigger tests + 45 RLS authorization tests + 8 storage RLS tests, 81 total, all against a live local Supabase instance)
 * [x] E2E framework configured (Playwright — smoke test in `e2e/smoke.spec.ts` verified passing against a production build)
 * [ ] CI checks configured (no GitHub Actions workflow yet — remote repo exists, CI pipeline itself not set up)
 
@@ -90,7 +90,7 @@
 * [ ] Authentication works (AUTH-001/002 — not started)
 * [x] Tests execute successfully (typecheck, lint, `npm test` (11/11), `npm run build`, and `npm run test:e2e` all verified passing)
 
-**Status:** 🟡 In Progress — FND-001/FND-002/FND-003 complete, FND-004/AUTH-001/AUTH-002 remain for Day 1 gate to fully close
+**Status:** 🟡 In Progress — FND-001/FND-002/FND-003/FND-004 complete, AUTH-001/AUTH-002 remain for Day 1 gate to fully close
 
 ---
 
