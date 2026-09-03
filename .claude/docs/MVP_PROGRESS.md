@@ -42,7 +42,7 @@
 * [x] Next.js setup (Next.js 16, App Router)
 * [x] TypeScript configuration (strict mode, `noUncheckedIndexedAccess`, `@/*` path alias)
 * [x] Tailwind CSS installed (v4) — no brand tokens yet; design tokens land with MKT-001 against `/design` references
-* [ ] Supabase configuration (FND-002 — basic client/server/admin utility files exist, not yet connected to a live project)
+* [x] Supabase configuration (FND-002 — typed clients, session-refresh proxy, connectivity verified against local Supabase — see PR #2)
 * [x] Environment configuration (`.env.example`, zod-validated `src/lib/env.ts`; no secrets committed)
 * [ ] Database foundation (FND-003)
 * [ ] Seed/test data (FND-003)
@@ -72,7 +72,7 @@
 ## Testing Infrastructure
 
 * [x] Unit testing configured (Vitest — 9 passing tests across `src/lib/utils.test.ts` and `src/lib/env.test.ts`)
-* [ ] Integration testing configured (needs FND-002/FND-003 — real DB/RLS to test against)
+* [x] Integration testing configured (Vitest, real connectivity tests in `admin.integration.test.ts` — full RLS/business-data integration tests still need FND-003/FND-004)
 * [x] E2E framework configured (Playwright — smoke test in `e2e/smoke.spec.ts` verified passing against a production build)
 * [ ] CI checks configured (no GitHub Actions workflow yet — remote repo exists, CI pipeline itself not set up)
 
@@ -86,11 +86,11 @@
 ### Day 1 Gate
 
 * [x] Application runs locally (`npm run dev` serves the app shell; verified via `curl`)
-* [ ] Supabase connected (FND-002 — not started; local Supabase services were previously started but no schema exists)
+* [x] Supabase connected (FND-002 — local instance running, Auth/Storage connectivity verified via real integration tests, no schema yet)
 * [ ] Authentication works (AUTH-001/002 — not started)
-* [x] Tests execute successfully (typecheck, lint, `npm test`, `npm run build`, and `npm run test:e2e` all verified passing)
+* [x] Tests execute successfully (typecheck, lint, `npm test` (11/11), `npm run build`, and `npm run test:e2e` all verified passing)
 
-**Status:** 🟡 In Progress — FND-001 complete, FND-002/FND-003/FND-004/AUTH-001/AUTH-002 remain for Day 1 gate to fully close
+**Status:** 🟡 In Progress — FND-001/FND-002 complete, FND-003/FND-004/AUTH-001/AUTH-002 remain for Day 1 gate to fully close
 
 ---
 
@@ -451,6 +451,7 @@ Regression Test
 | PR | Feature | Review | Tests | Status | Merged |
 | -- | ------- | ------ | ----- | ------ | ------ |
 | [#1](https://github.com/IshraqQureshi/automobile-marketplace/pull/1) | FND-001 (`feature/project-init` → `main`) | 🟢 APPROVED by Code Review Agent (2 MEDIUM findings, both fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (9/9)/E2E/build all passing | MERGED | 🟢 (squash, `e653976`) |
+| [#2](https://github.com/IshraqQureshi/automobile-marketplace/pull/2) | FND-002 (`feature/supabase-integration` → `main`) | 🟢 APPROVED by Code Review Agent (2 MEDIUM + 1 LOW, all fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (11/11, incl. real Auth/Storage integration tests)/E2E/build all passing | MERGED | 🟢 (squash, `2ba69c4`) |
 
 ---
 
@@ -488,6 +489,9 @@ Record important scope or architectural decisions here.
 | 2026-09-04 | Homepage "Watch & Discover" (TikTok) / "Reviews & Guides" (YouTube) sections built as static, manually-curated embeds | Matches the design without requiring live API integration |
 | 2026-09-04 | FND-001 stack pins: Next.js 16 (App Router), React 19, TypeScript ^5.7 (deliberately not the newly-released TS 7 — avoids ecosystem/tooling breakage on a foundational dependency), Tailwind CSS v4, ESLint 9 flat config via `eslint-config-next`'s native flat exports (not `FlatCompat`, which throws on this eslint-config-next/eslint combination), Vitest for unit tests, Playwright for E2E | Verified via `npm run typecheck/lint/test/build` and `npm run test:e2e`, all passing |
 | 2026-09-04 | Disabled Next.js 16's new auto-generated root `AGENTS.md`/`CLAUDE.md` (`agentRules: false` in `next.config.ts`) | It collided with the project's real engineering constitution at `.claude/CLAUDE.md` |
+| 2026-09-04 | `main` branch protection removed by repo owner | Unblocked merging PR #1 given the self-approval limitation (B-004) |
+| 2026-09-04 | FND-002: migrated `middleware.ts` to Next.js 16's `proxy.ts` convention via the official `@next/codemod` | `middleware.ts` printed a deprecation warning on build; not worth shipping new code against a convention already being replaced |
+| 2026-09-04 | FND-002: `.env.local` populated from local Supabase (`npx supabase status`), not the linked remote project | Matches "local development" scope for FND-002; production/staging Supabase credentials are a deployment-time concern, not Day 1 |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
