@@ -46,8 +46,8 @@
 * [x] Environment configuration (`.env.example`, zod-validated `src/lib/env.ts`; no secrets committed)
 * [x] Database foundation (FND-003 — 15 tables, enums, constraints, indexes, triggers; RLS/storage/seed data intentionally deferred to FND-004 — see PR #3)
 * [x] Seed/test data (FND-004 — 36 approved `system_settings` values seeded — see PR #4)
-* [ ] Error handling (ongoing per-feature)
-* [ ] Logging
+* [x] Error handling (global `error.tsx`/`global-error.tsx`/`not-found.tsx` foundation in place — see PR #6; feature-specific error handling continues to be added per-feature, e.g. auth's typed action states)
+* [x] Logging (`src/lib/logger.ts` — minimal structured JSON logging, wired into real error paths; not a dependency, deliberately, per MVP scope)
 * [x] Git workflow (feature branch created; no direct commits to `main` for feature work)
 
 ## Authentication
@@ -61,13 +61,13 @@
 
 ## UI Foundation
 
-* [ ] Application layout
-* [ ] Header
-* [ ] Navigation
-* [ ] Responsive foundation
-* [ ] Loading states
-* [ ] Empty states
-* [ ] Error states
+* [x] Application layout (Header + Footer wired into root `layout.tsx`, applied to every page — see PR #6)
+* [x] Header (real logo, Brands/Model/Type nav + search inert pending MKT-001/002/003, Log in/Sign up, working mobile hamburger)
+* [x] Navigation (header nav + mobile menu; per-feature navigation, e.g. marketplace filters, lands with those features)
+* [x] Responsive foundation (Header/Footer verified at 1440px and 390px via Playwright screenshots)
+* [x] Loading states (`src/app/loading.tsx` — root Suspense fallback; page-specific loading states land per feature)
+* [ ] Empty states (no data-driven listing pages exist yet to have an empty state — lands with MKT-002/SHR-004 etc.)
+* [x] Error states (`error.tsx`, `global-error.tsx`, `not-found.tsx`)
 
 ## Testing Infrastructure
 
@@ -467,6 +467,7 @@ Regression Test
 | B-003 | Original client requirements review found the Proposal doc (`Automotive_Marketplace_Proposal (2).docx`) is missing body content for Sections 10, 12–14, 16–17 (Monetization, Tech Stack, Hosting, Cost, Dev Phases, Assumptions) — headings exist in the TOC but no text follows in the extracted document | Cannot independently verify the client's own document specifies Next.js/Supabase/Vercel; currently relying on `CLAUDE.md`/Scope doc only | Client (re-supply complete doc if available) | ⬜ Not started |
 | B-004 | ~~`main` branch protection (required PR review) couldn't be satisfied — GitHub blocks an account from approving its own PR, and this repo currently has one collaborator~~ | Resolved 2026-09-04: branch protection removed by repo owner to unblock merging PR #1. Still enforced in practice: no direct commits to `main` for feature work (git-pr workflow followed manually); Code Review Agent verdicts recorded as PR comments instead of formal GitHub approvals. Revisit real branch protection (PR required, 0 approvals) once decided whether to add a second collaborator or accept comment-based review as the standing process. | Client / repo owner | 🟢 Resolved (process, not tooling) |
 | B-005 | No real Google OAuth credentials (client ID/secret) available for AUTH-002 | `supabase/config.toml` has `auth.external.google` wired and `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID`/`_SECRET` are ready in `.env.example`, but empty — email/password auth works fully, but the "Continue with Google" button fails at click-time until real credentials exist. See `.env.example` for the Google Cloud Console setup needed (redirect URI: `http://127.0.0.1:54321/auth/v1/callback` for local dev). | Client (create a Google Cloud OAuth 2.0 Client ID) | ⬜ Not started |
+| B-006 | No real legal content (Terms of Service, Privacy Policy, Cookie Policy) supplied yet | The signup form requires agreeing to Terms/Privacy before account creation (matches `design/signup-page.png`), and the footer links to all three — real pages exist at `/terms`, `/privacy`, `/cookie-policy` but show an honest "placeholder, not final" notice rather than fabricated legal text. Was already flagged generically in the original Proposal's "Client Requirements / Access Needed" list; this is the concrete point it starts blocking real functionality. | Client / legal counsel | ⬜ Not started |
 
 ---
 
@@ -507,6 +508,12 @@ Record important scope or architectural decisions here.
 | 2026-09-04 | AUTH-001/002: full Brands/Model/Type footer link lists from the design were omitted; a minimal copyright-only footer was built instead | No real vehicle taxonomy/category data exists yet to back those links — building them now would mean hardcoding fake navigation, deferred to when MKT-001 has real data |
 | 2026-09-04 | AUTH-002: `auth.external.google` added to `supabase/config.toml` (enabled, env-var credentials) even though no real Google OAuth credentials exist yet | Verified `supabase start` tolerates empty credential env vars without breaking the rest of the local stack; keeps the config ready to activate the moment real credentials are supplied (B-005), rather than needing a second migration/config PR later |
 | 2026-09-04 | AUTH-002: `signOutAction` now checks and surfaces a failed `supabase.auth.signOut()` instead of redirecting to `/login` unconditionally | Code review found that silently redirecting on failure would let a user believe they'd logged out (e.g. on a shared device) while the session cookie could still be valid |
+| 2026-09-04 | UI Foundation: Header/Footer built matching the design, using the real logo/hero photo supplied in `real-assets/` (copied into `public/`, `real-assets/` itself gitignored to match the `/design` pattern) | Direct user feedback — header/footer weren't matching the design, and real brand assets existed but weren't being used |
+| 2026-09-04 | Header's Brands/Model/Type nav dropdowns and search icon built as visually-present but inert (disabled, "coming soon" tooltip) | No vehicle taxonomy or search exists yet (MKT-001/002/003); matches design fidelity without faking functionality |
+| 2026-09-04 | Footer's Brands/Model/Type link lists and social icons rendered as static text, not real links | No real taxonomy/social-account data exists yet — avoids dead or misleading links while still matching the design's visual structure |
+| 2026-09-04 | Signup form updated to match `design/signup-page.png` (not previously reviewed): added phone number (+254 prefix) and a required Terms/Privacy agreement checkbox | Design review gap — this design file wasn't available/checked during the original AUTH-001/002 build |
+| 2026-09-04 | `handle_new_user` (FND-003) extended via a new migration to also capture `phone` from signup metadata | Phone isn't a privilege field (unlike `role`), so trusting it from client-supplied signup metadata carries no escalation risk |
+| 2026-09-04 | Minimal stub pages built for `/terms`, `/privacy`, `/cookie-policy` — honest "placeholder" notices, not fabricated legal text | Signup checkbox and footer need real destinations; real content is blocker B-006 |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
