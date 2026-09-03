@@ -8,7 +8,11 @@ export const metadata: Metadata = {
   title: "My Account — HarakaGari",
 };
 
-export default async function AccountPage() {
+interface AccountPageProps {
+  searchParams: Promise<{ error?: string }>;
+}
+
+export default async function AccountPage({ searchParams }: AccountPageProps) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -18,6 +22,7 @@ export default async function AccountPage() {
     redirect("/login");
   }
 
+  const { error } = await searchParams;
   const { data: profile } = await supabase.from("profiles").select("full_name, role").eq("id", user.id).single();
 
   return (
@@ -28,6 +33,11 @@ export default async function AccountPage() {
       <p className="text-sm text-neutral-500">
         {user.email} — role: {profile?.role ?? "unknown"}
       </p>
+      {error === "sign_out_failed" && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          Logging out failed. Please try again.
+        </p>
+      )}
       <p className="text-sm text-neutral-400">
         Full customer dashboard (AUTH-004) not yet implemented.
       </p>

@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { type AuthActionState, signInSchema, signUpSchema } from "./schemas";
 
+const DUPLICATE_EMAIL_MESSAGE = "An account with this email already exists. Try logging in instead.";
+
 function fieldErrorsFrom(error: { issues: { path: PropertyKey[]; message: string }[] }) {
   const fieldErrors: Partial<Record<string, string>> = {};
   for (const issue of error.issues) {
@@ -34,8 +36,6 @@ export async function signUpAction(
     password: parsed.data.password,
     options: { data: { full_name: parsed.data.fullName } },
   });
-
-  const DUPLICATE_EMAIL_MESSAGE = "An account with this email already exists. Try logging in instead.";
 
   if (error) {
     // With email confirmations disabled (as in local dev — see
@@ -112,6 +112,14 @@ export async function signInWithGoogleAction(): Promise<void> {
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    // Do not redirect to /login implying success — that would let a user
+    // believe they're logged out (e.g. on a shared device) when the
+    // session cookie may still be valid.
+    redirect("/account?error=sign_out_failed");
+  }
+
   redirect("/login");
 }

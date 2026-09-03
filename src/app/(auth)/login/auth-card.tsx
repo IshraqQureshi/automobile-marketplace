@@ -63,9 +63,9 @@ function LoginForm() {
           <label htmlFor="login-password" className="block text-sm font-medium text-neutral-700">
             Password
           </label>
-          <a href="#" className="text-sm text-brand hover:underline">
+          <span className="text-sm text-neutral-400" title="Password reset isn't available yet">
             Forgot password?
-          </a>
+          </span>
         </div>
         <Input id="login-password" name="password" type="password" autoComplete="current-password" required />
         {state.fieldErrors?.password && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.password}</p>}
