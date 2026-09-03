@@ -8,6 +8,9 @@ import { createAdminClient } from "./admin";
  *
  * FND-002 scope: connectivity only. No application tables exist yet
  * (FND-003), so there is no business data to query against.
+ *
+ * Makes real (read-only) API calls against whatever project the env vars
+ * point to. Never run this against a production Supabase project.
  */
 describe("Supabase connectivity (integration)", () => {
   it("reaches the Auth service with the service-role client", async () => {

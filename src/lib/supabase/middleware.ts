@@ -5,7 +5,8 @@ import type { Database } from "@/types/database";
 
 /**
  * Refreshes the Supabase auth session on every request that passes through
- * middleware.ts. Without this, Server Components alone cannot write cookies,
+ * src/proxy.ts (Next.js's "middleware" convention, renamed to "proxy" in
+ * Next.js 16). Without this, Server Components alone cannot write cookies,
  * so an expired access token would never get refreshed.
  *
  * IMPORTANT: do not add logic between createServerClient and the call to
