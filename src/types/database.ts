@@ -819,7 +819,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
+      is_admin: { Args: never; Returns: boolean }
+      owns_showroom: { Args: { target_showroom_id: string }; Returns: boolean }
     }
     Enums: {
       appointment_status:
