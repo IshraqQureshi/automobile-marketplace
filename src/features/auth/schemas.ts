@@ -12,10 +12,15 @@ const KENYA_LOCAL_PHONE_REGEX = /^[17]\d{8}$/;
 export const signUpSchema = z.object({
   fullName: z.string().trim().min(1, "Full name is required").max(200),
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  // The input's own placeholder ("7xx xxx xxx") models spaced input, and
+  // Kenyan numbers are very commonly typed with a leading 0 out of habit
+  // even though the UI shows a separate +254 prefix — strip both before
+  // validating, rather than rejecting input the UI itself invites.
   phone: z
     .string()
     .trim()
-    .regex(KENYA_LOCAL_PHONE_REGEX, "Enter a valid phone number (e.g. 712345678)"),
+    .transform((value) => value.replace(/[\s-]/g, "").replace(/^0/, ""))
+    .pipe(z.string().regex(KENYA_LOCAL_PHONE_REGEX, "Enter a valid phone number (e.g. 712345678)")),
   password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
   termsAccepted: z.literal("true", { message: "You must agree to the Terms of Service and Privacy Policy" }),
 });

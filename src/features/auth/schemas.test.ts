@@ -57,6 +57,27 @@ describe("signUpSchema", () => {
     const result = signUpSchema.safeParse({ ...validSignUp, termsAccepted: undefined });
     expect(result.success).toBe(false);
   });
+
+  it("accepts a phone number formatted like the input's own placeholder ('7xx xxx xxx')", () => {
+    const result = signUpSchema.safeParse({ ...validSignUp, phone: "712 345 678" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.phone).toBe("712345678");
+    }
+  });
+
+  it("accepts a phone number typed with a leading 0, stripping it", () => {
+    const result = signUpSchema.safeParse({ ...validSignUp, phone: "0712345678" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.phone).toBe("712345678");
+    }
+  });
+
+  it("accepts a dash-separated phone number", () => {
+    const result = signUpSchema.safeParse({ ...validSignUp, phone: "712-345-678" });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("signInSchema", () => {

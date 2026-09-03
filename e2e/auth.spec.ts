@@ -17,7 +17,7 @@ test("customer can register, land on their account, log out, and log back in", a
   await page.getByRole("tab", { name: "Sign up" }).click();
   await page.getByLabel("Full name").fill(fullName);
   await page.getByLabel("Email address").fill(email);
-  await page.getByLabel("Phone number").fill("712345678");
+  await page.getByLabel("Phone number").fill("0712 345 678");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Create account" }).click();
