@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 import { type AuthActionState, signInSchema, signUpSchema } from "./schemas";
 
 const DUPLICATE_EMAIL_MESSAGE = "An account with this email already exists. Try logging in instead.";
@@ -23,7 +24,9 @@ export async function signUpAction(
   const parsed = signUpSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
+    phone: formData.get("phone"),
     password: formData.get("password"),
+    termsAccepted: formData.get("termsAccepted"),
   });
 
   if (!parsed.success) {
@@ -34,7 +37,9 @@ export async function signUpAction(
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { full_name: parsed.data.fullName } },
+    options: {
+      data: { full_name: parsed.data.fullName, phone: `+254${parsed.data.phone}` },
+    },
   });
 
   if (error) {
@@ -104,6 +109,7 @@ export async function signInWithGoogleAction(): Promise<void> {
   });
 
   if (error || !data.url) {
+    logger.error("Google OAuth sign-in failed to produce a redirect URL", error);
     redirect("/login?error=google_oauth_failed");
   }
 
@@ -118,6 +124,7 @@ export async function signOutAction(): Promise<void> {
     // Do not redirect to /login implying success — that would let a user
     // believe they're logged out (e.g. on a shared device) when the
     // session cookie may still be valid.
+    logger.error("Sign-out failed", error);
     redirect("/account?error=sign_out_failed");
   }
 

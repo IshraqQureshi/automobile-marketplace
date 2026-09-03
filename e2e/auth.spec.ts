@@ -17,8 +17,10 @@ test("customer can register, land on their account, log out, and log back in", a
   await page.getByRole("tab", { name: "Sign up" }).click();
   await page.getByLabel("Full name").fill(fullName);
   await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Phone number").fill("0712 345 678");
   await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Create your account" }).click();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole("heading", { name: `Welcome, ${fullName}` })).toBeVisible();
@@ -60,10 +62,29 @@ test("duplicate email registration is rejected", async ({ page, request }) => {
   await page.getByRole("tab", { name: "Sign up" }).click();
   await page.getByLabel("Full name").fill("Duplicate Attempt");
   await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Phone number").fill("712345678");
   await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Create your account" }).click();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(page.getByText(/already exists/i)).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test("registration is rejected without agreeing to the Terms of Service", async ({ page }) => {
+  const unique = Date.now();
+  const email = `e2e-noterms-${unique}@example.com`;
+
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Sign up" }).click();
+  await page.getByLabel("Full name").fill("No Terms");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Phone number").fill("712345678");
+  await page.getByLabel("Password").fill("test-password-123");
+  // Deliberately not checking the terms checkbox.
+  await page.getByRole("button", { name: "Create account" }).click();
+
+  await expect(page.getByText(/agree to the Terms of Service/i)).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
 
