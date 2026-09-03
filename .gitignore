@@ -21,6 +21,11 @@ blob-report/
 supabase/.branches/
 supabase/.temp/
 
+# Client documents and design references (not for the repo)
+/Automotive_Marketplace_MVP_Phase2_Scope.docx
+/Automotive_Marketplace_Proposal*.docx
+/design/
+
 # Editor/OS
 .DS_Store
 *.pem
