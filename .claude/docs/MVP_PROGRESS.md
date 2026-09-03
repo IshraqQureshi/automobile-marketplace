@@ -23,7 +23,7 @@
 
 | Area               | Development | QA | PR | Production |
 | ------------------ | ----------- | -- | -- | ---------- |
-| Foundation         | ⬜           | ⬜  | ⬜  | ⬜          |
+| Foundation         | 🟡          | ⬜  | ⬜  | ⬜          |
 | Authentication     | ⬜           | ⬜  | ⬜  | ⬜          |
 | Showrooms          | ⬜           | ⬜  | ⬜  | ⬜          |
 | Vehicles           | ⬜           | ⬜  | ⬜  | ⬜          |
@@ -38,17 +38,17 @@
 
 ## Project Foundation
 
-* [ ] Repository setup
-* [ ] Next.js setup
-* [ ] TypeScript configuration
-* [ ] Tailwind/design system
-* [ ] Supabase configuration
-* [ ] Environment configuration
-* [ ] Database foundation
-* [ ] Seed/test data
-* [ ] Error handling
+* [x] Repository setup (git initialized, `.gitignore`, baseline commit on `main`, `feature/project-init` branch)
+* [x] Next.js setup (Next.js 16, App Router)
+* [x] TypeScript configuration (strict mode, `noUncheckedIndexedAccess`, `@/*` path alias)
+* [x] Tailwind CSS installed (v4) — no brand tokens yet; design tokens land with MKT-001 against `/design` references
+* [ ] Supabase configuration (FND-002 — basic client/server/admin utility files exist, not yet connected to a live project)
+* [x] Environment configuration (`.env.example`, zod-validated `src/lib/env.ts`; no secrets committed)
+* [ ] Database foundation (FND-003)
+* [ ] Seed/test data (FND-003)
+* [ ] Error handling (ongoing per-feature)
 * [ ] Logging
-* [ ] Git workflow
+* [x] Git workflow (feature branch created; no direct commits to `main` for feature work)
 
 ## Authentication
 
@@ -71,26 +71,26 @@
 
 ## Testing Infrastructure
 
-* [ ] Unit testing configured
-* [ ] Integration testing configured
-* [ ] E2E framework configured
-* [ ] CI checks configured
+* [x] Unit testing configured (Vitest — 3 passing tests in `src/lib/utils.test.ts`)
+* [ ] Integration testing configured (needs FND-002/FND-003 — real DB/RLS to test against)
+* [x] E2E framework configured (Playwright — smoke test in `e2e/smoke.spec.ts` verified passing against a production build)
+* [ ] CI checks configured (no CI pipeline defined yet — no remote repo configured)
 
 ## Claude Engineering System
 
-* [ ] CLAUDE.md
-* [ ] Agents configured
-* [ ] Skills configured
-* [ ] Figma integration verified
+* [x] CLAUDE.md
+* [x] Agents configured
+* [x] Skills configured
+* [x] Figma integration verified (Figma Make view-only access isn't fetchable; using 7 static design exports in `/design` instead — see Blocker B-002)
 
 ### Day 1 Gate
 
-* [ ] Application runs locally
-* [ ] Supabase connected
-* [ ] Authentication works
-* [ ] Tests execute successfully
+* [x] Application runs locally (`npm run dev` serves the app shell; verified via `curl`)
+* [ ] Supabase connected (FND-002 — not started; local Supabase services were previously started but no schema exists)
+* [ ] Authentication works (AUTH-001/002 — not started)
+* [x] Tests execute successfully (typecheck, lint, `npm test`, `npm run build`, and `npm run test:e2e` all verified passing)
 
-**Status:** ⬜
+**Status:** 🟡 In Progress — FND-001 complete, FND-002/FND-003/FND-004/AUTH-001/AUTH-002 remain for Day 1 gate to fully close
 
 ---
 
@@ -450,7 +450,7 @@ Regression Test
 
 | PR | Feature | Review | Tests | Status | Merged |
 | -- | ------- | ------ | ----- | ------ | ------ |
-| —  | —       | ⬜      | ⬜     | ⬜      | ⬜      |
+| [#1](https://github.com/IshraqQureshi/automobile-marketplace/pull/1) | FND-001 (`feature/project-init` → `main`) | ⬜ Not yet reviewed by Code Review Agent | 🟢 typecheck/lint/unit/E2E/build all passing | PR_OPEN | ⬜ |
 
 ---
 
@@ -485,6 +485,8 @@ Record important scope or architectural decisions here.
 | 2026-09-04 | Showroom subscription pricing (KSh 60,000/quarterly) shown as informational copy only, no billing logic | Registration still uses the existing manual admin-approval flow |
 | 2026-09-04 | Star rating in vehicle-detail "Sold By" card and showroom detail omitted from MVP UI | No reviews table/data exists for MVP; avoids showing fake data |
 | 2026-09-04 | Homepage "Watch & Discover" (TikTok) / "Reviews & Guides" (YouTube) sections built as static, manually-curated embeds | Matches the design without requiring live API integration |
+| 2026-09-04 | FND-001 stack pins: Next.js 16 (App Router), React 19, TypeScript ^5.7 (deliberately not the newly-released TS 7 — avoids ecosystem/tooling breakage on a foundational dependency), Tailwind CSS v4, ESLint 9 flat config via `eslint-config-next`'s native flat exports (not `FlatCompat`, which throws on this eslint-config-next/eslint combination), Vitest for unit tests, Playwright for E2E | Verified via `npm run typecheck/lint/test/build` and `npm run test:e2e`, all passing |
+| 2026-09-04 | Disabled Next.js 16's new auto-generated root `AGENTS.md`/`CLAUDE.md` (`agentRules: false` in `next.config.ts`) | It collided with the project's real engineering constitution at `.claude/CLAUDE.md` |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
