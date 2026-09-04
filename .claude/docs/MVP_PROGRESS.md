@@ -58,6 +58,8 @@
 * [ ] Password reset (not in AUTH-001/002 scope — "Forgot password?" link is a UI placeholder only)
 * [x] Session handling (proxy.ts refresh from FND-002; protected-route redirect verified)
 * [x] User roles (CUSTOMER auto-assigned via FND-003's handle_new_user trigger — verified via E2E)
+* [x] Real-time client-side validation + confirm-password field on signup (PR #7 — same zod schemas as the server, server remains sole authority; see PR #7 code review for the divergence analysis)
+* [x] Super-admin bootstrap (`npm run seed:admin` — `scripts/seed-admin.mjs`, PR #7; idempotent create-or-promote via service-role client, refuses to run against a non-local Supabase URL unless `ADMIN_SEED_ALLOW_REMOTE=true`, never writes/commits credentials)
 
 ## UI Foundation
 
@@ -455,6 +457,8 @@ Regression Test
 | [#3](https://github.com/IshraqQureshi/automobile-marketplace/pull/3) | FND-003 (`feature/database-schema` → `main`) | 🟢 APPROVED by Code Review Agent (1 HIGH + 2 LOW, all fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (28/28, incl. 17 real schema/constraint/trigger tests)/E2E/build/`supabase db reset` all passing | MERGED | 🟢 (squash, `b39172b`) |
 | [#4](https://github.com/IshraqQureshi/automobile-marketplace/pull/4) | FND-004 (`feature/rls-authorization` → `main`) | 🟢 APPROVED by Code Review Agent (2 BLOCKER + 2 HIGH + 1 MEDIUM + 2 LOW-tracked, all blocking findings fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (86/86, incl. 45 RLS + 8 storage RLS tests with real signed-in sessions per role)/E2E/build/`supabase db reset` all passing | MERGED | 🟢 (squash, `aa1341f`) |
 | [#5](https://github.com/IshraqQureshi/automobile-marketplace/pull/5) | AUTH-001/AUTH-002 (`feature/customer-auth` → `main`) | 🟢 APPROVED by Code Review Agent (1 MEDIUM + 2 LOW, all fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit (95/95)/E2E (4/4, incl. full register→account→logout→login journey)/build all passing | MERGED | 🟢 (squash, `ec72909`) |
+| [#6](https://github.com/IshraqQureshi/automobile-marketplace/pull/6) | UI foundation + real brand assets + signup design fidelity (`feature/ui-foundation` → `main`) | 🟢 APPROVED by Code Review Agent (findings fixed and re-verified — see PR comment) | 🟢 typecheck/lint/unit/E2E/build all passing | MERGED | 🟢 (squash, `494ce9c`) |
+| [#7](https://github.com/IshraqQureshi/automobile-marketplace/pull/7) | Day 1 follow-ups: real-time validation, confirm-password field, admin seed script, stats row (`feature/day1-followups` → `main`) | 🟢 APPROVED by Code Review Agent (1 HIGH — admin seed script had no local-only guard, fixed in `276230f` and re-verified — see PR comment) | 🟢 typecheck/lint/unit (103/103)/E2E (6/6)/build all passing | MERGED | 🟢 (squash, `e52e99c`) |
 
 ---
 
@@ -517,6 +521,7 @@ Record important scope or architectural decisions here.
 | 2026-09-05 | User feedback after Day 1 review: added real-time/inline field validation (`use-field-validation.ts`, validates on blur against the same zod schemas the server action uses), a confirm-password field, and visible password requirements text to the auth forms | Previously, form errors only appeared after a full submit + server round-trip; native `required` was the only pre-submit feedback |
 | 2026-09-05 | Added `scripts/seed-admin.mjs` (`npm run seed:admin`) — creates or promotes an ADMIN user via the service-role client, generates a random password if none supplied, never hardcodes/commits credentials | User feedback: no way existed to get an admin account into the system at all, despite `DATABASE_MIGRATION_PLAN.md` §43 explicitly requiring a controlled bootstrap process (not a hardcoded migration password) — this was the missing piece |
 | 2026-09-05 | Reinstated the login/signup hero panel's stats row ("12,400+ Cars listed / 800+ Verified dealers / 47 cities Across Kenya"), previously omitted on 2026-09-04 as fabricated-looking mockup numbers | Explicit user instruction to match the design as shown. Still logged here for traceability: these are the design mockup's own illustrative figures, not numbers backed by real platform data |
+| 2026-09-05 | PR #7 code review found `scripts/seed-admin.mjs` had no technical guard against running against a non-local Supabase project (only a post-hoc warning) — fixed by refusing to run unless the URL is `localhost`/`127.0.0.1`, with an `ADMIN_SEED_ALLOW_REMOTE=true` override required otherwise | Script grants ADMIN via the service-role key; a misconfigured `.env.local` could otherwise silently create a live production admin account |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
