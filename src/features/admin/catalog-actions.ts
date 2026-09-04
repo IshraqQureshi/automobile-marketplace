@@ -1,0 +1,147 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { logger } from "@/lib/logger";
+import { createClient } from "@/lib/supabase/server";
+import { catalogNameSchema } from "./catalog-schemas";
+
+export interface CatalogActionResult {
+  error?: string;
+}
+
+// Admin-only writes are enforced by RLS (brands/models/vehicle_types insert/
+// update/delete policies require public.is_admin() — see
+// supabase/migrations/20260905010001_create_catalog_rls_policies.sql,
+// verified by src/lib/supabase/catalog-rls.integration.test.ts), and the
+// page these actions are called from is already behind the ADMIN-only
+// /admin/(protected) layout guard. These actions don't duplicate the role
+// check — they just need to fail gracefully, not silently, if RLS ever
+// does reject a call.
+
+export async function createBrandAction(name: string): Promise<CatalogActionResult> {
+  const parsed = catalogNameSchema.safeParse(name);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("brands").insert({ name: parsed.data });
+  if (error) {
+    logger.error("Failed to create brand", error);
+    return { error: error.code === "23505" ? "A brand with this name already exists." : "Failed to create brand." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}
+
+export async function updateBrandAction(id: string, name: string): Promise<CatalogActionResult> {
+  const parsed = catalogNameSchema.safeParse(name);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("brands").update({ name: parsed.data }).eq("id", id);
+  if (error) {
+    logger.error("Failed to update brand", error, { id });
+    return { error: error.code === "23505" ? "A brand with this name already exists." : "Failed to update brand." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}
+
+export async function deleteBrandAction(id: string): Promise<CatalogActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("brands").delete().eq("id", id);
+  if (error) {
+    logger.error("Failed to delete brand", error, { id });
+    return { error: "Failed to delete brand." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}
+
+export async function createModelAction(brandId: string, name: string): Promise<CatalogActionResult> {
+  const parsed = catalogNameSchema.safeParse(name);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
+  if (!brandId) return { error: "Choose a brand." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("models").insert({ brand_id: brandId, name: parsed.data });
+  if (error) {
+    logger.error("Failed to create model", error, { brandId });
+    return { error: error.code === "23505" ? "This brand already has a model with this name." : "Failed to create model." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}
+
+export async function updateModelAction(id: string, name: string, brandId: string): Promise<CatalogActionResult> {
+  const parsed = catalogNameSchema.safeParse(name);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
+  if (!brandId) return { error: "Choose a brand." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("models").update({ name: parsed.data, brand_id: brandId }).eq("id", id);
+  if (error) {
+    logger.error("Failed to update model", error, { id });
+    return { error: error.code === "23505" ? "This brand already has a model with this name." : "Failed to update model." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}
+
+export async function deleteModelAction(id: string): Promise<CatalogActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("models").delete().eq("id", id);
+  if (error) {
+    logger.error("Failed to delete model", error, { id });
+    return { error: "Failed to delete model." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}
+
+export async function createVehicleTypeAction(name: string): Promise<CatalogActionResult> {
+  const parsed = catalogNameSchema.safeParse(name);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("vehicle_types").insert({ name: parsed.data });
+  if (error) {
+    logger.error("Failed to create vehicle type", error);
+    return { error: error.code === "23505" ? "A type with this name already exists." : "Failed to create type." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}
+
+export async function updateVehicleTypeAction(id: string, name: string): Promise<CatalogActionResult> {
+  const parsed = catalogNameSchema.safeParse(name);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("vehicle_types").update({ name: parsed.data }).eq("id", id);
+  if (error) {
+    logger.error("Failed to update vehicle type", error, { id });
+    return { error: error.code === "23505" ? "A type with this name already exists." : "Failed to update type." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}
+
+export async function deleteVehicleTypeAction(id: string): Promise<CatalogActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("vehicle_types").delete().eq("id", id);
+  if (error) {
+    logger.error("Failed to delete vehicle type", error, { id });
+    return { error: "Failed to delete type." };
+  }
+
+  revalidatePath("/admin/catalog");
+  return {};
+}

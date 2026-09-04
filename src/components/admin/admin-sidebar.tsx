@@ -6,16 +6,25 @@ import { usePathname } from "next/navigation";
 import { adminSignOutAction } from "@/features/admin/actions";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [{ label: "Dashboard", href: "/admin", icon: DashboardIcon }] as const;
+interface NavEntry {
+  label: string;
+  href: string | null; // null = not built yet, renders inert ("Coming soon")
+  icon: () => React.JSX.Element;
+}
 
-// Showroom/vehicle/user management are Day 2/4 scope — no pages exist yet.
-// Same "coming soon" treatment as the public header's Brands/Model/Type nav
-// (src/components/layout/header.tsx) rather than linking somewhere that 404s.
-const UPCOMING_NAV_ITEMS = [
-  { label: "Showrooms", icon: ShowroomIcon },
-  { label: "Vehicles", icon: VehicleIcon },
-  { label: "Users", icon: UsersIcon },
-] as const;
+const OVERVIEW_ITEMS: NavEntry[] = [{ label: "Dashboard", href: "/admin", icon: DashboardIcon }];
+
+// Showroom/vehicle/user management are Day 2/4 scope — no pages exist yet
+// (href: null). Same "coming soon" treatment as the public header's
+// Brands/Model/Type nav (src/components/layout/header.tsx) rather than
+// linking somewhere that 404s.
+const MARKETPLACE_ITEMS: NavEntry[] = [
+  { label: "Catalog", href: "/admin/catalog", icon: CatalogIcon },
+  { label: "Showrooms", href: null, icon: ShowroomIcon },
+  { label: "Vehicles", href: null, icon: VehicleIcon },
+];
+
+const ADMIN_ITEMS: NavEntry[] = [{ label: "Users", href: null, icon: UsersIcon }];
 
 interface AdminSidebarProps {
   email: string;
@@ -30,50 +39,9 @@ export function AdminSidebar({ email }: AdminSidebarProps) {
         <Image src="/logo.png" alt="HarakaGari — Powered by Arresa" width={130} height={34} priority />
       </Link>
 
-      <nav className="flex flex-col gap-0.5">
-        <span className="px-3 pb-1.5 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase">
-          Overview
-        </span>
-        {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-          // Exact match is correct today (every NAV_ITEMS entry is a
-          // top-level page). Once a real /admin/showrooms-style section
-          // gets nested detail routes (Day 2/4), this needs
-          // pathname.startsWith(href) instead, or a detail sub-page won't
-          // highlight its parent nav item.
-          const active = pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
-                active ? "bg-brand text-white" : "text-neutral-600 hover:bg-neutral-100",
-              )}
-            >
-              <Icon />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <nav className="flex flex-col gap-0.5">
-        <span className="px-3 pb-1.5 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase">
-          Marketplace
-        </span>
-        {UPCOMING_NAV_ITEMS.map(({ label, icon: Icon }) => (
-          <button
-            key={label}
-            type="button"
-            disabled
-            title="Coming soon"
-            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-600 disabled:cursor-default disabled:opacity-60"
-          >
-            <Icon />
-            {label}
-          </button>
-        ))}
-      </nav>
+      <NavGroup label="Overview" items={OVERVIEW_ITEMS} pathname={pathname} />
+      <NavGroup label="Marketplace" items={MARKETPLACE_ITEMS} pathname={pathname} />
+      <NavGroup label="Admin" items={ADMIN_ITEMS} pathname={pathname} />
 
       <div className="flex-1" />
 
@@ -100,6 +68,55 @@ export function AdminSidebar({ email }: AdminSidebarProps) {
   );
 }
 
+interface NavGroupProps {
+  label: string;
+  items: NavEntry[];
+  pathname: string;
+}
+
+function NavGroup({ label, items, pathname }: NavGroupProps) {
+  return (
+    <nav className="flex flex-col gap-0.5">
+      <span className="px-3 pb-1.5 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase">{label}</span>
+      {items.map((item) => {
+        if (item.href === null) {
+          return (
+            <button
+              key={item.label}
+              type="button"
+              disabled
+              title="Coming soon"
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-600 disabled:cursor-default disabled:opacity-60"
+            >
+              <item.icon />
+              {item.label}
+            </button>
+          );
+        }
+
+        // Exact match is correct today (every real NavEntry is a top-level
+        // page). Once a real /admin/showrooms-style section gets nested
+        // detail routes (Day 2/4), this needs pathname.startsWith(item.href)
+        // instead, or a detail sub-page won't highlight its parent nav item.
+        const active = pathname === item.href;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
+              active ? "bg-brand text-white" : "text-neutral-600 hover:bg-neutral-100",
+            )}
+          >
+            <item.icon />
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 function DashboardIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
@@ -107,6 +124,15 @@ function DashboardIcon() {
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
+function CatalogIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <path d="M20.6 12.9 12.9 20.6a2 2 0 0 1-2.8 0l-7.7-7.7a2 2 0 0 1 0-2.8L10.1 2.4a2 2 0 0 1 1.4-.6h5.5a2 2 0 0 1 2 2v5.5a2 2 0 0 1-.4 1.6Z" />
+      <circle cx="15.5" cy="6.5" r="1.25" fill="currentColor" stroke="none" />
     </svg>
   );
 }
