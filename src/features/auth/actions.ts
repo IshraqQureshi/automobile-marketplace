@@ -26,6 +26,7 @@ export async function signUpAction(
     email: formData.get("email"),
     phone: formData.get("phone"),
     password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
     termsAccepted: formData.get("termsAccepted"),
   });
 

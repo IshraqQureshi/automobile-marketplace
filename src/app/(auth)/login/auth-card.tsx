@@ -6,7 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { signInAction, signInWithGoogleAction, signUpAction } from "@/features/auth/actions";
-import { initialAuthActionState } from "@/features/auth/schemas";
+import {
+  PASSWORD_MIN_LENGTH,
+  initialAuthActionState,
+  signInFieldSchemas,
+  signUpFieldSchemas,
+} from "@/features/auth/schemas";
+import { useFieldValidation } from "@/features/auth/use-field-validation";
 
 type Tab = "login" | "signup";
 
@@ -46,9 +52,13 @@ function GoogleButton() {
 
 function LoginForm() {
   const [state, formAction, pending] = useActionState(signInAction, initialAuthActionState);
+  const { validate, errorFor } = useFieldValidation(signInFieldSchemas);
+
+  const emailError = errorFor("email", state.fieldErrors?.email);
+  const passwordError = errorFor("password", state.fieldErrors?.password);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4" noValidate>
       {state.status === "error" && state.message && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.message}</p>
       )}
@@ -56,8 +66,17 @@ function LoginForm() {
         <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-neutral-700">
           Email address
         </label>
-        <Input id="login-email" name="email" type="email" placeholder="you@example.com" autoComplete="email" required />
-        {state.fieldErrors?.email && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.email}</p>}
+        <Input
+          id="login-email"
+          name="email"
+          type="email"
+          placeholder="you@example.com"
+          autoComplete="email"
+          required
+          error={!!emailError}
+          onBlur={(e) => validate("email", e.target.value)}
+        />
+        {emailError && <p className="mt-1 text-sm text-red-600">{emailError}</p>}
       </div>
       <div>
         <div className="mb-1 flex items-center justify-between">
@@ -68,8 +87,16 @@ function LoginForm() {
             Forgot password?
           </span>
         </div>
-        <Input id="login-password" name="password" type="password" autoComplete="current-password" required />
-        {state.fieldErrors?.password && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.password}</p>}
+        <Input
+          id="login-password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          error={!!passwordError}
+          onBlur={(e) => validate("password", e.target.value)}
+        />
+        {passwordError && <p className="mt-1 text-sm text-red-600">{passwordError}</p>}
       </div>
       <Button type="submit" disabled={pending}>
         {pending ? "Signing in…" : "Sign in to HarakaGari"}
@@ -80,6 +107,10 @@ function LoginForm() {
 
 function SignUpForm() {
   const [state, formAction, pending] = useActionState(signUpAction, initialAuthActionState);
+  const { validate, errorFor } = useFieldValidation(signUpFieldSchemas);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmTouched, setConfirmTouched] = useState(false);
 
   if (state.status === "confirmation_required") {
     return (
@@ -87,8 +118,18 @@ function SignUpForm() {
     );
   }
 
+  const fullNameError = errorFor("fullName", state.fieldErrors?.fullName);
+  const emailError = errorFor("email", state.fieldErrors?.email);
+  const phoneError = errorFor("phone", state.fieldErrors?.phone);
+  const passwordError = errorFor("password", state.fieldErrors?.password);
+  const confirmPasswordError = confirmTouched
+    ? password !== confirmPassword
+      ? "Passwords do not match"
+      : undefined
+    : state.fieldErrors?.confirmPassword;
+
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4" noValidate>
       {state.status === "error" && state.message && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.message}</p>
       )}
@@ -96,15 +137,33 @@ function SignUpForm() {
         <label htmlFor="signup-name" className="mb-1 block text-sm font-medium text-neutral-700">
           Full name
         </label>
-        <Input id="signup-name" name="fullName" type="text" placeholder="e.g. John Kamau" autoComplete="name" required />
-        {state.fieldErrors?.fullName && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.fullName}</p>}
+        <Input
+          id="signup-name"
+          name="fullName"
+          type="text"
+          placeholder="e.g. John Kamau"
+          autoComplete="name"
+          required
+          error={!!fullNameError}
+          onBlur={(e) => validate("fullName", e.target.value)}
+        />
+        {fullNameError && <p className="mt-1 text-sm text-red-600">{fullNameError}</p>}
       </div>
       <div>
         <label htmlFor="signup-email" className="mb-1 block text-sm font-medium text-neutral-700">
           Email address
         </label>
-        <Input id="signup-email" name="email" type="email" placeholder="you@example.com" autoComplete="email" required />
-        {state.fieldErrors?.email && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.email}</p>}
+        <Input
+          id="signup-email"
+          name="email"
+          type="email"
+          placeholder="you@example.com"
+          autoComplete="email"
+          required
+          error={!!emailError}
+          onBlur={(e) => validate("email", e.target.value)}
+        />
+        {emailError && <p className="mt-1 text-sm text-red-600">{emailError}</p>}
       </div>
       <div>
         <label htmlFor="signup-phone" className="mb-1 block text-sm font-medium text-neutral-700">
@@ -122,17 +181,47 @@ function SignUpForm() {
             placeholder="7xx xxx xxx"
             autoComplete="tel-national"
             required
+            error={!!phoneError}
+            onBlur={(e) => validate("phone", e.target.value)}
             className="flex-1"
           />
         </div>
-        {state.fieldErrors?.phone && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.phone}</p>}
+        {phoneError && <p className="mt-1 text-sm text-red-600">{phoneError}</p>}
       </div>
       <div>
         <label htmlFor="signup-password" className="mb-1 block text-sm font-medium text-neutral-700">
           Password
         </label>
-        <Input id="signup-password" name="password" type="password" autoComplete="new-password" required />
-        {state.fieldErrors?.password && <p className="mt-1 text-sm text-red-600">{state.fieldErrors.password}</p>}
+        <Input
+          id="signup-password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          required
+          error={!!passwordError}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onBlur={(e) => validate("password", e.target.value)}
+        />
+        <p className="mt-1 text-xs text-neutral-400">At least {PASSWORD_MIN_LENGTH} characters.</p>
+        {passwordError && <p className="mt-1 text-sm text-red-600">{passwordError}</p>}
+      </div>
+      <div>
+        <label htmlFor="signup-confirm-password" className="mb-1 block text-sm font-medium text-neutral-700">
+          Confirm password
+        </label>
+        <Input
+          id="signup-confirm-password"
+          name="confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          required
+          error={!!confirmPasswordError}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          onBlur={() => setConfirmTouched(true)}
+        />
+        {confirmPasswordError && <p className="mt-1 text-sm text-red-600">{confirmPasswordError}</p>}
       </div>
       <div>
         <label className="flex items-start gap-2 text-sm text-neutral-600">

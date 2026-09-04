@@ -6,6 +6,7 @@ const validSignUp = {
   email: "john@example.com",
   phone: "712345678",
   password: "password123",
+  confirmPassword: "password123",
   termsAccepted: "true",
 } as const;
 
@@ -26,7 +27,7 @@ describe("signUpSchema", () => {
   });
 
   it("accepts a password exactly at the minimum length", () => {
-    const result = signUpSchema.safeParse({ ...validSignUp, password: "123456" });
+    const result = signUpSchema.safeParse({ ...validSignUp, password: "123456", confirmPassword: "123456" });
     expect(result.success).toBe(true);
   });
 
@@ -77,6 +78,20 @@ describe("signUpSchema", () => {
   it("accepts a dash-separated phone number", () => {
     const result = signUpSchema.safeParse({ ...validSignUp, phone: "712-345-678" });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects when confirmPassword doesn't match password", () => {
+    const result = signUpSchema.safeParse({ ...validSignUp, confirmPassword: "different123" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === "confirmPassword");
+      expect(issue?.message).toBe("Passwords do not match");
+    }
+  });
+
+  it("rejects a blank confirmPassword", () => {
+    const result = signUpSchema.safeParse({ ...validSignUp, confirmPassword: "" });
+    expect(result.success).toBe(false);
   });
 });
 
