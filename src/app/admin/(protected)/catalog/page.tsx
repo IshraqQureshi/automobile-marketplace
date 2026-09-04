@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { CatalogBrandsList } from "@/components/admin/catalog-brands-list";
 import { CatalogList } from "@/components/admin/catalog-list";
 import { CatalogModelsList } from "@/components/admin/catalog-models-list";
 import {
@@ -24,7 +25,7 @@ export default async function AdminCatalogPage() {
   const supabase = await createClient();
 
   const [brandsResult, modelsResult, typesResult] = await Promise.all([
-    supabase.from("brands").select("id, name").order("name"),
+    supabase.from("brands").select("id, name, logo_storage_path").order("name"),
     supabase.from("models").select("id, name, brand_id, brands(name)").order("name"),
     supabase.from("vehicle_types").select("id, name").order("name"),
   ]);
@@ -47,7 +48,10 @@ export default async function AdminCatalogPage() {
 
   const brandItems = brands.map((brand) => {
     const count = brandModelCounts.get(brand.id) ?? 0;
-    return { id: brand.id, name: brand.name, meta: `${count} model${count === 1 ? "" : "s"}` };
+    const logoUrl = brand.logo_storage_path
+      ? supabase.storage.from("brand-logos").getPublicUrl(brand.logo_storage_path).data.publicUrl
+      : null;
+    return { id: brand.id, name: brand.name, meta: `${count} model${count === 1 ? "" : "s"}`, logoUrl };
   });
 
   const modelItems = (modelsResult.data ?? []).map((model) => ({
@@ -64,7 +68,7 @@ export default async function AdminCatalogPage() {
       <AdminTopbar title="Catalog" />
       <main className="flex-1 px-7 py-6">
         <div className="grid grid-cols-3 items-start gap-4 *:min-w-0">
-          <CatalogList
+          <CatalogBrandsList
             title="Brands"
             description="Vehicle manufacturers"
             items={brandItems}

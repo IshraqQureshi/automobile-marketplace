@@ -9,6 +9,15 @@ import { createClient } from "@supabase/supabase-js";
 // Playwright runs spec files concurrently in separate workers: if both
 // files' beforeAll reset the password on the *same* account, a reset from
 // one file can invalidate a session the other file just logged in with.
+//
+// Also runs serially (mode: "serial" below) for the same reason: under the
+// project's fullyParallel default, this file's own tests can be spread
+// across more than one worker, and beforeAll runs once per worker that
+// picks up a test from this file — two concurrent beforeAll calls
+// resetting the *same* account's password can race each other's logins,
+// exactly like the cross-file case above but within one file.
+test.describe.configure({ mode: "serial" });
+
 const ADMIN_EMAIL = "e2e-admin-catalog-fixture@harakagari.local";
 const ADMIN_PASSWORD = "e2e-admin-catalog-fixture-password-123";
 
@@ -153,6 +162,44 @@ test("admin can create and delete a vehicle type", async ({ page }) => {
   page.once("dialog", (dialog) => dialog.accept());
   await typesCard.locator("li", { hasText: typeName }).getByRole("button", { name: "Delete" }).click();
   await expect(typesCard.locator("li", { hasText: typeName })).toHaveCount(0);
+});
+
+test("admin can upload a brand logo, replace it, and remove it", async ({ page }) => {
+  const unique = Date.now();
+  const brandName = `E2E Logo Brand ${unique}`;
+
+  const brandsCard = page.getByTestId("catalog-list-brands");
+
+  await brandsCard.getByPlaceholder("e.g. Toyota").fill(brandName);
+  await brandsCard.getByLabel("Logo").setInputFiles({
+    name: "logo.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("not a real png, just proving the upload path"),
+  });
+  await brandsCard.getByRole("button", { name: "Add" }).click();
+
+  const row = brandsCard.locator("li", { hasText: brandName });
+  await expect(row).toBeAttached();
+  await expect(row.getByRole("img", { name: `${brandName} logo` })).toBeAttached();
+
+  // Replace the logo with a different file.
+  await row.getByRole("button", { name: "Edit" }).click();
+  await brandsCard.getByLabel("Replace logo").setInputFiles({
+    name: "logo-2.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("a different fake png"),
+  });
+  await brandsCard.getByRole("button", { name: "Save" }).click();
+  await expect(row.getByRole("img", { name: `${brandName} logo` })).toBeAttached();
+
+  // Remove the logo entirely — the row falls back to the initial-letter badge.
+  await row.getByRole("button", { name: "Edit" }).click();
+  await brandsCard.getByLabel("Remove logo").check();
+  await brandsCard.getByRole("button", { name: "Save" }).click();
+  await expect(row.getByRole("img", { name: `${brandName} logo` })).toHaveCount(0);
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await row.getByRole("button", { name: "Delete" }).click();
 });
 
 test("rejects a duplicate brand name with an inline error, not a crash", async ({ page }) => {
