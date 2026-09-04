@@ -18,7 +18,8 @@ test("customer can register, land on their account, log out, and log back in", a
   await page.getByLabel("Full name").fill(fullName);
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Phone number").fill("0712 345 678");
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByLabel("Confirm password").fill(password);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Create account" }).click();
 
@@ -36,7 +37,7 @@ test("customer can register, land on their account, log out, and log back in", a
 
   // Log back in with the same credentials.
   await page.getByLabel("Email address").fill(email);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
 
   await expect(page).toHaveURL(/\/account$/);
@@ -63,7 +64,8 @@ test("duplicate email registration is rejected", async ({ page, request }) => {
   await page.getByLabel("Full name").fill("Duplicate Attempt");
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Phone number").fill("712345678");
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByLabel("Confirm password").fill(password);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Create account" }).click();
 
@@ -80,7 +82,8 @@ test("registration is rejected without agreeing to the Terms of Service", async 
   await page.getByLabel("Full name").fill("No Terms");
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Phone number").fill("712345678");
-  await page.getByLabel("Password").fill("test-password-123");
+  await page.getByLabel("Password", { exact: true }).fill("test-password-123");
+  await page.getByLabel("Confirm password").fill("test-password-123");
   // Deliberately not checking the terms checkbox.
   await page.getByRole("button", { name: "Create account" }).click();
 
@@ -88,10 +91,36 @@ test("registration is rejected without agreeing to the Terms of Service", async 
   await expect(page).toHaveURL(/\/login$/);
 });
 
+test("registration is rejected when the passwords don't match", async ({ page }) => {
+  const unique = Date.now();
+  const email = `e2e-mismatch-${unique}@example.com`;
+
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Sign up" }).click();
+  await page.getByLabel("Full name").fill("Mismatch Attempt");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Phone number").fill("712345678");
+  // Check the box before touching the password fields — checking it later,
+  // right after a blur-triggered validation re-render, was flaky.
+  await page.getByRole("checkbox").check();
+  await expect(page.getByRole("checkbox")).toBeChecked();
+
+  await page.getByLabel("Password", { exact: true }).fill("test-password-123");
+  await page.getByLabel("Confirm password").fill("different-password-456");
+
+  // The live on-blur check should surface this before the button is even
+  // clicked — blur out of the confirm-password field to prove it.
+  await page.getByLabel("Full name").focus();
+  await expect(page.getByText("Passwords do not match")).toBeVisible();
+
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
 test("invalid login credentials are rejected", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Email address").fill("no-such-user@example.com");
-  await page.getByLabel("Password").fill("wrong-password");
+  await page.getByLabel("Password", { exact: true }).fill("wrong-password");
   await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
 
   await expect(page.getByText("Invalid email or password.")).toBeVisible();

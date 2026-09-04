@@ -15,6 +15,17 @@ const HOW_IT_WORKS = [
   { step: "04", title: "Upload & Earn", description: "Buy through our platform. Submit your purchase. Get rewarded." },
 ] as const;
 
+// Matches design/login-page.png and design/signup-page.png exactly.
+// NOTE (2026-09-05): these are the design mockup's own illustrative
+// figures, not numbers backed by real platform data — logged explicitly
+// in MVP_PROGRESS.md rather than silently treated as real metrics. Added
+// back per explicit instruction after being deliberately omitted earlier.
+const STATS = [
+  { value: "12,400+", label: "Cars listed" },
+  { value: "800+", label: "Verified dealers" },
+  { value: "47 cities", label: "Across Kenya" },
+] as const;
+
 export default async function LoginPage() {
   const supabase = await createClient();
   const {
@@ -74,6 +85,15 @@ export default async function LoginPage() {
                 </li>
               ))}
             </ol>
+          </div>
+
+          <div className="flex gap-8 border-t border-white/10 pt-6">
+            {STATS.map(({ value, label }) => (
+              <div key={label}>
+                <p className="font-display text-2xl font-semibold">{value}</p>
+                <p className="text-sm text-white/60">{label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </aside>

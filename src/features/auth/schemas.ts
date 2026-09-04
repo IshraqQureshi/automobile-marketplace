@@ -3,13 +3,16 @@ import { z } from "zod";
 // Password minimum matches supabase/config.toml's auth.minimum_password_length.
 // Keep these in sync — Supabase is the actual enforcement point; this is
 // only for fast client/server-side feedback before the request round-trips.
-const PASSWORD_MIN_LENGTH = 6;
+export const PASSWORD_MIN_LENGTH = 6;
 
 // Kenyan mobile numbers without the leading 0 or country code, e.g. "712345678"
 // (the UI supplies a fixed "+254" prefix — see auth-card.tsx).
 const KENYA_LOCAL_PHONE_REGEX = /^[17]\d{8}$/;
 
-export const signUpSchema = z.object({
+// Base object (not yet cross-field-refined) so its `.shape` stays available
+// for per-field client-side validation (validateField in auth-card.tsx) —
+// a z.object().refine() result no longer exposes `.shape` directly.
+const signUpBaseSchema = z.object({
   fullName: z.string().trim().min(1, "Full name is required").max(200),
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
   // The input's own placeholder ("7xx xxx xxx") models spaced input, and
@@ -22,13 +25,24 @@ export const signUpSchema = z.object({
     .transform((value) => value.replace(/[\s-]/g, "").replace(/^0/, ""))
     .pipe(z.string().regex(KENYA_LOCAL_PHONE_REGEX, "Enter a valid phone number (e.g. 712345678)")),
   password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
   termsAccepted: z.literal("true", { message: "You must agree to the Terms of Service and Privacy Policy" }),
 });
 
-export const signInSchema = z.object({
+export const signUpFieldSchemas = signUpBaseSchema.shape;
+
+export const signUpSchema = signUpBaseSchema.refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+const signInBaseSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
   password: z.string().min(1, "Password is required"),
 });
+
+export const signInFieldSchemas = signInBaseSchema.shape;
+export const signInSchema = signInBaseSchema;
 
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
