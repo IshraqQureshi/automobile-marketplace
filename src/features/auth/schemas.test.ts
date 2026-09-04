@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { signInSchema, signUpSchema } from "./schemas";
+import { requestPasswordResetSchema, resetPasswordSchema, signInSchema, signUpSchema } from "./schemas";
 
 const validSignUp = {
   fullName: "John Kamau",
@@ -108,6 +108,49 @@ describe("signInSchema", () => {
 
   it("rejects an invalid email", () => {
     const result = signInSchema.safeParse({ email: "not-an-email", password: "anything" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("requestPasswordResetSchema", () => {
+  it("accepts a valid email", () => {
+    const result = requestPasswordResetSchema.safeParse({ email: "john@example.com" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an invalid email", () => {
+    const result = requestPasswordResetSchema.safeParse({ email: "not-an-email" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a blank email", () => {
+    const result = requestPasswordResetSchema.safeParse({ email: "" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("resetPasswordSchema", () => {
+  it("accepts matching passwords at the minimum length", () => {
+    const result = resetPasswordSchema.safeParse({ password: "123456", confirmPassword: "123456" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a password shorter than the minimum", () => {
+    const result = resetPasswordSchema.safeParse({ password: "12345", confirmPassword: "12345" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects when confirmPassword doesn't match password", () => {
+    const result = resetPasswordSchema.safeParse({ password: "password123", confirmPassword: "different123" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === "confirmPassword");
+      expect(issue?.message).toBe("Passwords do not match");
+    }
+  });
+
+  it("rejects a blank confirmPassword", () => {
+    const result = resetPasswordSchema.safeParse({ password: "password123", confirmPassword: "" });
     expect(result.success).toBe(false);
   });
 });

@@ -4,7 +4,15 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
-import { type AuthActionState, signInSchema, signUpSchema } from "./schemas";
+import {
+  type AuthActionState,
+  requestPasswordResetSchema,
+  resetPasswordSchema,
+  signInSchema,
+  signUpSchema,
+} from "./schemas";
+
+const RESET_REQUESTED_MESSAGE = "If an account exists for that email, we've sent a password reset link.";
 
 const DUPLICATE_EMAIL_MESSAGE = "An account with this email already exists. Try logging in instead.";
 
@@ -35,10 +43,12 @@ export async function signUpAction(
   }
 
   const supabase = await createClient();
+  const origin = (await headers()).get("origin");
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
+      emailRedirectTo: `${origin}/auth/callback?next=/account`,
       data: { full_name: parsed.data.fullName, phone: `+254${parsed.data.phone}` },
     },
   });
@@ -115,6 +125,59 @@ export async function signInWithGoogleAction(): Promise<void> {
   }
 
   redirect(data.url);
+}
+
+export async function requestPasswordResetAction(
+  _prevState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const parsed = requestPasswordResetSchema.safeParse({ email: formData.get("email") });
+
+  if (!parsed.success) {
+    return { status: "error", fieldErrors: fieldErrorsFrom(parsed.error) };
+  }
+
+  const supabase = await createClient();
+  const origin = (await headers()).get("origin");
+
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${origin}/auth/callback?next=/reset-password`,
+  });
+
+  // Deliberately generic regardless of outcome — do not reveal whether the
+  // email exists (email-enumeration protection, same reasoning as signIn's
+  // "Invalid email or password").
+  if (error) {
+    logger.error("Password reset request failed", error);
+  }
+
+  return { status: "confirmation_required", message: RESET_REQUESTED_MESSAGE };
+}
+
+export async function resetPasswordAction(
+  _prevState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const parsed = resetPasswordSchema.safeParse({
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    return { status: "error", fieldErrors: fieldErrorsFrom(parsed.error) };
+  }
+
+  const supabase = await createClient();
+
+  // Requires an active recovery session, established by the code exchange
+  // in /auth/callback before this page is reachable — see reset-password/page.tsx.
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+
+  if (error) {
+    return { status: "error", message: error.message };
+  }
+
+  redirect("/account");
 }
 
 export async function signOutAction(): Promise<void> {

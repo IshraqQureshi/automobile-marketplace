@@ -1,12 +1,40 @@
 import { test, expect } from "@playwright/test";
 
+const MAILPIT_URL = "http://127.0.0.1:54324";
+
 /**
- * AUTH-001/AUTH-002 E2E journey: registration → account → logout → login →
- * account, plus protected-route enforcement. Requires a running local
- * Supabase instance (see playwright.config.ts webServer, which builds and
- * starts the Next.js app pointed at it).
+ * Fetches the most recent email sent to `email` from the local Mailpit
+ * instance and extracts the first link in its plain-text body. Used to
+ * drive real signup-confirmation and password-reset flows end-to-end,
+ * rather than stubbing the email step.
  */
-test("customer can register, land on their account, log out, and log back in", async ({ page }) => {
+async function getLatestEmailLink(email: string): Promise<string> {
+  const searchRes = await fetch(`${MAILPIT_URL}/api/v1/search?query=to:${encodeURIComponent(email)}`);
+  const search = await searchRes.json();
+  // Mailpit's search returns newest-first — [0] is the most recent message,
+  // which matters when a test sends this address more than one email (e.g.
+  // a signup confirmation followed later by a password-reset request).
+  const latest = search.messages?.[0];
+  if (!latest) throw new Error(`No email found for ${email}`);
+
+  const msgRes = await fetch(`${MAILPIT_URL}/api/v1/message/${latest.ID}`);
+  const msg = await msgRes.json();
+  const match = (msg.Text as string).match(/\(\s*(http\S+)\s*\)/);
+  const link = match?.[1];
+  if (!link) throw new Error(`No link found in email body: ${msg.Text}`);
+  return link;
+}
+
+/**
+ * AUTH-001/AUTH-002 E2E journey: registration → email confirmation → account
+ * → logout → login → account, plus protected-route enforcement. Requires a
+ * running local Supabase instance (see playwright.config.ts webServer, which
+ * builds and starts the Next.js app pointed at it) with Mailpit capturing
+ * outgoing auth emails (auth.email.enable_confirmations = true).
+ */
+test("customer can register, confirm their email, land on their account, log out, and log back in", async ({
+  page,
+}) => {
   const unique = Date.now();
   const email = `e2e-customer-${unique}@example.com`;
   const password = "test-password-123";
@@ -22,6 +50,11 @@ test("customer can register, land on their account, log out, and log back in", a
   await page.getByLabel("Confirm password").fill(password);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Create account" }).click();
+
+  await expect(page.getByText(/check your email to confirm/i)).toBeVisible();
+
+  const confirmLink = await getLatestEmailLink(email);
+  await page.goto(confirmLink);
 
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole("heading", { name: `Welcome, ${fullName}` })).toBeVisible();
@@ -59,6 +92,18 @@ test("duplicate email registration is rejected", async ({ page, request }) => {
     data: { email, password },
   });
 
+  // The duplicate-email check only applies to a *confirmed* account — GoTrue
+  // treats a second signUp for an unconfirmed address as a legitimate
+  // "resend confirmation" and responds with success, not an error. Confirm
+  // the seeded account first so the real duplicate-email path is exercised.
+  await page.goto(await getLatestEmailLink(email));
+
+  // GoTrue's auth.email.max_frequency ("1s") throttles a second confirmation
+  // email to the same address — the UI attempt below tries to send one too,
+  // so without this wait it hits the throttle instead of the actual
+  // duplicate-email check.
+  await page.waitForTimeout(1200);
+
   await page.goto("/login");
   await page.getByRole("tab", { name: "Sign up" }).click();
   await page.getByLabel("Full name").fill("Duplicate Attempt");
@@ -87,7 +132,7 @@ test("registration is rejected without agreeing to the Terms of Service", async 
   // Deliberately not checking the terms checkbox.
   await page.getByRole("button", { name: "Create account" }).click();
 
-  await expect(page.getByText(/agree to the Terms of Service/i)).toBeVisible();
+  await expect(page.getByText("You must agree to the Terms of Service and Privacy Policy")).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
 
@@ -125,4 +170,81 @@ test("invalid login credentials are rejected", async ({ page }) => {
 
   await expect(page.getByText("Invalid email or password.")).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test("password field has a working show/hide toggle", async ({ page }) => {
+  await page.goto("/login");
+
+  const passwordInput = page.getByLabel("Password", { exact: true });
+  await passwordInput.fill("some-password");
+  await expect(passwordInput).toHaveAttribute("type", "password");
+
+  await page.getByRole("button", { name: "Show password" }).click();
+  await expect(passwordInput).toHaveAttribute("type", "text");
+
+  await page.getByRole("button", { name: "Hide password" }).click();
+  await expect(passwordInput).toHaveAttribute("type", "password");
+});
+
+test("customer can reset a forgotten password end-to-end", async ({ page }) => {
+  const unique = Date.now();
+  const email = `e2e-reset-${unique}@example.com`;
+  const originalPassword = "original-password-123";
+  const newPassword = "brand-new-password-456";
+
+  // Register and confirm a real account first, so there's a real password to reset.
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Sign up" }).click();
+  await page.getByLabel("Full name").fill("Reset Flow");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Phone number").fill("712345678");
+  await page.getByLabel("Password", { exact: true }).fill(originalPassword);
+  await page.getByLabel("Confirm password").fill(originalPassword);
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText(/check your email to confirm/i)).toBeVisible();
+  await page.goto(await getLatestEmailLink(email));
+  await expect(page).toHaveURL(/\/account$/);
+  await page.getByRole("button", { name: "Log out" }).click();
+
+  // Request a reset link.
+  await page.goto("/login");
+  await page.getByRole("link", { name: "Forgot password?" }).click();
+  await expect(page).toHaveURL(/\/forgot-password$/);
+  await page.getByLabel("Email address").fill(email);
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await expect(page.getByText(/we've sent a password reset link/i)).toBeVisible();
+
+  // Follow the emailed link and set a new password.
+  const resetLink = await getLatestEmailLink(email);
+  await page.goto(resetLink);
+  await expect(page).toHaveURL(/\/reset-password$/);
+  await page.getByLabel("New password", { exact: true }).fill(newPassword);
+  await page.getByLabel("Confirm new password").fill(newPassword);
+  await page.getByRole("button", { name: "Update password" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await page.getByRole("button", { name: "Log out" }).click();
+
+  // The old password no longer works; the new one does.
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(originalPassword);
+  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await expect(page.getByText("Invalid email or password.")).toBeVisible();
+
+  // React resets uncontrolled form fields after every action dispatch
+  // (success or failure), so the email field must be re-filled too, not
+  // just the password.
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(newPassword);
+  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+});
+
+test("visiting the reset-password page without a valid recovery session shows an expired-link message", async ({
+  page,
+}) => {
+  await page.goto("/reset-password");
+  await expect(page.getByRole("heading", { name: "Link expired or invalid" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request a new link" })).toBeVisible();
 });
