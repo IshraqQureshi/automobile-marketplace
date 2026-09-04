@@ -51,7 +51,19 @@ async function uploadBrandLogo(supabase: SupabaseServerClient, brandId: string, 
   if (uploadError) return { error: uploadError };
 
   const { error: updateError } = await supabase.from("brands").update({ logo_storage_path: path }).eq("id", brandId);
-  return { error: updateError ?? null };
+  if (updateError) {
+    // The file uploaded but nothing will ever reference it — clean it up
+    // rather than leaving a permanent orphan (a fresh randomUUID path is
+    // generated on retry either way, so this exact object can't become
+    // reachable later).
+    const { error: cleanupError } = await supabase.storage.from("brand-logos").remove([path]);
+    if (cleanupError) {
+      logger.warn("Failed to clean up an orphaned brand logo upload", { brandId, path, error: cleanupError.message });
+    }
+    return { error: updateError };
+  }
+
+  return { error: null };
 }
 
 export async function createBrandAction(formData: FormData): Promise<CatalogActionResult> {
