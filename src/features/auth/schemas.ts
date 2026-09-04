@@ -75,5 +75,14 @@ export interface AuthActionState {
 }
 
 // Kept out of actions.ts: a "use server" module may only export async
-// functions, not plain values.
+// functions, not plain values or sync functions.
 export const initialAuthActionState: AuthActionState = { status: "idle" };
+
+export function fieldErrorsFrom(error: { issues: { path: PropertyKey[]; message: string }[] }) {
+  const fieldErrors: Partial<Record<string, string>> = {};
+  for (const issue of error.issues) {
+    const key = String(issue.path[0]);
+    if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+  }
+  return fieldErrors;
+}
