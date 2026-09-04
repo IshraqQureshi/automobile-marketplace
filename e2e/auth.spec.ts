@@ -122,6 +122,7 @@ test("duplicate email registration is rejected", async ({ page, request }) => {
   // typed (they'd have to redo everything just to fix one thing, e.g.
   // pick a different email).
   await expect(page.getByLabel("Full name")).toHaveValue("Duplicate Attempt");
+  await expect(page.getByLabel("Email address")).toHaveValue(email);
   await expect(page.getByLabel("Phone number")).toHaveValue("712345678");
   await expect(page.getByLabel("Password", { exact: true })).toHaveValue(password);
   await expect(page.getByLabel("Confirm password")).toHaveValue(password);
