@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { TagIcon } from "@/components/admin/catalog-ui";
 import { adminSignOutAction } from "@/features/admin/actions";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +20,7 @@ const OVERVIEW_ITEMS: NavEntry[] = [{ label: "Dashboard", href: "/admin", icon: 
 // Brands/Model/Type nav (src/components/layout/header.tsx) rather than
 // linking somewhere that 404s.
 const MARKETPLACE_ITEMS: NavEntry[] = [
-  { label: "Catalog", href: "/admin/catalog", icon: CatalogIcon },
+  { label: "Catalog", href: "/admin/catalog", icon: () => <TagIcon className="h-4.25 w-4.25" /> },
   { label: "Showrooms", href: null, icon: ShowroomIcon },
   { label: "Vehicles", href: null, icon: VehicleIcon },
 ];
@@ -124,15 +125,6 @@ function DashboardIcon() {
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
-    </svg>
-  );
-}
-
-function CatalogIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
-      <path d="M20.6 12.9 12.9 20.6a2 2 0 0 1-2.8 0l-7.7-7.7a2 2 0 0 1 0-2.8L10.1 2.4a2 2 0 0 1 1.4-.6h5.5a2 2 0 0 1 2 2v5.5a2 2 0 0 1-.4 1.6Z" />
-      <circle cx="15.5" cy="6.5" r="1.25" fill="currentColor" stroke="none" />
     </svg>
   );
 }
