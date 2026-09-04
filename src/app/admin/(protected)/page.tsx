@@ -11,6 +11,11 @@ interface AdminDashboardPageProps {
   searchParams: Promise<{ error?: string }>;
 }
 
+function countOrError(result: { count: number | null; error: unknown }): { value: string; isError: boolean } {
+  if (result.error) return { value: "—", isError: true };
+  return { value: String(result.count ?? 0), isError: false };
+}
+
 export default async function AdminDashboardPage({ searchParams }: AdminDashboardPageProps) {
   const { error } = await searchParams;
   const supabase = await createClient();
@@ -38,11 +43,14 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
     }
   }
 
+  // A failed query and a genuine zero must not look the same — an admin
+  // reading "0 pending showrooms" needs that to mean zero, not "the count
+  // query failed and we hid it behind a fallback."
   const stats = [
-    { label: "Pending showrooms", value: pendingShowrooms.count ?? 0, hint: "Awaiting review" },
-    { label: "Approved showrooms", value: approvedShowrooms.count ?? 0, hint: "Live on the marketplace" },
-    { label: "Vehicles listed", value: activeVehicles.count ?? 0, hint: "Active listings" },
-    { label: "Registered users", value: users.count ?? 0, hint: "Customers & showrooms" },
+    { label: "Pending showrooms", ...countOrError(pendingShowrooms), hint: "Awaiting review" },
+    { label: "Approved showrooms", ...countOrError(approvedShowrooms), hint: "Live on the marketplace" },
+    { label: "Vehicles listed", ...countOrError(activeVehicles), hint: "Active listings" },
+    { label: "Registered users", ...countOrError(users), hint: "Customers & showrooms" },
   ];
 
   return (
@@ -60,8 +68,12 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
             {stats.map((stat) => (
               <div key={stat.label} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                 <p className="text-xs font-medium text-neutral-500">{stat.label}</p>
-                <p className="mt-2 font-mono text-2xl font-semibold text-neutral-900">{stat.value}</p>
-                <p className="mt-1 text-xs text-neutral-400">{stat.hint}</p>
+                <p
+                  className={`mt-2 font-mono text-2xl font-semibold ${stat.isError ? "text-neutral-300" : "text-neutral-900"}`}
+                >
+                  {stat.value}
+                </p>
+                <p className="mt-1 text-xs text-neutral-400">{stat.isError ? "Couldn't load" : stat.hint}</p>
               </div>
             ))}
           </section>

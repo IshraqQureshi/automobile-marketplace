@@ -5,7 +5,7 @@ import Link from "next/link";
  * not live data or real destinations — no vehicle taxonomy exists yet
  * (MKT-003) and there are no real HarakaGari social accounts. Rendered as
  * inert text rather than dead/misleading links. Legal links are real —
- * see the stub pages under src/app/(legal) and blocker B-006 for real
+ * see the stub pages under src/app/(site)/(legal) and blocker B-006 for real
  * content.
  */
 const FOOTER_COLUMNS = {

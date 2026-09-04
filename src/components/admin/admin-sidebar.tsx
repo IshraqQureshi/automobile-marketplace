@@ -35,6 +35,11 @@ export function AdminSidebar({ email }: AdminSidebarProps) {
           Overview
         </span>
         {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+          // Exact match is correct today (every NAV_ITEMS entry is a
+          // top-level page). Once a real /admin/showrooms-style section
+          // gets nested detail routes (Day 2/4), this needs
+          // pathname.startsWith(href) instead, or a detail sub-page won't
+          // highlight its parent nav item.
           const active = pathname === href;
           return (
             <Link
@@ -97,7 +102,7 @@ export function AdminSidebar({ email }: AdminSidebarProps) {
 
 function DashboardIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[17px] w-[17px]" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <rect x="3" y="3" width="7" height="9" rx="1.5" />
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
@@ -108,7 +113,7 @@ function DashboardIcon() {
 
 function ShowroomIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[17px] w-[17px]" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <path d="M3 9.5 12 3l9 6.5" />
       <path d="M5 9v11h14V9" />
     </svg>
@@ -117,7 +122,7 @@ function ShowroomIcon() {
 
 function VehicleIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[17px] w-[17px]" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <path d="M3 13l1.6-5.2A2 2 0 0 1 6.5 6.5h11a2 2 0 0 1 1.9 1.3L21 13" />
       <rect x="3" y="13" width="18" height="6" rx="1.5" />
     </svg>
@@ -126,7 +131,7 @@ function VehicleIcon() {
 
 function UsersIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[17px] w-[17px]" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
