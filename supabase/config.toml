@@ -232,15 +232,19 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Local/staging dev mailer — Mailtrap sandbox inbox (nothing sent to real
+# addresses, just captured for inspection). Credentials come from
+# .env.local (gitignored — see .env.example), never committed. Production
+# will use real Google Workspace SMTP once the client supplies credentials
+# (see MVP_PROGRESS.md blocker for this — swap the values below then).
+[auth.email.smtp]
+enabled = true
+host = "sandbox.smtp.mailtrap.io"
+port = 2525
+user = "env(MAILTRAP_SMTP_USER)"
+pass = "env(MAILTRAP_SMTP_PASS)"
+admin_email = "noreply@harakagari.local"
+sender_name = "HarakaGari"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
