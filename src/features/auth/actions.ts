@@ -15,6 +15,7 @@ import {
 const RESET_REQUESTED_MESSAGE = "If an account exists for that email, we've sent a password reset link.";
 
 const DUPLICATE_EMAIL_MESSAGE = "An account with this email already exists. Try logging in instead.";
+const RATE_LIMITED_MESSAGE = "We're sending a lot of emails right now — please wait a few minutes and try again.";
 
 function fieldErrorsFrom(error: { issues: { path: PropertyKey[]; message: string }[] }) {
   const fieldErrors: Partial<Record<string, string>> = {};
@@ -54,14 +55,23 @@ export async function signUpAction(
   });
 
   if (error) {
-    // With email confirmations disabled (as in local dev — see
-    // supabase/config.toml auth.email.enable_confirmations), Supabase has
-    // nothing to hide and returns an explicit user_already_exists error
-    // directly, rather than the ambiguous "success" response its
-    // email-enumeration protection uses when confirmations are required.
-    // Verified against the actual local API response, not assumed.
+    // A brand-new signup gets this error directly. A duplicate *unconfirmed*
+    // account instead gets treated as a "resend confirmation" (see the
+    // over_email_send_rate_limit branch below for why that matters) and a
+    // duplicate *confirmed* account is handled by the empty-identities check
+    // further down — all three paths are real, verified against the actual
+    // local API responses, not assumed.
     if (error.code === "user_already_exists") {
       return { status: "error", message: DUPLICATE_EMAIL_MESSAGE };
+    }
+    // Resending a confirmation email (the duplicate-unconfirmed-account path
+    // above) counts against the same per-project email-send cap as a fresh
+    // signup — so a user retrying a signup they didn't receive, or testing
+    // duplicate-email handling, can hit this instead of a clean
+    // already-exists response. Never leak GoTrue's raw error text for this.
+    if (error.code === "over_email_send_rate_limit") {
+      logger.error("Signup hit the email send rate limit", error);
+      return { status: "error", message: RATE_LIMITED_MESSAGE };
     }
     return { status: "error", message: error.message };
   }

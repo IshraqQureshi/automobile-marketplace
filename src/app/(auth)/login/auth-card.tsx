@@ -54,6 +54,21 @@ function GoogleButton() {
 function LoginForm() {
   const [state, formAction, pending] = useActionState(signInAction, initialAuthActionState);
   const { validate, errorFor } = useFieldValidation(signInFieldSchemas);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  // React resets uncontrolled form fields after every action dispatch —
+  // success or failure. These fields are controlled specifically so a
+  // failed login doesn't silently wipe what the user typed; only the
+  // password is deliberately cleared on failure (common security-conscious
+  // convention), the email address is preserved. Reacting to the new
+  // `state` during render (not in an effect) avoids an extra
+  // render-then-effect cascade for what's really "derived from a prop".
+  const [prevState, setPrevState] = useState(state);
+  if (state !== prevState) {
+    setPrevState(state);
+    if (state.status === "error") setPassword("");
+  }
 
   const emailError = errorFor("email", state.fieldErrors?.email);
   const passwordError = errorFor("password", state.fieldErrors?.password);
@@ -75,6 +90,8 @@ function LoginForm() {
           autoComplete="email"
           required
           error={!!emailError}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           onBlur={(e) => validate("email", e.target.value)}
         />
         {emailError && <p className="mt-1 text-sm text-red-600">{emailError}</p>}
@@ -94,6 +111,8 @@ function LoginForm() {
           autoComplete="current-password"
           required
           error={!!passwordError}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           onBlur={(e) => validate("password", e.target.value)}
         />
         {passwordError && <p className="mt-1 text-sm text-red-600">{passwordError}</p>}
@@ -108,14 +127,37 @@ function LoginForm() {
 function SignUpForm() {
   const [state, formAction, pending] = useActionState(signUpAction, initialAuthActionState);
   const { validate, errorFor } = useFieldValidation(signUpFieldSchemas);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [confirmTouched, setConfirmTouched] = useState(false);
 
-  if (state.status === "confirmation_required") {
-    return (
-      <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{state.message}</p>
-    );
+  // React resets uncontrolled form fields after every action dispatch —
+  // success or failure. All fields are controlled specifically so a failed
+  // submission (e.g. re-checking the terms box after a validation error)
+  // doesn't silently wipe the rest of what the user typed. On genuine
+  // success, clear everything back to empty and keep the form visible
+  // (rather than replacing it) so the success message reads as a status,
+  // not a full-page takeover. Reacting to the new `state` during render
+  // (not in an effect) avoids an extra render-then-effect cascade for
+  // what's really "derived from a prop".
+  const [prevState, setPrevState] = useState(state);
+  const [dispatchCount, setDispatchCount] = useState(0);
+  if (state !== prevState) {
+    setPrevState(state);
+    setDispatchCount((c) => c + 1);
+    if (state.status === "confirmation_required") {
+      setFullName("");
+      setEmail("");
+      setPhone("");
+      setPassword("");
+      setConfirmPassword("");
+      setTermsAccepted(false);
+      setConfirmTouched(false);
+    }
   }
 
   const fullNameError = errorFor("fullName", state.fieldErrors?.fullName);
@@ -133,6 +175,9 @@ function SignUpForm() {
       {state.status === "error" && state.message && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.message}</p>
       )}
+      {state.status === "confirmation_required" && (
+        <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{state.message}</p>
+      )}
       <div>
         <label htmlFor="signup-name" className="mb-1 block text-sm font-medium text-neutral-700">
           Full name
@@ -145,6 +190,8 @@ function SignUpForm() {
           autoComplete="name"
           required
           error={!!fullNameError}
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
           onBlur={(e) => validate("fullName", e.target.value)}
         />
         {fullNameError && <p className="mt-1 text-sm text-red-600">{fullNameError}</p>}
@@ -161,6 +208,8 @@ function SignUpForm() {
           autoComplete="email"
           required
           error={!!emailError}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           onBlur={(e) => validate("email", e.target.value)}
         />
         {emailError && <p className="mt-1 text-sm text-red-600">{emailError}</p>}
@@ -182,6 +231,8 @@ function SignUpForm() {
             autoComplete="tel-national"
             required
             error={!!phoneError}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
             onBlur={(e) => validate("phone", e.target.value)}
             className="flex-1"
           />
@@ -223,7 +274,24 @@ function SignUpForm() {
       </div>
       <div>
         <label className="flex items-start gap-2 text-sm text-neutral-600">
-          <input type="checkbox" name="termsAccepted" value="true" required className="mt-0.5" />
+          <input
+            // React calls the DOM form's native reset() after every action
+            // dispatch, which force-unchecks this checkbox directly in the
+            // DOM. Since our own `checked` prop value doesn't itself change
+            // on a failed submission, React has no reason to re-apply it,
+            // so the DOM and React's state silently desync — the box shows
+            // unchecked even though `termsAccepted` is still true. Keying
+            // on dispatchCount forces a fresh DOM node every dispatch,
+            // which always reflects the current React state.
+            key={dispatchCount}
+            type="checkbox"
+            name="termsAccepted"
+            value="true"
+            required
+            className="mt-0.5"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+          />
           <span>
             I agree to the{" "}
             <Link href="/terms" target="_blank" className="text-brand hover:underline">

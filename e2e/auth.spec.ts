@@ -116,6 +116,45 @@ test("duplicate email registration is rejected", async ({ page, request }) => {
 
   await expect(page.getByText(/already exists/i)).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
+
+  // React resets uncontrolled form fields after every action dispatch —
+  // a failed submission must not silently wipe what the user already
+  // typed (they'd have to redo everything just to fix one thing, e.g.
+  // pick a different email).
+  await expect(page.getByLabel("Full name")).toHaveValue("Duplicate Attempt");
+  await expect(page.getByLabel("Phone number")).toHaveValue("712345678");
+  await expect(page.getByLabel("Password", { exact: true })).toHaveValue(password);
+  await expect(page.getByLabel("Confirm password")).toHaveValue(password);
+  await expect(page.getByRole("checkbox")).toBeChecked();
+});
+
+test("signup form stays visible, shows a success message, and resets after a successful submission", async ({
+  page,
+}) => {
+  const unique = Date.now();
+  const email = `e2e-success-reset-${unique}@example.com`;
+
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Sign up" }).click();
+  await page.getByLabel("Full name").fill("Success Reset");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Phone number").fill("712345678");
+  await page.getByLabel("Password", { exact: true }).fill("test-password-123");
+  await page.getByLabel("Confirm password").fill("test-password-123");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Create account" }).click();
+
+  await expect(page.getByText(/check your email to confirm/i)).toBeVisible();
+
+  // The form itself must still be there (not replaced by the message) —
+  // and reset back to empty, ready for another submission.
+  await expect(page.getByLabel("Full name")).toBeVisible();
+  await expect(page.getByLabel("Full name")).toHaveValue("");
+  await expect(page.getByLabel("Email address")).toHaveValue("");
+  await expect(page.getByLabel("Phone number")).toHaveValue("");
+  await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Confirm password")).toHaveValue("");
+  await expect(page.getByRole("checkbox")).not.toBeChecked();
 });
 
 test("registration is rejected without agreeing to the Terms of Service", async ({ page }) => {
