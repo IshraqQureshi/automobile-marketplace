@@ -246,16 +246,34 @@ pass = "env(MAILTRAP_SMTP_PASS)"
 admin_email = "noreply@harakagari.local"
 sender_name = "HarakaGari"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Branded HTML templates (see scripts/generate-email-templates.mjs — the
+# source of truth; re-run it and `supabase stop && supabase start` after
+# editing that script, don't hand-edit the generated HTML here).
+[auth.email.template.confirmation]
+subject = "Confirm your email — HarakaGari"
+content_path = "./supabase/templates/confirmation.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./supabase/templates/password_changed_notification.html"
+[auth.email.template.recovery]
+subject = "Reset your password — HarakaGari"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new email — HarakaGari"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.invite]
+subject = "You've been invited to HarakaGari"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Your password was changed — HarakaGari"
+content_path = "./supabase/templates/password_changed_notification.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "Your email address was changed — HarakaGari"
+content_path = "./supabase/templates/email_changed_notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
