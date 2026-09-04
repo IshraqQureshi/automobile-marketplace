@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import {
   type AuthActionState,
+  fieldErrorsFrom,
   requestPasswordResetSchema,
   resetPasswordSchema,
   signInSchema,
@@ -17,13 +18,22 @@ const RESET_REQUESTED_MESSAGE = "If an account exists for that email, we've sent
 const DUPLICATE_EMAIL_MESSAGE = "An account with this email already exists. Try logging in instead.";
 const RATE_LIMITED_MESSAGE = "We're sending a lot of emails right now — please wait a few minutes and try again.";
 
-function fieldErrorsFrom(error: { issues: { path: PropertyKey[]; message: string }[] }) {
-  const fieldErrors: Partial<Record<string, string>> = {};
-  for (const issue of error.issues) {
-    const key = String(issue.path[0]);
-    if (!fieldErrors[key]) fieldErrors[key] = issue.message;
-  }
-  return fieldErrors;
+/**
+ * Reads the currently-authenticated user's role from their own `profiles`
+ * row (allowed under RLS — everyone can read their own profile). Shared by
+ * signInAction (rejects ADMIN) and adminSignInAction (requires ADMIN) so the
+ * customer/showroom and admin login surfaces stay genuinely separate.
+ */
+export async function currentUserRole(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<"CUSTOMER" | "SHOWROOM" | "ADMIN" | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  return profile?.role ?? null;
 }
 
 export async function signUpAction(
@@ -117,6 +127,24 @@ export async function signInAction(
     return { status: "error", message: "Invalid email or password." };
   }
 
+  // This login is for customers and showrooms only — admin has its own
+  // surface at /admin/login. Reject and sign back out rather than let an
+  // admin session start here. Reusing the same generic message (not
+  // "use the admin login instead") deliberately avoids confirming to
+  // whoever's at the keyboard that these credentials belong to an admin
+  // account — same reasoning as the "Invalid email or password" above.
+  const role = await currentUserRole(supabase);
+  if (role === "ADMIN") {
+    // scope: "local" — sign out only the session this attempt just created,
+    // not every session this admin has elsewhere. supabase-js defaults
+    // signOut() to "global" scope, which would otherwise kill a legitimate
+    // active admin session on another device just because someone (or the
+    // admin themselves, by habit) tried these credentials on the wrong
+    // login form.
+    await supabase.auth.signOut({ scope: "local" });
+    return { status: "error", message: "Invalid email or password." };
+  }
+
   redirect("/account");
 }
 
@@ -192,7 +220,10 @@ export async function resetPasswordAction(
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.auth.signOut();
+  // scope: "local" — log out of this device only. supabase-js defaults to
+  // "global" (all sessions everywhere), which isn't what a single "Log out"
+  // button on one device should do.
+  const { error } = await supabase.auth.signOut({ scope: "local" });
 
   if (error) {
     // Do not redirect to /login implying success — that would let a user
