@@ -1,0 +1,95 @@
+import type { Metadata } from "next";
+import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { logger } from "@/lib/logger";
+import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "Admin — HarakaGari",
+};
+
+interface AdminDashboardPageProps {
+  searchParams: Promise<{ error?: string }>;
+}
+
+export default async function AdminDashboardPage({ searchParams }: AdminDashboardPageProps) {
+  const { error } = await searchParams;
+  const supabase = await createClient();
+
+  // Real counts, not placeholders — showroom/vehicle management (Day 2)
+  // hasn't shipped yet, so these are honestly 0 right now. `is_admin()` is
+  // OR'd into each table's SELECT policy, so an authenticated admin gets an
+  // unrestricted count here through the regular (RLS-scoped) client —
+  // verified against the actual policy SQL, no service-role client needed.
+  const [pendingShowrooms, approvedShowrooms, activeVehicles, users] = await Promise.all([
+    supabase.from("showrooms").select("*", { count: "exact", head: true }).eq("status", "PENDING"),
+    supabase.from("showrooms").select("*", { count: "exact", head: true }).eq("status", "APPROVED"),
+    supabase.from("vehicles").select("*", { count: "exact", head: true }).eq("status", "ACTIVE"),
+    supabase.from("profiles").select("*", { count: "exact", head: true }),
+  ]);
+
+  for (const [label, result] of [
+    ["pending showrooms", pendingShowrooms],
+    ["approved showrooms", approvedShowrooms],
+    ["active vehicles", activeVehicles],
+    ["users", users],
+  ] as const) {
+    if (result.error) {
+      logger.error(`Admin dashboard: failed to count ${label}`, result.error);
+    }
+  }
+
+  const stats = [
+    { label: "Pending showrooms", value: pendingShowrooms.count ?? 0, hint: "Awaiting review" },
+    { label: "Approved showrooms", value: approvedShowrooms.count ?? 0, hint: "Live on the marketplace" },
+    { label: "Vehicles listed", value: activeVehicles.count ?? 0, hint: "Active listings" },
+    { label: "Registered users", value: users.count ?? 0, hint: "Customers & showrooms" },
+  ];
+
+  return (
+    <>
+      <AdminTopbar title="Dashboard" />
+      <main className="flex-1 px-7 py-6">
+        <div className="flex flex-col gap-6">
+          {error === "sign_out_failed" && (
+            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+              Logging out failed. Please try again.
+            </p>
+          )}
+
+          <section className="grid grid-cols-4 gap-3.5">
+            {stats.map((stat) => (
+              <div key={stat.label} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-medium text-neutral-500">{stat.label}</p>
+                <p className="mt-2 font-mono text-2xl font-semibold text-neutral-900">{stat.value}</p>
+                <p className="mt-1 text-xs text-neutral-400">{stat.hint}</p>
+              </div>
+            ))}
+          </section>
+
+          <section className="grid grid-cols-[2fr_300px] gap-4">
+            <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+              <div className="border-b border-neutral-200 px-5 py-4">
+                <h2 className="font-display text-base font-semibold text-neutral-900">Pending approvals</h2>
+                <p className="text-xs text-neutral-500">New showroom and listing submissions</p>
+              </div>
+              <div className="flex flex-col items-center justify-center gap-1 px-5 py-14 text-center">
+                <p className="text-sm font-medium text-neutral-500">No pending submissions yet</p>
+                <p className="text-xs text-neutral-400">Showroom and vehicle management launches in Day 2.</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+              <div className="border-b border-neutral-200 px-5 py-4">
+                <h2 className="font-display text-base font-semibold text-neutral-900">Recent activity</h2>
+                <p className="text-xs text-neutral-500">Last 24 hours</p>
+              </div>
+              <div className="flex flex-col items-center justify-center gap-1 px-5 py-14 text-center">
+                <p className="text-sm font-medium text-neutral-500">No activity yet</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </>
+  );
+}
