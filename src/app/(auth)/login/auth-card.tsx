@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { cn } from "@/lib/utils";
 import { signInAction, signInWithGoogleAction, signUpAction } from "@/features/auth/actions";
 import {
@@ -83,14 +84,13 @@ function LoginForm() {
           <label htmlFor="login-password" className="block text-sm font-medium text-neutral-700">
             Password
           </label>
-          <span className="text-sm text-neutral-400" title="Password reset isn't available yet">
+          <Link href="/forgot-password" className="text-sm text-brand hover:underline">
             Forgot password?
-          </span>
+          </Link>
         </div>
-        <Input
+        <PasswordInput
           id="login-password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           error={!!passwordError}
@@ -192,10 +192,9 @@ function SignUpForm() {
         <label htmlFor="signup-password" className="mb-1 block text-sm font-medium text-neutral-700">
           Password
         </label>
-        <Input
+        <PasswordInput
           id="signup-password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           error={!!passwordError}
@@ -210,10 +209,9 @@ function SignUpForm() {
         <label htmlFor="signup-confirm-password" className="mb-1 block text-sm font-medium text-neutral-700">
           Confirm password
         </label>
-        <Input
+        <PasswordInput
           id="signup-confirm-password"
           name="confirmPassword"
-          type="password"
           autoComplete="new-password"
           required
           error={!!confirmPasswordError}

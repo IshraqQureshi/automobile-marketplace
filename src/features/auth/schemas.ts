@@ -44,8 +44,29 @@ const signInBaseSchema = z.object({
 export const signInFieldSchemas = signInBaseSchema.shape;
 export const signInSchema = signInBaseSchema;
 
+const requestPasswordResetBaseSchema = z.object({
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+});
+
+export const requestPasswordResetFieldSchemas = requestPasswordResetBaseSchema.shape;
+export const requestPasswordResetSchema = requestPasswordResetBaseSchema;
+
+const resetPasswordBaseSchema = z.object({
+  password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
+});
+
+export const resetPasswordFieldSchemas = resetPasswordBaseSchema.shape;
+
+export const resetPasswordSchema = resetPasswordBaseSchema.refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
+export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export interface AuthActionState {
   status: "idle" | "error" | "confirmation_required";
