@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
-import { catalogNameSchema } from "./catalog-schemas";
+import { ALLOWED_LOGO_MIME_TYPES, MAX_LOGO_SIZE_BYTES, catalogNameSchema } from "./catalog-schemas";
 
 export interface CatalogActionResult {
   error?: string;
@@ -26,32 +26,114 @@ export interface CatalogActionResult {
 // false "success".
 const NOT_FOUND_ERROR = "Not found, or you don't have permission to do that.";
 
-export async function createBrandAction(name: string): Promise<CatalogActionResult> {
-  const parsed = catalogNameSchema.safeParse(name);
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+function validateLogoFile(file: File): string | null {
+  if (!ALLOWED_LOGO_MIME_TYPES.includes(file.type as (typeof ALLOWED_LOGO_MIME_TYPES)[number])) {
+    return "Logo must be a JPG, PNG, WEBP, or SVG file.";
+  }
+  if (file.size > MAX_LOGO_SIZE_BYTES) {
+    return "Logo must be smaller than 2MB.";
+  }
+  return null;
+}
+
+// Uploads a new logo file and records its path on the brand row. Not
+// rolled back on failure the way showroom document uploads are — unlike a
+// showroom registration, a brand with no (or an unchanged) logo is a
+// perfectly valid, non-stuck state the admin can freely retry from the
+// same edit form, so there's no unrecoverable dead end to guard against.
+async function uploadBrandLogo(supabase: SupabaseServerClient, brandId: string, file: File) {
+  const extension = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+  const path = `${brandId}/logo-${crypto.randomUUID()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage.from("brand-logos").upload(path, file, { contentType: file.type, upsert: false });
+  if (uploadError) return { error: uploadError };
+
+  const { error: updateError } = await supabase.from("brands").update({ logo_storage_path: path }).eq("id", brandId);
+  return { error: updateError ?? null };
+}
+
+export async function createBrandAction(formData: FormData): Promise<CatalogActionResult> {
+  const parsed = catalogNameSchema.safeParse(formData.get("name"));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
 
+  const logoEntry = formData.get("logo");
+  const logoFile = logoEntry instanceof File && logoEntry.size > 0 ? logoEntry : null;
+  if (logoFile) {
+    const logoError = validateLogoFile(logoFile);
+    if (logoError) return { error: logoError };
+  }
+
   const supabase = await createClient();
-  const { error } = await supabase.from("brands").insert({ name: parsed.data });
-  if (error) {
+  const { data: brand, error } = await supabase.from("brands").insert({ name: parsed.data }).select("id").single();
+  if (error || !brand) {
     logger.error("Failed to create brand", error);
-    return { error: error.code === "23505" ? "A brand with this name already exists." : "Failed to create brand." };
+    return { error: error?.code === "23505" ? "A brand with this name already exists." : "Failed to create brand." };
+  }
+
+  if (logoFile) {
+    const { error: logoError } = await uploadBrandLogo(supabase, brand.id, logoFile);
+    if (logoError) {
+      logger.error("Failed to upload brand logo", logoError, { brandId: brand.id });
+      revalidatePath("/admin/catalog");
+      return { error: "Brand created, but the logo failed to upload. Edit the brand to try again." };
+    }
   }
 
   revalidatePath("/admin/catalog");
   return {};
 }
 
-export async function updateBrandAction(id: string, name: string): Promise<CatalogActionResult> {
-  const parsed = catalogNameSchema.safeParse(name);
+export async function updateBrandAction(formData: FormData): Promise<CatalogActionResult> {
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) return { error: "Missing brand id." };
+
+  const parsed = catalogNameSchema.safeParse(formData.get("name"));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
 
+  const logoEntry = formData.get("logo");
+  const logoFile = logoEntry instanceof File && logoEntry.size > 0 ? logoEntry : null;
+  const removeLogo = formData.get("removeLogo") === "true";
+  if (logoFile) {
+    const logoError = validateLogoFile(logoFile);
+    if (logoError) return { error: logoError };
+  }
+
   const supabase = await createClient();
-  const { data, error } = await supabase.from("brands").update({ name: parsed.data }).eq("id", id).select("id");
+
+  let previousLogoPath: string | null = null;
+  if (logoFile || removeLogo) {
+    const { data: existing } = await supabase.from("brands").select("logo_storage_path").eq("id", id).maybeSingle();
+    previousLogoPath = existing?.logo_storage_path ?? null;
+  }
+
+  const { data, error } = await supabase
+    .from("brands")
+    .update({ name: parsed.data, ...(removeLogo && !logoFile ? { logo_storage_path: null } : {}) })
+    .eq("id", id)
+    .select("id");
   if (error) {
     logger.error("Failed to update brand", error, { id });
     return { error: error.code === "23505" ? "A brand with this name already exists." : "Failed to update brand." };
   }
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
+
+  if (logoFile) {
+    const { error: logoError } = await uploadBrandLogo(supabase, id, logoFile);
+    if (logoError) {
+      logger.error("Failed to upload brand logo", logoError, { brandId: id });
+      revalidatePath("/admin/catalog");
+      return { error: "Name updated, but the new logo failed to upload. Try again." };
+    }
+  }
+
+  if ((logoFile || removeLogo) && previousLogoPath) {
+    const { error: removeError } = await supabase.storage.from("brand-logos").remove([previousLogoPath]);
+    if (removeError) {
+      logger.warn("Failed to remove a brand's previous logo file", { brandId: id, previousLogoPath, error: removeError.message });
+    }
+  }
 
   revalidatePath("/admin/catalog");
   return {};
@@ -59,12 +141,22 @@ export async function updateBrandAction(id: string, name: string): Promise<Catal
 
 export async function deleteBrandAction(id: string): Promise<CatalogActionResult> {
   const supabase = await createClient();
+
+  const { data: existing } = await supabase.from("brands").select("logo_storage_path").eq("id", id).maybeSingle();
+
   const { data, error } = await supabase.from("brands").delete().eq("id", id).select("id");
   if (error) {
     logger.error("Failed to delete brand", error, { id });
     return { error: "Failed to delete brand." };
   }
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
+
+  if (existing?.logo_storage_path) {
+    const { error: removeError } = await supabase.storage.from("brand-logos").remove([existing.logo_storage_path]);
+    if (removeError) {
+      logger.warn("Failed to remove a deleted brand's logo file", { brandId: id, path: existing.logo_storage_path, error: removeError.message });
+    }
+  }
 
   revalidatePath("/admin/catalog");
   return {};
