@@ -123,9 +123,12 @@ export function UploadIcon() {
   );
 }
 
-export function TagIcon() {
+// Also used as the admin sidebar's "Catalog" nav icon (imported from here
+// rather than duplicated) — className lets each caller size it for its own
+// context (nav row vs. this file's card-header badge).
+export function TagIcon({ className = "h-4.5 w-4.5" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.5 w-4.5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
       <path d="M20.6 12.9 12.9 20.6a2 2 0 0 1-2.8 0l-7.7-7.7a2 2 0 0 1 0-2.8L10.1 2.4a2 2 0 0 1 1.4-.6h5.5a2 2 0 0 1 2 2v5.5a2 2 0 0 1-.4 1.6Z" />
       <circle cx="15.5" cy="6.5" r="1.25" fill="currentColor" stroke="none" />
     </svg>
