@@ -18,7 +18,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const CONFIG_PATH = "supabase/config.toml";
-const SMTP_SECTION = /(\[auth\.email\.smtp\]\s*\n(?:[^\n]*\n)*?enabled = )(true|false)/;
+// Bounded to the [auth.email.smtp] section only — the lookahead stops the
+// match from crossing into the next [section] header, so a missing/renamed
+// `enabled` line inside this block throws instead of silently toggling an
+// unrelated section's `enabled` flag.
+const SMTP_SECTION = /(\[auth\.email\.smtp\]\s*\n(?:(?!\[)[^\n]*\n)*?enabled = )(true|false)/;
 
 function readSmtpEnabled(content) {
   const match = content.match(SMTP_SECTION);
