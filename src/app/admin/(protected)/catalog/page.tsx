@@ -3,6 +3,7 @@ import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { CatalogBrandsList } from "@/components/admin/catalog-brands-list";
 import { CatalogList } from "@/components/admin/catalog-list";
 import { CatalogModelsList } from "@/components/admin/catalog-models-list";
+import { LayersIcon } from "@/components/admin/catalog-ui";
 import {
   createBrandAction,
   createModelAction,
@@ -89,6 +90,7 @@ export default async function AdminCatalogPage() {
           />
 
           <CatalogList
+            icon={<LayersIcon />}
             title="Types"
             description="Body / fuel category"
             items={typeItems}

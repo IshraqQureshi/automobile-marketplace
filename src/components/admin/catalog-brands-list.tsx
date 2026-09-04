@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState, useTransition } from "react";
+import { CatalogCardHeader, CheckIcon, MetaBadge, PencilIcon, PlusIcon, RowIconButton, TagIcon, TrashIcon, UploadIcon, XIcon } from "./catalog-ui";
 
 export interface BrandItem {
   id: string;
@@ -24,6 +25,8 @@ interface CatalogBrandsListProps {
   // renders this list down to this Client Component.
   deleteWarning?: string;
 }
+
+const LOGO_ACCEPT = "image/jpeg,image/png,image/webp,image/svg+xml";
 
 /**
  * Brands get their own CRUD list (rather than reusing CatalogList, which
@@ -108,13 +111,10 @@ export function CatalogBrandsList({
 
   return (
     <div data-testid={`catalog-list-${title.toLowerCase()}`} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-      <div className="border-b border-neutral-200 px-5 py-4">
-        <h2 className="font-display text-base font-semibold text-neutral-900">{title}</h2>
-        <p className="text-xs text-neutral-500">{description}</p>
-      </div>
+      <CatalogCardHeader icon={<TagIcon />} title={title} description={description} count={items.length} />
 
       <div className="border-b border-neutral-200 px-5 py-3">
-        {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+        {error && <p className="mb-2 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600">{error}</p>}
         <div className="flex min-w-0 gap-2">
           <input
             type="text"
@@ -127,19 +127,28 @@ export function CatalogBrandsList({
             type="button"
             onClick={handleCreate}
             disabled={pending || !newName.trim()}
-            className="shrink-0 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <PlusIcon />
             Add
           </button>
         </div>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2">
+          <label
+            htmlFor="new-brand-logo"
+            className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-500 hover:border-brand hover:text-brand"
+          >
+            <UploadIcon />
+            <span className="truncate">{newLogo ? newLogo.name : "Upload logo (optional)"}</span>
+          </label>
           <input
             key={newLogoInputKey}
+            id="new-brand-logo"
             type="file"
             aria-label="Logo"
-            accept="image/jpeg,image/png,image/webp,image/svg+xml"
+            accept={LOGO_ACCEPT}
             onChange={(e) => setNewLogo(e.target.files?.[0] ?? null)}
-            className="min-w-0 flex-1 text-xs text-neutral-500 file:mr-2 file:rounded-md file:border-0 file:bg-neutral-100 file:px-2 file:py-1 file:text-xs file:font-medium"
+            className="sr-only"
           />
         </div>
       </div>
@@ -149,7 +158,7 @@ export function CatalogBrandsList({
       ) : (
         <ul className="max-h-80 overflow-y-auto">
           {items.map((item) => (
-            <li key={item.id} className="flex min-w-0 items-center gap-2 border-b border-neutral-100 px-5 py-2.5 last:border-b-0">
+            <li key={item.id} className="flex min-w-0 items-center gap-3 border-b border-neutral-100 px-5 py-3 last:border-b-0 hover:bg-neutral-50">
               {editingId === item.id ? (
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div className="flex min-w-0 items-center gap-2">
@@ -160,29 +169,33 @@ export function CatalogBrandsList({
                       className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                       autoFocus
                     />
-                    <button type="button" onClick={() => handleSaveEdit(item.id)} disabled={pending} className="shrink-0 text-xs font-medium text-brand hover:underline">
-                      Save
-                    </button>
-                    <button type="button" onClick={() => setEditingId(null)} className="shrink-0 text-xs font-medium text-neutral-500 hover:underline">
-                      Cancel
-                    </button>
+                    <RowIconButton label="Save" onClick={() => handleSaveEdit(item.id)} disabled={pending} variant="brand">
+                      <CheckIcon />
+                    </RowIconButton>
+                    <RowIconButton label="Cancel" onClick={() => setEditingId(null)}>
+                      <XIcon />
+                    </RowIconButton>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label
+                      htmlFor={`edit-brand-logo-${item.id}`}
+                      className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-500 hover:border-brand hover:text-brand"
+                    >
+                      <UploadIcon />
+                      <span className="truncate">{editLogo ? editLogo.name : "Replace logo"}</span>
+                    </label>
                     <input
                       key={editLogoInputKey}
+                      id={`edit-brand-logo-${item.id}`}
                       type="file"
                       aria-label="Replace logo"
-                      accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                      accept={LOGO_ACCEPT}
                       onChange={(e) => setEditLogo(e.target.files?.[0] ?? null)}
-                      className="min-w-0 flex-1 text-xs text-neutral-500 file:mr-2 file:rounded-md file:border-0 file:bg-neutral-100 file:px-2 file:py-1 file:text-xs file:font-medium"
+                      className="sr-only"
                     />
                     {item.logoUrl && !editLogo && (
-                      <label className="flex shrink-0 items-center gap-1 text-xs text-neutral-500">
-                        <input
-                          type="checkbox"
-                          checked={editRemoveLogo}
-                          onChange={(e) => setEditRemoveLogo(e.target.checked)}
-                        />
+                      <label className="flex shrink-0 items-center gap-1.5 text-xs text-neutral-500">
+                        <input type="checkbox" checked={editRemoveLogo} onChange={(e) => setEditRemoveLogo(e.target.checked)} />
                         Remove logo
                       </label>
                     )}
@@ -191,19 +204,14 @@ export function CatalogBrandsList({
               ) : (
                 <>
                   <BrandLogoThumbnail logoUrl={item.logoUrl} name={item.name} />
-                  <span className="min-w-0 flex-1 truncate text-sm text-neutral-800">{item.name}</span>
-                  {item.meta && <span className="shrink-0 text-xs text-neutral-400">{item.meta}</span>}
-                  <button type="button" onClick={() => startEditing(item)} className="shrink-0 text-xs font-medium text-neutral-500 hover:text-neutral-800">
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(item)}
-                    disabled={pending}
-                    className="shrink-0 text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
-                  >
-                    Delete
-                  </button>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-800">{item.name}</span>
+                  {item.meta && <MetaBadge>{item.meta}</MetaBadge>}
+                  <RowIconButton label="Edit" onClick={() => startEditing(item)}>
+                    <PencilIcon />
+                  </RowIconButton>
+                  <RowIconButton label="Delete" onClick={() => handleDelete(item)} disabled={pending} variant="danger">
+                    <TrashIcon />
+                  </RowIconButton>
                 </>
               )}
             </li>
@@ -217,7 +225,7 @@ export function CatalogBrandsList({
 function BrandLogoThumbnail({ logoUrl, name }: { logoUrl: string | null; name: string }) {
   if (!logoUrl) {
     return (
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-[10px] font-semibold text-neutral-400">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-400">
         {name.slice(0, 1).toUpperCase()}
       </span>
     );
@@ -226,10 +234,10 @@ function BrandLogoThumbnail({ logoUrl, name }: { logoUrl: string | null; name: s
     <Image
       src={logoUrl}
       alt={`${name} logo`}
-      width={28}
-      height={28}
+      width={32}
+      height={32}
       unoptimized
-      className="h-7 w-7 shrink-0 rounded-md border border-neutral-200 object-contain"
+      className="h-8 w-8 shrink-0 rounded-lg border border-neutral-200 object-contain p-0.5"
     />
   );
 }

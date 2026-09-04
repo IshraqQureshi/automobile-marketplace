@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { CatalogCardHeader, CheckIcon, InitialAvatar, MetaBadge, PencilIcon, PlusIcon, RowIconButton, TrashIcon, XIcon } from "./catalog-ui";
 
 export interface CatalogItem {
   id: string;
@@ -9,6 +10,7 @@ export interface CatalogItem {
 }
 
 interface CatalogListProps {
+  icon: React.ReactNode;
   title: string;
   description: string;
   items: CatalogItem[];
@@ -25,11 +27,12 @@ interface CatalogListProps {
 }
 
 /**
- * Shared CRUD list for the simple (name-only) catalog entities — Brands and
- * Vehicle Types. Models has its own component (models.tsx) since it also
- * needs a Brand selector.
+ * Shared CRUD list for the simple (name-only) catalog entities — currently
+ * just Vehicle Types. Brands and Models have their own components since
+ * they need a logo upload / a Brand selector respectively.
  */
 export function CatalogList({
+  icon,
   title,
   description,
   items,
@@ -87,31 +90,26 @@ export function CatalogList({
   }
 
   return (
-    <div
-      data-testid={`catalog-list-${title.toLowerCase()}`}
-      className="rounded-xl border border-neutral-200 bg-white shadow-sm"
-    >
-      <div className="border-b border-neutral-200 px-5 py-4">
-        <h2 className="font-display text-base font-semibold text-neutral-900">{title}</h2>
-        <p className="text-xs text-neutral-500">{description}</p>
-      </div>
+    <div data-testid={`catalog-list-${title.toLowerCase()}`} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <CatalogCardHeader icon={icon} title={title} description={description} count={items.length} />
 
       <div className="border-b border-neutral-200 px-5 py-3">
-        {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+        {error && <p className="mb-2 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600">{error}</p>}
         <div className="flex min-w-0 gap-2">
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder={addPlaceholder}
-            className="flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
           />
           <button
             type="button"
             onClick={handleCreate}
             disabled={pending || !newName.trim()}
-            className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <PlusIcon />
             Add
           </button>
         </div>
@@ -122,51 +120,34 @@ export function CatalogList({
       ) : (
         <ul className="max-h-80 overflow-y-auto">
           {items.map((item) => (
-            <li key={item.id} className="flex min-w-0 items-center gap-2 border-b border-neutral-100 px-5 py-2.5 last:border-b-0">
+            <li key={item.id} className="flex min-w-0 items-center gap-3 border-b border-neutral-100 px-5 py-3 last:border-b-0 hover:bg-neutral-50">
               {editingId === item.id ? (
                 <>
                   <input
                     type="text"
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
-                    className="flex-1 rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                    className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                     autoFocus
                   />
-                  <button
-                    type="button"
-                    onClick={() => handleSaveEdit(item.id)}
-                    disabled={pending}
-                    className="text-xs font-medium text-brand hover:underline"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(null)}
-                    className="text-xs font-medium text-neutral-500 hover:underline"
-                  >
-                    Cancel
-                  </button>
+                  <RowIconButton label="Save" onClick={() => handleSaveEdit(item.id)} disabled={pending} variant="brand">
+                    <CheckIcon />
+                  </RowIconButton>
+                  <RowIconButton label="Cancel" onClick={() => setEditingId(null)}>
+                    <XIcon />
+                  </RowIconButton>
                 </>
               ) : (
                 <>
-                  <span className="min-w-0 flex-1 truncate text-sm text-neutral-800">{item.name}</span>
-                  {item.meta && <span className="shrink-0 text-xs text-neutral-400">{item.meta}</span>}
-                  <button
-                    type="button"
-                    onClick={() => startEditing(item)}
-                    className="text-xs font-medium text-neutral-500 hover:text-neutral-800"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(item)}
-                    disabled={pending}
-                    className="text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
-                  >
-                    Delete
-                  </button>
+                  <InitialAvatar name={item.name} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-800">{item.name}</span>
+                  {item.meta && <MetaBadge>{item.meta}</MetaBadge>}
+                  <RowIconButton label="Edit" onClick={() => startEditing(item)}>
+                    <PencilIcon />
+                  </RowIconButton>
+                  <RowIconButton label="Delete" onClick={() => handleDelete(item)} disabled={pending} variant="danger">
+                    <TrashIcon />
+                  </RowIconButton>
                 </>
               )}
             </li>
