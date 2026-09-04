@@ -17,6 +17,14 @@ export interface CatalogActionResult {
 // /admin/(protected) layout guard. These actions don't duplicate the role
 // check — they just need to fail gracefully, not silently, if RLS ever
 // does reject a call.
+//
+// Unlike insert (which raises a real error when its WITH CHECK fails),
+// update/delete's USING clause silently filters out rows the caller isn't
+// allowed to touch — an RLS-blocked or already-deleted row just affects 0
+// rows with no error. Every update/delete below chains .select("id") and
+// checks the result so that case is reported as a failure instead of a
+// false "success".
+const NOT_FOUND_ERROR = "Not found, or you don't have permission to do that.";
 
 export async function createBrandAction(name: string): Promise<CatalogActionResult> {
   const parsed = catalogNameSchema.safeParse(name);
@@ -38,11 +46,12 @@ export async function updateBrandAction(id: string, name: string): Promise<Catal
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("brands").update({ name: parsed.data }).eq("id", id);
+  const { data, error } = await supabase.from("brands").update({ name: parsed.data }).eq("id", id).select("id");
   if (error) {
     logger.error("Failed to update brand", error, { id });
     return { error: error.code === "23505" ? "A brand with this name already exists." : "Failed to update brand." };
   }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/admin/catalog");
   return {};
@@ -50,11 +59,12 @@ export async function updateBrandAction(id: string, name: string): Promise<Catal
 
 export async function deleteBrandAction(id: string): Promise<CatalogActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.from("brands").delete().eq("id", id);
+  const { data, error } = await supabase.from("brands").delete().eq("id", id).select("id");
   if (error) {
     logger.error("Failed to delete brand", error, { id });
     return { error: "Failed to delete brand." };
   }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/admin/catalog");
   return {};
@@ -82,11 +92,16 @@ export async function updateModelAction(id: string, name: string, brandId: strin
   if (!brandId) return { error: "Choose a brand." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("models").update({ name: parsed.data, brand_id: brandId }).eq("id", id);
+  const { data, error } = await supabase
+    .from("models")
+    .update({ name: parsed.data, brand_id: brandId })
+    .eq("id", id)
+    .select("id");
   if (error) {
     logger.error("Failed to update model", error, { id });
     return { error: error.code === "23505" ? "This brand already has a model with this name." : "Failed to update model." };
   }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/admin/catalog");
   return {};
@@ -94,11 +109,12 @@ export async function updateModelAction(id: string, name: string, brandId: strin
 
 export async function deleteModelAction(id: string): Promise<CatalogActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.from("models").delete().eq("id", id);
+  const { data, error } = await supabase.from("models").delete().eq("id", id).select("id");
   if (error) {
     logger.error("Failed to delete model", error, { id });
     return { error: "Failed to delete model." };
   }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/admin/catalog");
   return {};
@@ -124,11 +140,12 @@ export async function updateVehicleTypeAction(id: string, name: string): Promise
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("vehicle_types").update({ name: parsed.data }).eq("id", id);
+  const { data, error } = await supabase.from("vehicle_types").update({ name: parsed.data }).eq("id", id).select("id");
   if (error) {
     logger.error("Failed to update vehicle type", error, { id });
     return { error: error.code === "23505" ? "A type with this name already exists." : "Failed to update type." };
   }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/admin/catalog");
   return {};
@@ -136,11 +153,12 @@ export async function updateVehicleTypeAction(id: string, name: string): Promise
 
 export async function deleteVehicleTypeAction(id: string): Promise<CatalogActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.from("vehicle_types").delete().eq("id", id);
+  const { data, error } = await supabase.from("vehicle_types").delete().eq("id", id).select("id");
   if (error) {
     logger.error("Failed to delete vehicle type", error, { id });
     return { error: "Failed to delete type." };
   }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/admin/catalog");
   return {};
