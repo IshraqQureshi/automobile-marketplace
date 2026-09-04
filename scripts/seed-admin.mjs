@@ -30,6 +30,16 @@ if (!supabaseUrl || !serviceRoleKey) {
   process.exit(1);
 }
 
+// This script grants ADMIN with a service-role key — it must never run
+// silently against a real (staging/production) project. Refuse unless the
+// target is the local Supabase stack, or the caller explicitly opts in.
+const isLocalUrl = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(supabaseUrl);
+if (!isLocalUrl && process.env.ADMIN_SEED_ALLOW_REMOTE !== "true") {
+  console.error(`Refusing to run: NEXT_PUBLIC_SUPABASE_URL (${supabaseUrl}) is not a local Supabase instance.`);
+  console.error("Set ADMIN_SEED_ALLOW_REMOTE=true to explicitly override this check.");
+  process.exit(1);
+}
+
 const email = process.env.ADMIN_SEED_EMAIL ?? "admin@harakagari.local";
 const providedPassword = process.env.ADMIN_SEED_PASSWORD;
 const password = providedPassword ?? randomBytes(9).toString("base64url");
