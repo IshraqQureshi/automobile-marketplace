@@ -44,6 +44,9 @@ export function Header() {
           <button type="button" disabled title="Search coming soon" aria-label="Search" className="text-neutral-500 disabled:opacity-60">
             <SearchIcon />
           </button>
+          <Link href="/ready-to-sell" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
+            Sell your car
+          </Link>
           <Link href="/login" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
             Log in
           </Link>
@@ -73,6 +76,9 @@ export function Header() {
               {item} <span className="text-xs">(coming soon)</span>
             </span>
           ))}
+          <Link href="/ready-to-sell" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+            Sell your car
+          </Link>
           <Link href="/login" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
             Log in
           </Link>

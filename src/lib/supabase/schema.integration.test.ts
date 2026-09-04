@@ -25,6 +25,7 @@ describe("Database schema integrity (integration)", () => {
   let customerEmail: string;
   const customerPassword = "test-password-not-real-123";
   let showroomOwnerId: string;
+  let otherShowroomOwnerId: string;
   let showroomId: string;
   let otherShowroomId: string;
   let vehicleId: string;
@@ -61,10 +62,22 @@ describe("Database schema integrity (integration)", () => {
     if (showroomErr || !showroom) throw showroomErr ?? new Error("showroom not created");
     showroomId = showroom.id;
 
+    // A distinct owner — showrooms_owner_user_id_active_unique (added
+    // alongside SHR-001 registration) now permits only one PENDING/APPROVED/
+    // SUSPENDED showroom per owner, so this can no longer share
+    // showroomOwnerId with the showroom above.
+    const { data: otherOwner, error: otherOwnerErr } = await supabase.auth.admin.createUser({
+      email: `test-other-owner-${testId}@example.com`,
+      password: "test-password-not-real-789",
+      email_confirm: true,
+    });
+    if (otherOwnerErr || !otherOwner.user) throw otherOwnerErr ?? new Error("other owner not created");
+    otherShowroomOwnerId = otherOwner.user.id;
+
     const { data: otherShowroom, error: otherShowroomErr } = await supabase
       .from("showrooms")
       .insert({
-        owner_user_id: showroomOwnerId,
+        owner_user_id: otherShowroomOwnerId,
         business_name: "Other Showroom",
         phone: "0700000001",
         email: "other-showroom@example.com",
@@ -99,6 +112,7 @@ describe("Database schema integrity (integration)", () => {
     if (otherShowroomId) await supabase.from("showrooms").delete().eq("id", otherShowroomId);
     if (customerId) await supabase.auth.admin.deleteUser(customerId);
     if (showroomOwnerId) await supabase.auth.admin.deleteUser(showroomOwnerId);
+    if (otherShowroomOwnerId) await supabase.auth.admin.deleteUser(otherShowroomOwnerId);
   });
 
   it("auto-creates a CUSTOMER profile when an auth user is created", async () => {

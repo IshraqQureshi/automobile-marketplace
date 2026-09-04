@@ -1,13 +1,10 @@
 import { z } from "zod";
+import { kenyaLocalPhoneSchema } from "@/lib/validation/kenya-phone";
 
 // Password minimum matches supabase/config.toml's auth.minimum_password_length.
 // Keep these in sync — Supabase is the actual enforcement point; this is
 // only for fast client/server-side feedback before the request round-trips.
 export const PASSWORD_MIN_LENGTH = 6;
-
-// Kenyan mobile numbers without the leading 0 or country code, e.g. "712345678"
-// (the UI supplies a fixed "+254" prefix — see auth-card.tsx).
-const KENYA_LOCAL_PHONE_REGEX = /^[17]\d{8}$/;
 
 // Base object (not yet cross-field-refined) so its `.shape` stays available
 // for per-field client-side validation (validateField in auth-card.tsx) —
@@ -15,15 +12,7 @@ const KENYA_LOCAL_PHONE_REGEX = /^[17]\d{8}$/;
 const signUpBaseSchema = z.object({
   fullName: z.string().trim().min(1, "Full name is required").max(200),
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
-  // The input's own placeholder ("7xx xxx xxx") models spaced input, and
-  // Kenyan numbers are very commonly typed with a leading 0 out of habit
-  // even though the UI shows a separate +254 prefix — strip both before
-  // validating, rather than rejecting input the UI itself invites.
-  phone: z
-    .string()
-    .trim()
-    .transform((value) => value.replace(/[\s-]/g, "").replace(/^0/, ""))
-    .pipe(z.string().regex(KENYA_LOCAL_PHONE_REGEX, "Enter a valid phone number (e.g. 712345678)")),
+  phone: kenyaLocalPhoneSchema,
   password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
   confirmPassword: z.string().min(1, "Please confirm your password"),
   termsAccepted: z.literal("true", { message: "You must agree to the Terms of Service and Privacy Policy" }),
@@ -78,11 +67,7 @@ export interface AuthActionState {
 // functions, not plain values or sync functions.
 export const initialAuthActionState: AuthActionState = { status: "idle" };
 
-export function fieldErrorsFrom(error: { issues: { path: PropertyKey[]; message: string }[] }) {
-  const fieldErrors: Partial<Record<string, string>> = {};
-  for (const issue of error.issues) {
-    const key = String(issue.path[0]);
-    if (!fieldErrors[key]) fieldErrors[key] = issue.message;
-  }
-  return fieldErrors;
-}
+// Re-exported for existing importers — the implementation itself lives in
+// src/lib/validation/field-errors.ts so non-auth features (e.g. showroom
+// registration) can use it without importing an auth-specific module.
+export { fieldErrorsFrom } from "@/lib/validation/field-errors";
