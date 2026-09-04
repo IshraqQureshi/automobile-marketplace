@@ -102,6 +102,14 @@ test("signed-in customer can submit a showroom registration and sees a pending c
 
   await expect(page.getByRole("heading", { name: "Application submitted" })).toBeVisible();
 
+  // Confirm the upload actually persisted (not just that the UI said so) —
+  // a real showroom_documents row referencing the uploaded file.
+  const { data: showroom } = await admin().from("showrooms").select("id").eq("owner_user_id", customerId).single();
+  const { data: documents } = await admin().from("showroom_documents").select("document_type, storage_path").eq("showroom_id", showroom!.id);
+  expect(documents).toHaveLength(1);
+  expect(documents?.[0]?.document_type).toBe("business_registration");
+  expect(documents?.[0]?.storage_path).toContain("license.pdf");
+
   // Revisiting the page now shows the pending-review status instead of the
   // form — one active showroom per owner is enforced.
   await page.goto("/register-showroom");

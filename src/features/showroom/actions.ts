@@ -2,6 +2,7 @@
 
 import { logger } from "@/lib/logger";
 import { fieldErrorsFrom } from "@/lib/validation/field-errors";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
@@ -122,6 +123,27 @@ export async function registerShowroomAction(
       logger.error("Failed to record uploaded showroom document", documentError, { showroomId: showroom.id, fileName: file.name });
       failedUploads.push(file.name);
     }
+  }
+
+  // If every document failed, the applicant would otherwise be left with a
+  // documentless PENDING showroom they have no way to fix themselves — RLS
+  // only lets an admin delete a showroom (showrooms_delete_admin_only), and
+  // there's no "add documents later" UI yet, so a stuck record here isn't
+  // recoverable without manual support intervention. Roll it back via the
+  // service-role client (this one narrow case only — every other write in
+  // this action goes through the regular RLS-scoped client) so the one-
+  // showroom-per-owner constraint doesn't block a clean retry.
+  if (failedUploads.length === documents.length) {
+    logger.error("Showroom registration failed: every document upload failed, rolling back", undefined, {
+      showroomId: showroom.id,
+      failedUploads,
+    });
+    const admin = createAdminClient();
+    const { error: rollbackError } = await admin.from("showrooms").delete().eq("id", showroom.id);
+    if (rollbackError) {
+      logger.error("Failed to roll back showroom after total upload failure", rollbackError, { showroomId: showroom.id });
+    }
+    return { status: "error", message: "Failed to upload your documents. Please try again." };
   }
 
   // Deliberately no revalidatePath() here: it would refresh the parent
