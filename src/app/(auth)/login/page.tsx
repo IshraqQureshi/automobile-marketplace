@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fraunces } from "next/font/google";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -7,6 +8,11 @@ import { AuthCard } from "./auth-card";
 export const metadata: Metadata = {
   title: "Log in — HarakaGari",
 };
+
+// Self-hosted via next/font (no runtime Google Fonts request) — used only
+// for the hero stats figures per design instruction, not the site-wide
+// display font (see --font-display in globals.css for that).
+const fraunces = Fraunces({ subsets: ["latin"], weight: ["600"] });
 
 const HOW_IT_WORKS = [
   { step: "01", title: "Find a Car", description: "Explore cars from showrooms and dealers on our platform." },
@@ -90,7 +96,7 @@ export default async function LoginPage() {
           <div className="flex gap-8 border-t border-white/10 pt-6">
             {STATS.map(({ value, label }) => (
               <div key={label}>
-                <p className="font-display text-2xl font-semibold">{value}</p>
+                <p className={`${fraunces.className} text-2xl font-semibold`}>{value}</p>
                 <p className="text-sm text-white/60">{label}</p>
               </div>
             ))}
