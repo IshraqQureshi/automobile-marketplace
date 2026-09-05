@@ -133,8 +133,16 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   // entirely for invalid input, rather than relying on the browser's own
   // (bypassable, and not actually a validation guarantee) constraint
   // validation to keep bad data from ever being submitted.
-  const { validate: validateField, errorFor: errorForField } = useFieldValidation(showroomFieldSchemas);
-  const { validate: validateOwnerField, errorFor: errorForOwnerField } = useFieldValidation(newOwnerFieldSchemas);
+  const {
+    validate: validateField,
+    errorFor: errorForField,
+    reset: resetFieldValidation,
+  } = useFieldValidation(showroomFieldSchemas);
+  const {
+    validate: validateOwnerField,
+    errorFor: errorForOwnerField,
+    reset: resetOwnerFieldValidation,
+  } = useFieldValidation(newOwnerFieldSchemas);
 
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<ShowroomListItem | null>(null);
@@ -225,6 +233,8 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     setRemoveLogo(false);
     setLogoInputKey((k) => k + 1);
     setFormError(null);
+    resetFieldValidation();
+    resetOwnerFieldValidation();
   }
 
   function openEdit(item: ShowroomListItem) {
@@ -249,6 +259,8 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     setRemoveLogo(false);
     setLogoInputKey((k) => k + 1);
     setFormError(null);
+    resetFieldValidation();
+    resetOwnerFieldValidation();
   }
 
   function closeDialog() {
@@ -296,10 +308,11 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       description: form.description,
     });
     if (!businessParsed.success) {
+      // Only the inline per-field errors below each input — not also the
+      // top banner, which would show the exact same message twice.
       for (const field of Object.keys(showroomFieldSchemas) as (keyof typeof showroomFieldSchemas)[]) {
         validateField(field, form[field as keyof ShowroomFormState] ?? "");
       }
-      setFormError(businessParsed.error.issues[0]?.message ?? "Please fix the errors below.");
       return;
     }
 
@@ -319,10 +332,11 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       if (ownerMode === "new") {
         const ownerParsed = newOwnerSchema.safeParse(newOwner);
         if (!ownerParsed.success) {
+          // Only the inline per-field errors below each input — not also
+          // the top banner, which would show the exact same message twice.
           for (const field of Object.keys(newOwnerFieldSchemas) as (keyof typeof newOwnerFieldSchemas)[]) {
             validateOwnerField(field, newOwner[field]);
           }
-          setFormError(ownerParsed.error.issues[0]?.message ?? "Please fix the new owner's details below.");
           return;
         }
       }

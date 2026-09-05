@@ -44,7 +44,7 @@ interface CatalogModelsListProps {
 export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete }: CatalogModelsListProps) {
   const toast = useToast();
   const isActive = useIsActiveCatalogTab("models");
-  const { validate, errorFor } = useFieldValidation(catalogFieldSchemas);
+  const { validate, errorFor, reset: resetValidation } = useFieldValidation(catalogFieldSchemas);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<ModelItem | null>(null);
   const [name, setName] = useState("");
@@ -77,6 +77,7 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
     setName("");
     setBrandId(brands[0]?.id ?? "");
     setFormError(null);
+    resetValidation();
   }
 
   function openEdit(item: ModelItem) {
@@ -85,6 +86,7 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
     setName(item.name);
     setBrandId(item.brandId);
     setFormError(null);
+    resetValidation();
   }
 
   function closeDialog() {
@@ -96,8 +98,9 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
     setFormError(null);
     const parsed = catalogNameSchema.safeParse(name);
     if (!parsed.success) {
+      // Only the inline per-field error below the input — not also the
+      // top banner, which would show the exact same message twice.
       validate("name", name);
-      setFormError(parsed.error.issues[0]?.message ?? "Invalid name.");
       return;
     }
     if (!brandId) {

@@ -103,15 +103,30 @@ test("admin can create, rename, and delete a brand", async ({ page }) => {
 
 test("rejects an empty brand name client-side, without ever reaching the server", async ({ page }) => {
   await page.getByRole("button", { name: "New Brand" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Name").fill("");
+  let dialog = page.getByRole("dialog");
+  // A fresh dialog must show no error at all until the user has actually
+  // submitted or touched the field — regression check for a real bug found
+  // here: Dialog's own initial-focus effect was stealing focus back from
+  // this field's autoFocus right after opening, triggering the onBlur
+  // validation handler before the user ever interacted with anything.
+  await expect(dialog.getByText("Name is required")).toHaveCount(0);
+
   await dialog.getByRole("button", { name: "Create" }).click();
   // A real, styled application error — not the browser's native "required"
-  // tooltip, which this form deliberately opts out of (noValidate) so this
-  // message is the only thing a user ever sees.
-  await expect(dialog.getByText("Name is required").first()).toBeVisible();
+  // tooltip, which this form deliberately opts out of. Exactly one
+  // instance: a regression check for a real bug found here, where the
+  // same message was shown twice (once in a top banner, once inline).
+  await expect(dialog.getByText("Name is required")).toHaveCount(1);
   await expect(dialog).toBeVisible();
   await expect(page.getByText("Brand created.")).toHaveCount(0);
+
+  // Closing and reopening a fresh dialog must not show the previous
+  // session's error either — regression check for stale useFieldValidation
+  // state persisting across a dialog that stays mounted between opens.
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "New Brand" }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Name is required")).toHaveCount(0);
 });
 
 test("admin can add a model under a brand and delete it, without deleting the brand", async ({ page }) => {
@@ -202,9 +217,11 @@ test("rejects an empty vehicle type name client-side, without ever reaching the 
   await page.getByRole("tab", { name: /Types/ }).click();
   await page.getByRole("button", { name: "New Type" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Name").fill("");
+  await expect(dialog.getByText("Name is required")).toHaveCount(0);
+
   await dialog.getByRole("button", { name: "Create" }).click();
-  await expect(dialog.getByText("Name is required").first()).toBeVisible();
+  // Exactly one instance — see the brand test's comment for why.
+  await expect(dialog.getByText("Name is required")).toHaveCount(1);
   await expect(dialog).toBeVisible();
   await expect(page.getByText("Type created.")).toHaveCount(0);
 });
