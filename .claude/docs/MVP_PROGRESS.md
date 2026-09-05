@@ -27,7 +27,7 @@
 | Authentication     | 🟢          | ⬜  | 🟢  | ⬜          |
 | Showrooms          | 🟡           | ⬜  | 🟢  | ⬜          |
 | Vehicles           | ⬜           | ⬜  | ⬜  | ⬜          |
-| Marketplace        | ⬜           | ⬜  | ⬜  | ⬜          |
+| Marketplace        | 🟡           | ⬜  | 🟢  | ⬜          |
 | Finance Calculator | ⬜           | ⬜  | ⬜  | ⬜          |
 | WhatsApp Inquiry   | ⬜           | ⬜  | ⬜  | ⬜          |
 | Admin              | 🟡           | ⬜  | 🟢  | ⬜          |
@@ -145,6 +145,12 @@
 
 # DAY 3 — Marketplace
 
+## Homepage
+
+* [x] Marketplace homepage (MKT-001 — `/` fully rebuilt from the Day-1 placeholder: hero search banner, certified-showrooms strip, browse-by-brand grid, "Watch & Discover"/TikTok and "Reviews & Guides"/YouTube video sections, most-searched listings, popular brands/models — all real Server-Component-fetched data, matching `design/homepage.png` — see PR #35)
+* [x] Admin-manageable homepage highlights (`/admin/highlights` — admin uploads a thumbnail + pastes a TikTok/YouTube video URL; static/manually-curated per MVP_REQUIREMENTS.md §4.1/§29.1, no live API integration — see PR #35)
+* [x] SEO (per-page metadata incl. OpenGraph/Twitter, `metadataBase` via a new `NEXT_PUBLIC_SITE_URL` env var, JSON-LD `WebSite` structured data, `sitemap.ts`/`robots.ts` — see PR #35)
+
 ## Vehicle Discovery
 
 * [ ] Vehicle listing
@@ -163,11 +169,12 @@
 
 ## Testing
 
+* [x] Homepage tests (`e2e/homepage-highlights.spec.ts` — admin CRUD, the `is_active` visibility toggle, social links, deletion, all verified against the real homepage; `e2e/smoke.spec.ts` updated for the real homepage's content)
 * [ ] Search tests
 * [ ] Filter tests
 * [ ] Marketplace tests
 * [ ] E2E marketplace flow
-* [ ] Figma visual QA
+* [ ] Figma visual QA (homepage visually verified live via Playwright screenshots at 1440px/390px against `design/homepage.png` — see decisions log; formal Figma sign-off process not otherwise applicable, no Figma Dev Mode access this project — see B-002)
 
 ### Day 3 Gate
 
@@ -633,6 +640,9 @@ Record important scope or architectural decisions here.
 | 2026-09-06 | Code review (PR #33) found 1 HIGH + 1 MEDIUM, both fixed and re-verified. HIGH: a new E2E test created an ad-hoc second owner/showroom (to work around `showrooms_owner_user_id_active_unique`, which only allows one active showroom per owner) but only cleaned both up with plain awaits after all assertions — a thrown assertion partway through would have left them orphaned in the database; fixed with try/finally, matching an existing identical pattern already in the same file. MEDIUM: `ShowroomList` and the dashboard `VehicleList` rendered their new search/filter bar unconditionally, so a genuinely empty list still showed a live (functionally pointless) search box above the "nothing here yet" empty state — fixed by gating both behind `items.length > 0`, matching the three catalog list components' existing pattern | Independent Code Review Agent finding, not self-caught — the MEDIUM in particular is a reminder to check a new UI element's behavior across a component's empty state, not just its populated state |
 | 2026-09-06 | Built personal-account self-service profile editing (PR #34) for both roles that previously had none: a new `/admin/profile` ("My Profile") and `/dashboard/account` ("My Account", distinct from the existing business-profile `/dashboard/profile`). One shared `AccountProfileForm` + `src/features/account/actions.ts` back both — full name/phone (a plain `profiles` self-update, already permitted by existing RLS/trigger, no new migration), email (`supabase.auth.updateUser`, real double-confirmation via both old and new address per `config.toml`'s `double_confirm_changes = true`), and password (`supabase.auth.updateUser`, no reauth required per `secure_password_change = false`) | User: "now admin and showroom owner should edit theri own profile" |
 | 2026-09-06 | Code review (PR #34) found 1 HIGH + 2 MEDIUM + 1 LOW, all fixed and re-verified. HIGH: the phone field was required, but Google OAuth (already enabled in `config.toml`) never populates a phone at signup, so any such user could never save even just their name — switched to the existing `kenyaLocalPhoneOptionalSchema` and fixed the action to store `null` (not the literal string `"+254undefined"`) when absent. MEDIUM: the form's three submit handlers only checked `result.error`, never `result.fieldErrors` — a future server-only validation rule could have shown a false success toast on a rejected write; now treats either as failure. MEDIUM: two new E2E tests (password change, email change) only restored the fixture's real password/email as the last line of the test, unprotected — a thrown assertion earlier would leave the fixture mutated (cascading failures, or silently orphaning the auth user on email); wrapped both in try/finally. LOW (fixed same pass): the now-optional phone input still had a native `required` attribute/plain label | Independent Code Review Agent finding, not self-caught — the HIGH in particular is a reminder to check a new required-field assumption against every account-creation path this app actually supports (password signup *and* Google OAuth), not just the more commonly-tested one |
+| 2026-09-06 | Started Day 3 (Marketplace) with MKT-001, the public homepage (PR #35), replacing the Day-1 placeholder — matches `design/homepage.png`: hero search banner, certified-showrooms strip, browse-by-brand grid, TikTok/YouTube video sections, most-searched listings, popular brands/models, all Server-Component-fetched real data (no client-side fetch, confirmed dynamically rendered — `ƒ` in the build output). Per `MVP_REQUIREMENTS.md` §4.1/§29.1's own design-review decision, the two requested video sections ("Watch & Discover"/TikTok, "Reviews & Guides"/YouTube) are static/manually-curated embeds, not a live TikTok/YouTube API integration — a new `homepage_highlights` table + `homepage-highlights` Storage bucket (mirrors the `brand-logos` bucket's admin-write/public-read shape exactly), managed via a new `/admin/highlights` page (new "Content" sidebar group) where the admin uploads a thumbnail and pastes the video URL/title. The "@HarakaGari" profile-link buttons reuse the existing `system_settings` catalog (2 new rows, category 'homepage') rather than a new table | User: "Start with homepage two thing to highlight home page sections for tiktok videos and youtube there should be option on super admin panel to add the embeded links there Match the design 100% proper seo of the page, ssr implement all data should be dynamic" |
+| 2026-09-06 | Real judgment calls made building PR #35, since the Figma design's own copy ("Most Searched"/"Popular Brands"/"Popular Models") implies data this project doesn't track: no search-analytics exist, so "Most Searched" is backed by the most-recently-published ACTIVE listings instead, and "Popular Brands"/"Popular Models" by real listing counts aggregated in-memory over the 300 most-recent ACTIVE vehicles (same in-memory aggregation pattern the admin catalog page already uses for brand/model counts) — all genuinely real, dynamically-computed data, just not literally "most searched" in the sense of tracked search frequency. Every link whose destination page doesn't exist yet (vehicle detail/search, showroom detail, "All brands"/"All models") renders as an inert "coming soon" control, exactly matching the header's own pre-existing convention for its Brands/Model/Type nav, rather than a dead link | Design intent inferred from `design/homepage.png`'s own labels combined with CLAUDE.md's "no fabricated data" rule — not an explicit user instruction, a documented interpretation |
+| 2026-09-06 | Code review (PR #35) found 1 MEDIUM + 1 LOW, neither blocking, both accepted as documented limitations rather than fixed. MEDIUM: "Popular Brands"/"Popular Models" counts are capped to the 300 most-recently-created ACTIVE vehicles — at real MVP scale this is a non-issue, but a brand with many older listings could theoretically under-rank a newer, smaller brand; flagged as a real Phase-2-adjacent gap (replace with a real `count(*) group by make` query once vehicle volume grows), not fixed now. LOW: "Most Searched"'s label doesn't literally match its recency-based backing data — reviewer agreed this is defensible engineering judgment under the "no fabricated data" rule (the underlying data is 100% real) rather than something requiring an immediate fix, since relabeling approved Figma copy would itself need a design-review decision first | Independent Code Review Agent finding — both explicitly assessed as acceptable trade-offs, not oversights, and left unfixed with the reasoning recorded here rather than silently dropped |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
