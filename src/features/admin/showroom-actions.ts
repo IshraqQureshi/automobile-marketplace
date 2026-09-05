@@ -15,10 +15,13 @@ export interface ShowroomActionResult {
 // guard — same "don't duplicate the role check, just fail gracefully if
 // the DB ever rejects it" reasoning as src/features/admin/catalog-actions.ts.
 //
-// update()'s USING clause silently filters out rows the caller isn't
-// allowed to touch (0 rows affected, no error) rather than raising — every
-// update below chains .select("id") and checks the result so that case is
-// reported as a failure instead of a false "success".
+// Two distinct rejection paths can occur here, and both are handled below:
+// the trigger raises a real error when a non-admin tries to change status/
+// verified, while RLS's UPDATE USING clause silently filters out rows the
+// caller isn't allowed to touch at all (0 rows affected, no error) — e.g. a
+// non-owner customer targeting someone else's showroom. Every update below
+// chains .select("id") and checks the result so the silent-filter case is
+// also reported as a failure instead of a false "success".
 const NOT_FOUND_ERROR = "Not found, or you don't have permission to do that.";
 
 export async function approveShowroomAction(id: string): Promise<ShowroomActionResult> {
