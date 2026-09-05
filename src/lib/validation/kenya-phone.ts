@@ -14,6 +14,16 @@ export const kenyaLocalPhoneSchema = z
   .transform((value) => value.replace(/[\s-]/g, "").replace(/^0/, ""))
   .pipe(z.string().regex(KENYA_LOCAL_PHONE_REGEX, "Enter a valid phone number (e.g. 712345678)"));
 
+// Same validation, but an empty field is valid too (transformed to
+// undefined) — for forms where a phone number is optional, e.g. an admin
+// creating a showroom owner without necessarily knowing their phone.
+export const kenyaLocalPhoneOptionalSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/[\s-]/g, "").replace(/^0/, ""))
+  .pipe(z.union([z.literal(""), z.string().regex(KENYA_LOCAL_PHONE_REGEX, "Enter a valid phone number (e.g. 712345678)")]))
+  .transform((value) => value || undefined);
+
 // Stored phone numbers carry a "+254" prefix already (see signUpAction /
 // registerShowroomAction) — strip it back off wherever a form re-displays
 // one of these numbers in a local-number input with its own fixed "+254"

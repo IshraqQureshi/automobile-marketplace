@@ -1,7 +1,20 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { DialogFormActions, FieldLabel, InitialAvatar, PencilIcon, RowIconButton, SectionHeader, ShowroomIcon, StatusBadge, TableEmptyState, TableShell, TrashIcon } from "./admin-ui";
+import {
+  DialogFormActions,
+  FieldLabel,
+  InitialAvatar,
+  PencilIcon,
+  RowIconButton,
+  SectionHeader,
+  ShowroomIcon,
+  StatusBadge,
+  TableEmptyState,
+  TableShell,
+  TrashIcon,
+  UploadIcon,
+} from "./admin-ui";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -32,8 +45,8 @@ export interface ShowroomListItem {
 
 interface ShowroomListProps {
   items: ShowroomListItem[];
-  onCreate: (formData: FormData) => Promise<{ error?: string }>;
-  onUpdate: (formData: FormData) => Promise<{ error?: string }>;
+  onCreate: (formData: FormData) => Promise<{ error?: string; warning?: string }>;
+  onUpdate: (formData: FormData) => Promise<{ error?: string; warning?: string }>;
   onDelete: (id: string) => Promise<{ error?: string }>;
   onSearchOwners: (query: string) => Promise<{ users: ShowroomOwnerCandidate[] }>;
 }
@@ -54,6 +67,7 @@ function formatDate(iso: string) {
 }
 
 const OWNER_SEARCH_DEBOUNCE_MS = 300;
+const DOCUMENT_ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
 
 interface ShowroomFormState {
   businessName: string;
@@ -65,6 +79,14 @@ interface ShowroomFormState {
 }
 
 const BLANK_FORM: ShowroomFormState = { businessName: "", location: "", businessPhone: "", businessEmail: "", address: "", description: "" };
+
+interface NewOwnerFormState {
+  ownerFullName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+}
+
+const BLANK_NEW_OWNER: NewOwnerFormState = { ownerFullName: "", ownerEmail: "", ownerPhone: "" };
 
 export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwners }: ShowroomListProps) {
   const toast = useToast();
@@ -81,10 +103,14 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<ShowroomListItem | null>(null);
   const [form, setForm] = useState<ShowroomFormState>(BLANK_FORM);
+  const [ownerMode, setOwnerMode] = useState<"existing" | "new">("existing");
   const [selectedOwner, setSelectedOwner] = useState<ShowroomOwnerCandidate | null>(null);
   const [ownerQuery, setOwnerQuery] = useState("");
   const [ownerResults, setOwnerResults] = useState<ShowroomOwnerCandidate[]>([]);
   const [ownerSearchLoading, setOwnerSearchLoading] = useState(false);
+  const [newOwner, setNewOwner] = useState<NewOwnerFormState>(BLANK_NEW_OWNER);
+  const [documents, setDocuments] = useState<File[]>([]);
+  const [documentsInputKey, setDocumentsInputKey] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ShowroomListItem | null>(null);
   const [crudPending, startCrudTransition] = useTransition();
@@ -147,9 +173,13 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     setDialogMode("create");
     setEditingItem(null);
     setForm(BLANK_FORM);
+    setOwnerMode("existing");
     setSelectedOwner(null);
     setOwnerQuery("");
     setOwnerResults([]);
+    setNewOwner(BLANK_NEW_OWNER);
+    setDocuments([]);
+    setDocumentsInputKey((k) => k + 1);
     setFormError(null);
   }
 
@@ -164,9 +194,13 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       address: item.address ?? "",
       description: item.description ?? "",
     });
+    setOwnerMode("existing");
     setSelectedOwner(null);
     setOwnerQuery("");
     setOwnerResults([]);
+    setNewOwner(BLANK_NEW_OWNER);
+    setDocuments([]);
+    setDocumentsInputKey((k) => k + 1);
     setFormError(null);
   }
 
@@ -198,9 +232,19 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!editingItem && !selectedOwner) {
-      setFormError("Choose an owner for this showroom.");
-      return;
+    if (!editingItem) {
+      if (ownerMode === "existing" && !selectedOwner) {
+        setFormError("Choose an owner for this showroom.");
+        return;
+      }
+      if (ownerMode === "new" && !newOwner.ownerFullName.trim()) {
+        setFormError("Enter the new owner's full name.");
+        return;
+      }
+      if (ownerMode === "new" && !newOwner.ownerEmail.trim()) {
+        setFormError("Enter the new owner's email.");
+        return;
+      }
     }
     startCrudTransition(async () => {
       const formData = new FormData();
@@ -212,8 +256,16 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       formData.set("description", form.description);
       if (editingItem) {
         formData.set("id", editingItem.id);
+      } else if (ownerMode === "new") {
+        formData.set("ownerMode", "new");
+        formData.set("ownerFullName", newOwner.ownerFullName);
+        formData.set("ownerEmail", newOwner.ownerEmail);
+        formData.set("ownerPhone", newOwner.ownerPhone);
       } else if (selectedOwner) {
         formData.set("ownerUserId", selectedOwner.id);
+      }
+      if (!editingItem) {
+        for (const file of documents) formData.append("documents", file);
       }
       const result = editingItem ? await onUpdate(formData) : await onCreate(formData);
       if (result.error) {
@@ -221,6 +273,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
         return;
       }
       toast.success(editingItem ? "Showroom updated." : "Showroom created.");
+      if (result.warning) toast.error(result.warning);
       setDialogMode(null);
     });
   }
@@ -416,60 +469,116 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
           {formError && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
 
           {!editingItem && (
-            <div className="relative">
-              <FieldLabel htmlFor="owner-search">Owner</FieldLabel>
-              {selectedOwner ? (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-neutral-800">{selectedOwner.fullName || selectedOwner.email}</p>
-                    <p className="truncate text-xs text-neutral-500">{selectedOwner.email}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedOwner(null);
-                      setOwnerQuery("");
-                    }}
-                    className="shrink-0 text-xs font-medium text-neutral-500 hover:underline"
-                  >
-                    Change
-                  </button>
+            <div>
+              <FieldLabel htmlFor="owner-mode-existing">Owner</FieldLabel>
+              <div className="mb-2 inline-flex rounded-md border border-neutral-300 p-0.5 text-sm">
+                <button
+                  type="button"
+                  id="owner-mode-existing"
+                  onClick={() => setOwnerMode("existing")}
+                  className={`rounded px-3 py-1.5 font-medium ${ownerMode === "existing" ? "bg-brand text-white" : "text-neutral-600 hover:bg-neutral-50"}`}
+                >
+                  Existing owner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOwnerMode("new")}
+                  className={`rounded px-3 py-1.5 font-medium ${ownerMode === "new" ? "bg-brand text-white" : "text-neutral-600 hover:bg-neutral-50"}`}
+                >
+                  New owner
+                </button>
+              </div>
+
+              {ownerMode === "existing" ? (
+                <div className="relative">
+                  {selectedOwner ? (
+                    <div className="flex items-center justify-between gap-2 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-neutral-800">{selectedOwner.fullName || selectedOwner.email}</p>
+                        <p className="truncate text-xs text-neutral-500">{selectedOwner.email}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedOwner(null);
+                          setOwnerQuery("");
+                        }}
+                        className="shrink-0 text-xs font-medium text-neutral-500 hover:underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <Input
+                        id="owner-search"
+                        value={ownerQuery}
+                        onChange={(e) => handleOwnerQueryChange(e.target.value)}
+                        placeholder="Search by email…"
+                        autoComplete="off"
+                        autoFocus
+                      />
+                      {ownerQuery.trim().length >= 2 && (
+                        <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-neutral-200 bg-white shadow-md">
+                          {ownerSearchLoading ? (
+                            <p className="px-3 py-2 text-xs text-neutral-400">Searching…</p>
+                          ) : ownerResults.length === 0 ? (
+                            <p className="px-3 py-2 text-xs text-neutral-400">No matching users found.</p>
+                          ) : (
+                            ownerResults.map((user) => (
+                              <button
+                                key={user.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedOwner(user);
+                                  setOwnerResults([]);
+                                }}
+                                className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-neutral-50"
+                              >
+                                <span className="font-medium text-neutral-800">{user.fullName || user.email}</span>
+                                <span className="text-xs text-neutral-500">{user.email}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               ) : (
-                <>
-                  <Input
-                    id="owner-search"
-                    value={ownerQuery}
-                    onChange={(e) => handleOwnerQueryChange(e.target.value)}
-                    placeholder="Search by email…"
-                    autoComplete="off"
-                    autoFocus
-                  />
-                  {ownerQuery.trim().length >= 2 && (
-                    <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-neutral-200 bg-white shadow-md">
-                      {ownerSearchLoading ? (
-                        <p className="px-3 py-2 text-xs text-neutral-400">Searching…</p>
-                      ) : ownerResults.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-neutral-400">No matching users found.</p>
-                      ) : (
-                        ownerResults.map((user) => (
-                          <button
-                            key={user.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedOwner(user);
-                              setOwnerResults([]);
-                            }}
-                            className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-neutral-50"
-                          >
-                            <span className="font-medium text-neutral-800">{user.fullName || user.email}</span>
-                            <span className="text-xs text-neutral-500">{user.email}</span>
-                          </button>
-                        ))
-                      )}
+                <div className="flex flex-col gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <div>
+                    <FieldLabel htmlFor="new-owner-name">Owner full name</FieldLabel>
+                    <Input
+                      id="new-owner-name"
+                      value={newOwner.ownerFullName}
+                      onChange={(e) => setNewOwner((o) => ({ ...o, ownerFullName: e.target.value }))}
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel htmlFor="new-owner-email">Owner email</FieldLabel>
+                    <Input
+                      id="new-owner-email"
+                      type="email"
+                      value={newOwner.ownerEmail}
+                      onChange={(e) => setNewOwner((o) => ({ ...o, ownerEmail: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel htmlFor="new-owner-phone">Owner phone (optional)</FieldLabel>
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center rounded-md border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-500">+254</span>
+                      <Input
+                        id="new-owner-phone"
+                        value={newOwner.ownerPhone}
+                        onChange={(e) => setNewOwner((o) => ({ ...o, ownerPhone: e.target.value }))}
+                        placeholder="712345678"
+                      />
                     </div>
-                  )}
-                </>
+                  </div>
+                  <p className="text-xs text-neutral-500">We&apos;ll email them an invite to set up their login.</p>
+                </div>
               )}
             </div>
           )}
@@ -483,6 +592,49 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
               required
             />
           </div>
+
+          {!editingItem && (
+            <div>
+              <FieldLabel htmlFor="showroom-documents">License / Registration documents (optional)</FieldLabel>
+              <label
+                htmlFor="showroom-documents"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-neutral-300 px-4 py-5 text-center hover:border-brand"
+              >
+                <UploadIcon />
+                <span className="mt-1.5 text-xs text-neutral-500">Upload PDF, JPG or PNG</span>
+              </label>
+              <input
+                key={documentsInputKey}
+                id="showroom-documents"
+                type="file"
+                multiple
+                accept={DOCUMENT_ACCEPT}
+                className="sr-only"
+                onChange={(e) => setDocuments(Array.from(e.target.files ?? []))}
+              />
+              {documents.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <ul className="flex flex-1 flex-wrap gap-2 text-xs text-neutral-600">
+                    {documents.map((file) => (
+                      <li key={file.name} className="rounded-md bg-neutral-100 px-2 py-1">
+                        {file.name}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocuments([]);
+                      setDocumentsInputKey((k) => k + 1);
+                    }}
+                    className="text-xs font-medium text-neutral-500 hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <FieldLabel htmlFor="showroom-location">Location</FieldLabel>
