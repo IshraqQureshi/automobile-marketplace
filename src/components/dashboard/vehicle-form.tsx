@@ -17,8 +17,15 @@ import {
 } from "@/features/vehicle/schemas";
 import type { CatalogOption, ModelOption, VehicleListItem } from "@/features/vehicle/types";
 
+// Deliberately no width class baked in here — Tailwind's generated
+// stylesheet orders `.w-full` after `.w-32` regardless of the order classes
+// appear in a template string, so appending "w-32" after this constant (as
+// the Deposit type select below does) silently lost to a `w-full` baked in
+// here, leaving that select full-width and squeezing its sibling input down
+// to a sliver (confirmed live: the Deposit value input rendered ~26px wide
+// and overlapped the next grid column). Each call site adds its own width.
 const selectClassName =
-  "w-full rounded-md border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand";
+  "rounded-md border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand";
 
 interface VehicleFormState {
   title: string;
@@ -290,7 +297,7 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
 
           <div>
             <FieldLabel htmlFor="vehicle-brand">Brand</FieldLabel>
-            <select id="vehicle-brand" value={form.brandId} onChange={(e) => handleBrandChange(e.target.value)} className={selectClassName}>
+            <select id="vehicle-brand" value={form.brandId} onChange={(e) => handleBrandChange(e.target.value)} className={`${selectClassName} w-full`}>
               <option value="">Select brand</option>
               {brands.map((brand) => (
                 <option key={brand.id} value={brand.id}>
@@ -308,7 +315,7 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
               value={form.model}
               onChange={(e) => setField("model", e.target.value)}
               disabled={!form.brandId}
-              className={`${selectClassName} disabled:cursor-not-allowed disabled:opacity-60`}
+              className={`${selectClassName} w-full disabled:cursor-not-allowed disabled:opacity-60`}
             >
               <option value="">{form.brandId ? "Select model" : "Select a brand first"}</option>
               {modelsForBrand.map((model) => (
@@ -398,7 +405,7 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <FieldLabel htmlFor="vehicle-body-type">Body type (optional)</FieldLabel>
-            <select id="vehicle-body-type" value={form.bodyType} onChange={(e) => setField("bodyType", e.target.value)} className={selectClassName}>
+            <select id="vehicle-body-type" value={form.bodyType} onChange={(e) => setField("bodyType", e.target.value)} className={`${selectClassName} w-full`}>
               <option value="">Select body type</option>
               {bodyTypeOptions.map((type) => (
                 <option key={type} value={type}>
@@ -427,7 +434,7 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
               id="vehicle-transmission"
               value={form.transmission}
               onChange={(e) => setField("transmission", e.target.value)}
-              className={selectClassName}
+              className={`${selectClassName} w-full`}
             >
               <option value="">Select transmission</option>
               {TRANSMISSIONS.map((type) => (
@@ -440,7 +447,7 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
 
           <div>
             <FieldLabel htmlFor="vehicle-fuel-type">Fuel type (optional)</FieldLabel>
-            <select id="vehicle-fuel-type" value={form.fuelType} onChange={(e) => setField("fuelType", e.target.value)} className={selectClassName}>
+            <select id="vehicle-fuel-type" value={form.fuelType} onChange={(e) => setField("fuelType", e.target.value)} className={`${selectClassName} w-full`}>
               <option value="">Select fuel type</option>
               {FUEL_TYPES.map((type) => (
                 <option key={type} value={type}>
@@ -546,7 +553,7 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
 
         {form.installmentEnabled && (
           <div className="mt-5 grid grid-cols-1 gap-4 border-t border-neutral-100 pt-5 sm:grid-cols-3">
-            <div>
+            <div className="sm:col-span-2">
               <FieldLabel htmlFor="vehicle-down-payment-value">Deposit</FieldLabel>
               <div className="flex gap-2">
                 <select
@@ -570,6 +577,7 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
                     onBlur={(e) => validate("financingDownPaymentPercent", e.target.value)}
                     placeholder="e.g. 20"
                     error={!!errorFor("financingDownPaymentPercent")}
+                    className="min-w-0 flex-1"
                   />
                 ) : (
                   <Input
@@ -580,6 +588,7 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
                     onBlur={(e) => validate("financingDownPaymentAmount", e.target.value)}
                     placeholder="e.g. 500000"
                     error={!!errorFor("financingDownPaymentAmount")}
+                    className="min-w-0 flex-1"
                   />
                 )}
               </div>
