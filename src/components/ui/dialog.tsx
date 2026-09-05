@@ -9,16 +9,15 @@ interface DialogProps {
   title: string;
   description?: string;
   children: ReactNode;
-  // "md" (default) fits every existing create/edit form; "lg"/"xl" are for
+  // "md" (default) fits every existing create/edit form; "lg" is for
   // content-heavier dialogs (e.g. a review panel with an inline document
   // preview) that would otherwise feel cramped at max-w-md.
-  size?: "md" | "lg" | "xl";
+  size?: "md" | "lg";
 }
 
 const SIZE_CLASSES: Record<NonNullable<DialogProps["size"]>, string> = {
   md: "max-w-md",
   lg: "max-w-2xl",
-  xl: "max-w-4xl",
 };
 
 /**
