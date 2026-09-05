@@ -72,7 +72,16 @@ export function Dialog({ open, onClose, title, description, children, size = "md
       }
     }
     document.addEventListener("keydown", onKeyDown);
-    panelRef.current?.focus();
+    // Don't steal focus from a field that already has it — a form field
+    // with `autoFocus` receives focus during React's commit phase, which
+    // runs before this effect. Unconditionally re-focusing the panel here
+    // would blur that field immediately after the dialog opens, and (now
+    // that fields validate on blur) show a validation error before the
+    // user has ever touched it. Confirmed live: opening "New Brand" showed
+    // "Name is required" instantly, with no interaction at all.
+    if (!panelRef.current?.contains(document.activeElement)) {
+      panelRef.current?.focus();
+    }
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 

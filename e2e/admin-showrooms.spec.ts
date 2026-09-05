@@ -281,7 +281,13 @@ test("rejects an invalid business email or phone client-side, without ever reach
   await page.goto("/admin/showrooms");
 
   await page.getByRole("button", { name: "New Showroom" }).click();
-  const dialog = page.getByRole("dialog");
+  let dialog = page.getByRole("dialog");
+  // A fresh dialog must show no error at all — regression check for a real
+  // bug found here: Dialog's own initial-focus effect was stealing focus
+  // back from a field's autoFocus right after opening, triggering the
+  // onBlur validation handler before the user ever interacted with it.
+  await expect(dialog.getByText("Business name is required")).toHaveCount(0);
+
   await dialog.getByPlaceholder("Search by email…").fill(OWNER_EMAIL.split("@")[0] ?? OWNER_EMAIL);
   await expect(dialog.getByText(OWNER_EMAIL).first()).toBeVisible();
   await dialog.getByText(OWNER_EMAIL).first().click();
@@ -294,17 +300,28 @@ test("rejects an invalid business email or phone client-side, without ever reach
   await dialog.getByRole("button", { name: "Create" }).click();
   // A real, styled application error — not the browser's native
   // type="email"/required tooltip, which this form deliberately opts out
-  // of (noValidate) so this message is the only thing a user ever sees.
-  await expect(dialog.getByText("Enter a valid phone number (e.g. 712345678)").first()).toBeVisible();
+  // of (noValidate). Exactly one instance — a regression check for a real
+  // bug found here, where the same message was shown twice (once in a top
+  // banner, once inline).
+  await expect(dialog.getByText("Enter a valid phone number (e.g. 712345678)")).toHaveCount(1);
   await expect(dialog).toBeVisible();
   await expect(page.getByRole("row", { name: businessName })).toHaveCount(0);
 
   await dialog.locator("#showroom-phone").fill("712345678");
   await dialog.locator("#showroom-email").fill("not-an-email");
   await dialog.getByRole("button", { name: "Create" }).click();
-  await expect(dialog.getByText("Enter a valid email address").first()).toBeVisible();
+  await expect(dialog.getByText("Enter a valid email address")).toHaveCount(1);
   await expect(dialog).toBeVisible();
   await expect(page.getByRole("row", { name: businessName })).toHaveCount(0);
+
+  // Closing and reopening a fresh dialog must not show the previous
+  // session's error either — regression check for stale
+  // useFieldValidation state persisting across a dialog that stays
+  // mounted between opens.
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "New Showroom" }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Enter a valid email address")).toHaveCount(0);
 });
 
 test("admin can delete a showroom", async ({ page }) => {

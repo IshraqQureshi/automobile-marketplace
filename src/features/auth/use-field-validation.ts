@@ -32,5 +32,16 @@ export function useFieldValidation<Shape extends Record<string, ZodType>>(shape:
     return touched[name] ? liveErrors[name] : serverError;
   }
 
-  return { validate, errorFor };
+  // For callers that reuse one hook instance across multiple independent
+  // "sessions" of the same form — e.g. a dialog that stays mounted between
+  // opens, only toggling its `open` prop — clear touched/liveErrors when a
+  // new session starts (opening a fresh create/edit dialog), so a
+  // validation error from a previous, already-closed session doesn't
+  // reappear before the user has touched anything this time.
+  function reset() {
+    setTouched({});
+    setLiveErrors({});
+  }
+
+  return { validate, errorFor, reset };
 }

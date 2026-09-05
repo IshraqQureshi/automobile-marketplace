@@ -71,7 +71,7 @@ export function CatalogList({
 }: CatalogListProps) {
   const toast = useToast();
   const isActive = useIsActiveCatalogTab(tabKey);
-  const { validate, errorFor } = useFieldValidation(catalogFieldSchemas);
+  const { validate, errorFor, reset: resetValidation } = useFieldValidation(catalogFieldSchemas);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [name, setName] = useState("");
@@ -103,6 +103,7 @@ export function CatalogList({
     setEditingItem(null);
     setName("");
     setFormError(null);
+    resetValidation();
   }
 
   function openEdit(item: CatalogItem) {
@@ -110,6 +111,7 @@ export function CatalogList({
     setEditingItem(item);
     setName(item.name);
     setFormError(null);
+    resetValidation();
   }
 
   function closeDialog() {
@@ -121,8 +123,9 @@ export function CatalogList({
     setFormError(null);
     const parsed = catalogNameSchema.safeParse(name);
     if (!parsed.success) {
+      // Only the inline per-field error below the input — not also the
+      // top banner, which would show the exact same message twice.
       validate("name", name);
-      setFormError(parsed.error.issues[0]?.message ?? "Invalid name.");
       return;
     }
     startTransition(async () => {
