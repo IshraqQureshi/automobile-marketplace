@@ -101,8 +101,8 @@
 ## Showrooms
 
 * [x] Create showroom (SHR-001/SHR-002 — `/ready-to-sell` chooser + `/register-showroom` form: business info, license/registration document upload to the `showroom-documents` bucket, one-active-showroom-per-owner enforced at both the app and DB layer — see PR #16)
-* [ ] Showroom profile
-* [ ] Edit showroom
+* [x] Showroom profile (`/dashboard/profile` — showroom owner can view their own business name, logo, location, phone, email, address, description; editable even while PENDING — see PR #31)
+* [x] Edit showroom (owner self-service via `/dashboard/profile`, reusing the same `updateShowroomProfile()` write/logo-upload logic as admin's `/admin/showrooms` edit — see PR #31; admin-side edit already existed, see PR #21/#23)
 * [ ] Showroom listing
 * [ ] Showroom details
 
@@ -126,20 +126,20 @@
 
 ## Testing
 
-* [x] Unit tests (schema/validation tests across showroom + catalog + vehicle features — 201/201 passing as of PR #26)
-* [x] Integration tests (RLS ownership coverage for showrooms/catalog/vehicles/vehicle_media/storage)
-* [ ] E2E showroom flow (registration + admin approval covered; showroom self-service profile/edit not built yet)
+* [x] Unit tests (schema/validation tests across showroom + catalog + vehicle features — 207/207 passing as of PR #31)
+* [x] Integration tests (RLS ownership coverage for showrooms/catalog/vehicles/vehicle_media/storage, including the showroom-logos bucket's owner-or-admin write policies added in PR #31)
+* [x] E2E showroom flow (registration + admin approval covered; self-service profile edit — `e2e/dashboard-profile.spec.ts` — added in PR #31)
 * [x] E2E vehicle flow (`e2e/dashboard-vehicles.spec.ts` — create/edit/publish/mark sold/deactivate, photo upload/set-primary/delete, pending-showroom gating — see PR #26)
 * [ ] Figma visual QA (no Figma mockup exists for the showroom-owner dashboard/vehicle-management screens — confirmed before implementation; built from the existing admin-panel design system instead, per CLAUDE.md's "don't invent visual patterns where Figma already defines them, but don't fabricate a Figma reference either" spirit)
 
 ### Day 2 Gate
 
-* [ ] Showroom can manage its profile (self-service profile edit not built — showroom profile is currently admin-editable only, via `/admin/showrooms`)
+* [x] Showroom can manage its profile (self-service profile edit at `/dashboard/profile` — see PR #31)
 * [x] Showroom can manage vehicles (add/edit/publish/mark sold/deactivate/photos — see PR #26)
 * [x] Admin can manage showroom/vehicle data (showroom: PR #20-#23; vehicle catalog taxonomy: PR #15/#17 — admin vehicle *moderation* specifically is Day 4/ADM-004, not yet built)
-* [x] Required tests pass (201/201 unit+integration, 46/46 E2E, typecheck/lint/build all clean as of PR #26)
+* [x] Required tests pass (207/207 unit+integration, 59/59 E2E, typecheck/lint/build all clean as of PR #31)
 
-**Status:** 🟡 Day 2 Gate mostly closed — showroom self-service profile editing is the one remaining item
+**Status:** 🟢 Day 2 Gate CLOSED — showroom self-service profile editing (PR #31) was the last remaining item
 
 ---
 
@@ -620,6 +620,9 @@ Record important scope or architectural decisions here.
 | 2026-09-05 | Code Review Agent flagged (non-blocking, tracked as B-008) that PR #29's `bodySizeLimit` increase is a global Next.js setting — every Server Action in the app, not just uploads, now accepts request bodies up to 20MB instead of 1MB, with no rate limiting anywhere in the app to compensate | Independent Code Review Agent finding — accepted as a deliberate, necessary trade-off for uploads to work at all (Next.js exposes no per-action override), but logged as a real pre-production hardening item rather than dismissed |
 | 2026-09-05 | Added a Status field to the vehicle create/edit form (PR #30), choosing "add a field" over "auto-publish on create": a brand-new vehicle has no photos yet (only addable once it has a real id), so auto-publishing would put an empty listing live immediately. The field reuses the existing `updateVehicleStatusAction` (same authorization path as the list's own status dropdown), called as a follow-up after the main create/update succeeds, only when the selected status actually changed | User: "when add a vechicle this should auto published or add a field on vehicle crud form which is good ux point of view" |
 | 2026-09-05 | Code review (PR #30) found 1 HIGH, fixed and re-verified: the edit form's "did status change?" check compared against the `initialValues` prop, which is frozen at page-load time (neither `updateVehicleAction` nor `updateVehicleStatusAction` triggers a navigation/refresh) — a second status change in the same visit without a reload compared against the stale original status instead of the just-persisted one, silently failing to apply a real revert while still showing a success toast. Fixed by tracking a `lastKnownStatus` local state, updated only after a successful status change, instead of the frozen prop | Independent Code Review Agent finding, not self-caught — a reminder that any "did X change from its original value" check against a prop needs to ask what actually keeps that prop's value current across repeated saves without a full remount |
+| 2026-09-05 | Built showroom self-service profile editing (PR #31) — the last open Day 2 gate item. New `/dashboard/profile` lets a showroom owner edit business name, logo, location, phone, email, address, and description themselves, instead of only via admin. The actual DB-write-and-logo-upload logic was extracted out of admin's existing `updateShowroomAction` into a shared `updateShowroomProfile()` helper (`src/features/showroom/profile.ts`), now called by both admin's action (form-supplied showroom id, page already admin-gated) and a new owner action (`updateMyShowroomProfileAction`) that never accepts a showroom id from the client at all — it always resolves the caller's own showroom server-side via the existing `getOwnerShowroom(user.id)`. Deliberately not gated to APPROVED-only (unlike vehicle management): a PENDING showroom can still correct its submitted details while awaiting review | User: "start showroom self service profile editing" |
+| 2026-09-05 | While building PR #31, found and fixed a real, previously-undiscovered RLS gap: the `showroom-logos` Storage bucket's write policies were admin-only (`20260905060002_create_showroom_logos_storage_policies.sql`), with no owner-write path at all — confirmed live (not assumed) that a real showroom owner's logo upload failed with "new row violates row-level security policy" against the old policies. Fixed via new migration `20260905210000_showroom_logos_owner_write.sql`, extending insert/update/delete to owner-or-admin (mirroring `vehicle-media`'s existing pattern, using `owns_showroom()` on the path's showroom-id segment); `src/lib/supabase/storage-rls.integration.test.ts`'s `showroom-logos` block rewritten to cover the new shape. This would have blocked every real showroom owner's logo upload had it shipped without self-service profile editing surfacing it | Self-caught via live reproduction before writing the fix — the original migration's own comment had explicitly anticipated this exact moment ("extend additively... once that lands") |
+| 2026-09-05 | Code review (PR #31) found 2 MEDIUM, both fixed and re-verified: (1) the admin/owner refactor changed `updateShowroomAction`'s prior behavior — `revalidatePath` now fired even when the DB update errored or matched 0 rows, where before it only fired on success/warning; fixed by returning early on `result.error` in both the admin and new owner actions before revalidating. (2) the extraction that unified admin's and owner's actual update-and-logo logic (into `updateShowroomProfile()`) left the smaller field-extraction step still duplicated between `readShowroomFormFields` (admin) and `readShowroomProfileFormFields` (owner) — unified into the one implementation in `src/features/showroom/profile.ts`, imported by both callers | Independent Code Review Agent finding, not self-caught — same "a refactor's own stated goal (preserve behavior / eliminate duplication) is itself something to verify, not just the new code" discipline as prior PRs |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
