@@ -27,6 +27,15 @@ const NOT_FOUND_ERROR = "Not found, or you don't have permission to do that.";
 const NO_SHOWROOM_ERROR = "No showroom found for your account.";
 
 function readVehicleFormData(formData: FormData) {
+  const installmentEnabled = String(formData.get("installmentEnabled") ?? "");
+  // The Financing section (and its own validation errors) is only rendered
+  // in the UI while "Available on installment" is checked — a value left
+  // over from before the owner unchecked it must not block saving, or the
+  // server would reject a submission the user has no visible field left to
+  // fix (confirmed live: an invalid financing value + installment
+  // unchecked silently failed to save before this blanking was added).
+  const financingFieldsActive = installmentEnabled === "true";
+
   return {
     title: String(formData.get("title") ?? ""),
     make: String(formData.get("make") ?? ""),
@@ -45,17 +54,17 @@ function readVehicleFormData(formData: FormData) {
     doors: String(formData.get("doors") ?? ""),
     seats: String(formData.get("seats") ?? ""),
     countryOfOrigin: String(formData.get("countryOfOrigin") ?? ""),
-    installmentEnabled: String(formData.get("installmentEnabled") ?? ""),
+    installmentEnabled,
     bankFinanceEnabled: String(formData.get("bankFinanceEnabled") ?? ""),
     financingDownPaymentType: String(formData.get("financingDownPaymentType") ?? "PERCENT"),
-    financingDownPaymentPercent: String(formData.get("financingDownPaymentPercent") ?? ""),
-    financingDownPaymentAmount: String(formData.get("financingDownPaymentAmount") ?? ""),
-    financingInterestRate: String(formData.get("financingInterestRate") ?? ""),
-    financingInsurancePercent: String(formData.get("financingInsurancePercent") ?? ""),
-    financingPartner: String(formData.get("financingPartner") ?? ""),
-    financingTenureMonths: formData.getAll("financingTenureMonths").map(String),
-    financingTracker1YearPrice: String(formData.get("financingTracker1YearPrice") ?? ""),
-    financingTracker2YearPrice: String(formData.get("financingTracker2YearPrice") ?? ""),
+    financingDownPaymentPercent: financingFieldsActive ? String(formData.get("financingDownPaymentPercent") ?? "") : "",
+    financingDownPaymentAmount: financingFieldsActive ? String(formData.get("financingDownPaymentAmount") ?? "") : "",
+    financingInterestRate: financingFieldsActive ? String(formData.get("financingInterestRate") ?? "") : "",
+    financingInsurancePercent: financingFieldsActive ? String(formData.get("financingInsurancePercent") ?? "") : "",
+    financingPartner: financingFieldsActive ? String(formData.get("financingPartner") ?? "") : "",
+    financingTenureMonths: financingFieldsActive ? formData.getAll("financingTenureMonths").map(String) : [],
+    financingTracker1YearPrice: financingFieldsActive ? String(formData.get("financingTracker1YearPrice") ?? "") : "",
+    financingTracker2YearPrice: financingFieldsActive ? String(formData.get("financingTracker2YearPrice") ?? "") : "",
   };
 }
 

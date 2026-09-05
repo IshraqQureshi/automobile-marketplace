@@ -242,15 +242,40 @@ test("specification and financing fields save and reload correctly", async ({ pa
   await expect(page.locator("#vehicle-tracker-1yr")).toHaveValue("15000");
   await expect(page.getByLabel("24 months")).toBeChecked();
 
-  // Switching deposit type to Fixed hides the percent value and shows a
-  // fresh fixed-amount input instead.
-  await page.getByLabel("Deposit type").selectOption("FIXED");
+  // Switching deposit type to Fixed swaps in a fresh fixed-amount input at
+  // the same id (the percent and fixed inputs are two different elements
+  // rendered by a ternary, not one element with a changed binding). This
+  // <select> was already present in the very first paint after the reload
+  // above (installment was already enabled from the previous save), so an
+  // interaction fired the instant the page becomes actionable can land
+  // before hydration attaches its change handler and get silently
+  // overwritten on the next render — retry the select until the DOM
+  // genuinely reflects it, rather than trusting one attempt.
+  await expect(async () => {
+    await page.getByLabel("Deposit type").selectOption("FIXED");
+    await expect(page.getByLabel("Deposit type")).toHaveValue("FIXED");
+  }).toPass({ timeout: 10_000 });
   await page.locator("#vehicle-down-payment-value").fill("500000");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Vehicle updated.")).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Deposit type")).toHaveValue("FIXED");
   await expect(page.locator("#vehicle-down-payment-value")).toHaveValue("500000");
+});
+
+test("an invalid financing field left over after disabling installment doesn't silently block Save", async ({ page }) => {
+  const unique = Date.now();
+  const title = `E2E Hidden Financing Vehicle ${unique}`;
+
+  await loginAsFixtureOwner(page);
+  await createVehicleViaForm(page, title);
+
+  await page.getByLabel("Available on installment (HP)").check();
+  await page.locator("#vehicle-interest-rate").fill("-5");
+  await page.getByLabel("Available on installment (HP)").uncheck();
+  await page.locator("#vehicle-doors").fill("4");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
 });
 
 test("an approved owner can upload a vehicle photo and it becomes the featured image", async ({ page }) => {

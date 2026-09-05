@@ -143,6 +143,15 @@ const VALIDATED_FIELDS = [
   "doors",
   "seats",
   "countryOfOrigin",
+] as const;
+
+// Validated separately, and only when the Financing section is actually
+// visible (form.installmentEnabled) — these fields' only inputs and error
+// text live inside that conditionally-rendered section, so validating them
+// unconditionally could block Save on a field the user can no longer see
+// or fix (confirmed live: toggling installment off after typing an invalid
+// value there left Save silently doing nothing).
+const FINANCING_VALIDATED_FIELDS = [
   "financingDownPaymentPercent",
   "financingDownPaymentAmount",
   "financingInterestRate",
@@ -195,7 +204,10 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
     setFormError(null);
 
     let hasError = false;
-    for (const field of VALIDATED_FIELDS) {
+    const fieldsToValidate: readonly ((typeof VALIDATED_FIELDS)[number] | (typeof FINANCING_VALIDATED_FIELDS)[number])[] = form.installmentEnabled
+      ? [...VALIDATED_FIELDS, ...FINANCING_VALIDATED_FIELDS]
+      : VALIDATED_FIELDS;
+    for (const field of fieldsToValidate) {
       if (!vehicleFieldSchemas[field].safeParse(form[field]).success) {
         validate(field, form[field]);
         hasError = true;
