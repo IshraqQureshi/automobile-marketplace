@@ -18,6 +18,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { useFieldValidation } from "@/features/auth/use-field-validation";
+import { catalogFieldSchemas, catalogNameSchema } from "@/features/admin/catalog-schemas";
 
 export interface ModelItem {
   id: string;
@@ -42,11 +44,13 @@ interface CatalogModelsListProps {
 export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete }: CatalogModelsListProps) {
   const toast = useToast();
   const isActive = useIsActiveCatalogTab("models");
+  const { validate, errorFor } = useFieldValidation(catalogFieldSchemas);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<ModelItem | null>(null);
   const [name, setName] = useState("");
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
   const [formError, setFormError] = useState<string | null>(null);
+  const nameError = errorFor("name");
   const [deleteTarget, setDeleteTarget] = useState<ModelItem | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -90,6 +94,16 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    const parsed = catalogNameSchema.safeParse(name);
+    if (!parsed.success) {
+      validate("name", name);
+      setFormError(parsed.error.issues[0]?.message ?? "Invalid name.");
+      return;
+    }
+    if (!brandId) {
+      setFormError("Choose a brand.");
+      return;
+    }
     startTransition(async () => {
       const result = editingItem ? await onUpdate(editingItem.id, name, brandId) : await onCreate(brandId, name);
       if (result.error) {
@@ -169,7 +183,7 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
         {brands.length === 0 ? (
           <p className="text-sm text-neutral-500">Add a brand first before adding models.</p>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             {formError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
             <div className="mb-3">
               <FieldLabel htmlFor="model-brand">Brand</FieldLabel>
@@ -187,7 +201,17 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
               </select>
             </div>
             <FieldLabel htmlFor="model-name">Name</FieldLabel>
-            <Input id="model-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Corolla" autoFocus required />
+            <Input
+              id="model-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={(e) => validate("name", e.target.value)}
+              placeholder="e.g. Corolla"
+              autoFocus
+              required
+              error={!!nameError}
+            />
+            {nameError && <p className="mt-1 text-sm text-red-600">{nameError}</p>}
             <div className="mt-4">
               <DialogFormActions pending={pending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />
             </div>

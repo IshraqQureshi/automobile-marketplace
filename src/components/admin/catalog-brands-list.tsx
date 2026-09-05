@@ -20,6 +20,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { useFieldValidation } from "@/features/auth/use-field-validation";
+import { catalogFieldSchemas, catalogNameSchema } from "@/features/admin/catalog-schemas";
+import { validateLogoFile } from "@/features/admin/logo-upload";
 
 export interface BrandItem {
   id: string;
@@ -64,6 +67,7 @@ export function CatalogBrandsList({
 }: CatalogBrandsListProps) {
   const toast = useToast();
   const isActive = useIsActiveCatalogTab("brands");
+  const { validate, errorFor } = useFieldValidation(catalogFieldSchemas);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<BrandItem | null>(null);
   const [name, setName] = useState("");
@@ -71,6 +75,7 @@ export function CatalogBrandsList({
   const [logoInputKey, setLogoInputKey] = useState(0);
   const [removeLogo, setRemoveLogo] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const nameError = errorFor("name");
   const [deleteTarget, setDeleteTarget] = useState<BrandItem | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -118,6 +123,19 @@ export function CatalogBrandsList({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    const parsed = catalogNameSchema.safeParse(name);
+    if (!parsed.success) {
+      validate("name", name);
+      setFormError(parsed.error.issues[0]?.message ?? "Invalid name.");
+      return;
+    }
+    if (logo) {
+      const logoError = validateLogoFile(logo);
+      if (logoError) {
+        setFormError(logoError);
+        return;
+      }
+    }
     startTransition(async () => {
       const formData = new FormData();
       formData.set("name", name);
@@ -197,11 +215,21 @@ export function CatalogBrandsList({
         title={editingItem ? "Edit Brand" : "New Brand"}
         description={editingItem ? undefined : "Add a new vehicle manufacturer to the catalog."}
       >
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           {formError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
 
           <FieldLabel htmlFor="brand-name">Name</FieldLabel>
-          <Input id="brand-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={addPlaceholder} autoFocus required />
+          <Input
+            id="brand-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={(e) => validate("name", e.target.value)}
+            placeholder={addPlaceholder}
+            autoFocus
+            required
+            error={!!nameError}
+          />
+          {nameError && <p className="mt-1 text-sm text-red-600">{nameError}</p>}
 
           <div className="mt-3">
             <FieldLabel htmlFor="brand-logo">Logo</FieldLabel>

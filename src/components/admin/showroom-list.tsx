@@ -20,7 +20,10 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { useFieldValidation } from "@/features/auth/use-field-validation";
+import { validateLogoFile } from "@/features/admin/logo-upload";
 import { approveShowroomAction, getShowroomDocumentUrlAction, rejectShowroomAction, type ShowroomOwnerCandidate } from "@/features/admin/showroom-actions";
+import { adminShowroomSchema, newOwnerFieldSchemas, newOwnerSchema, showroomFieldSchemas } from "@/features/admin/showroom-schemas";
 import { stripKenyaPrefix } from "@/lib/validation/kenya-phone";
 
 export interface ShowroomDocumentItem {
@@ -122,6 +125,16 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   // top — same reasoning as the approve/reject inline confirmation swap.
   const [previewingDocument, setPreviewingDocument] = useState<PreviewingDocument | null>(null);
   const [reviewPending, startReviewTransition] = useTransition();
+
+  // Real, application-level (zod) validation, not just native HTML5
+  // attributes — mirrors register-showroom-form.tsx's use of the same
+  // hook against the same schemas: on-blur inline errors here, plus an
+  // explicit safeParse in handleSubmit below that blocks the server call
+  // entirely for invalid input, rather than relying on the browser's own
+  // (bypassable, and not actually a validation guarantee) constraint
+  // validation to keep bad data from ever being submitted.
+  const { validate: validateField, errorFor: errorForField } = useFieldValidation(showroomFieldSchemas);
+  const { validate: validateOwnerField, errorFor: errorForOwnerField } = useFieldValidation(newOwnerFieldSchemas);
 
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<ShowroomListItem | null>(null);
@@ -266,20 +279,55 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+
+    // Real zod validation against the exact same schemas the server action
+    // uses — not just the browser's native `required`/`type=email`
+    // constraint validation, which a user can trivially bypass (e.g. via
+    // devtools) and which isn't itself a source of truth. This blocks the
+    // network call entirely for invalid input; the server independently
+    // re-validates everything regardless, same as every other form in
+    // this app that uses useFieldValidation.
+    const businessParsed = adminShowroomSchema.safeParse({
+      businessName: form.businessName,
+      location: form.location,
+      businessPhone: form.businessPhone,
+      businessEmail: form.businessEmail,
+      address: form.address,
+      description: form.description,
+    });
+    if (!businessParsed.success) {
+      for (const field of Object.keys(showroomFieldSchemas) as (keyof typeof showroomFieldSchemas)[]) {
+        validateField(field, form[field as keyof ShowroomFormState] ?? "");
+      }
+      setFormError(businessParsed.error.issues[0]?.message ?? "Please fix the errors below.");
+      return;
+    }
+
+    if (logo) {
+      const logoError = validateLogoFile(logo);
+      if (logoError) {
+        setFormError(logoError);
+        return;
+      }
+    }
+
     if (!editingItem) {
       if (ownerMode === "existing" && !selectedOwner) {
         setFormError("Choose an owner for this showroom.");
         return;
       }
-      if (ownerMode === "new" && !newOwner.ownerFullName.trim()) {
-        setFormError("Enter the new owner's full name.");
-        return;
-      }
-      if (ownerMode === "new" && !newOwner.ownerEmail.trim()) {
-        setFormError("Enter the new owner's email.");
-        return;
+      if (ownerMode === "new") {
+        const ownerParsed = newOwnerSchema.safeParse(newOwner);
+        if (!ownerParsed.success) {
+          for (const field of Object.keys(newOwnerFieldSchemas) as (keyof typeof newOwnerFieldSchemas)[]) {
+            validateOwnerField(field, newOwner[field]);
+          }
+          setFormError(ownerParsed.error.issues[0]?.message ?? "Please fix the new owner's details below.");
+          return;
+        }
       }
     }
+
     startCrudTransition(async () => {
       const formData = new FormData();
       formData.set("businessName", form.businessName);
@@ -547,7 +595,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
         title={editingItem ? "Edit Showroom" : "New Showroom"}
         description={editingItem ? undefined : "Register a showroom on behalf of an existing user."}
       >
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3" noValidate>
           {formError && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
 
           {!editingItem && (
@@ -637,9 +685,12 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                       id="new-owner-name"
                       value={newOwner.ownerFullName}
                       onChange={(e) => setNewOwner((o) => ({ ...o, ownerFullName: e.target.value }))}
+                      onBlur={(e) => validateOwnerField("ownerFullName", e.target.value)}
                       required
                       autoFocus
+                      error={!!errorForOwnerField("ownerFullName")}
                     />
+                    {errorForOwnerField("ownerFullName") && <p className="mt-1 text-sm text-red-600">{errorForOwnerField("ownerFullName")}</p>}
                   </div>
                   <div>
                     <FieldLabel htmlFor="new-owner-email">Owner email</FieldLabel>
@@ -648,8 +699,11 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                       type="email"
                       value={newOwner.ownerEmail}
                       onChange={(e) => setNewOwner((o) => ({ ...o, ownerEmail: e.target.value }))}
+                      onBlur={(e) => validateOwnerField("ownerEmail", e.target.value)}
                       required
+                      error={!!errorForOwnerField("ownerEmail")}
                     />
+                    {errorForOwnerField("ownerEmail") && <p className="mt-1 text-sm text-red-600">{errorForOwnerField("ownerEmail")}</p>}
                   </div>
                   <div>
                     <FieldLabel htmlFor="new-owner-phone">Owner phone (optional)</FieldLabel>
@@ -659,9 +713,12 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                         id="new-owner-phone"
                         value={newOwner.ownerPhone}
                         onChange={(e) => setNewOwner((o) => ({ ...o, ownerPhone: e.target.value }))}
+                        onBlur={(e) => validateOwnerField("ownerPhone", e.target.value)}
                         placeholder="712345678"
+                        error={!!errorForOwnerField("ownerPhone")}
                       />
                     </div>
+                    {errorForOwnerField("ownerPhone") && <p className="mt-1 text-sm text-red-600">{errorForOwnerField("ownerPhone")}</p>}
                   </div>
                   <p className="text-xs text-neutral-500">We&apos;ll email them an invite to set up their login.</p>
                 </div>
@@ -675,8 +732,11 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
               id="showroom-business-name"
               value={form.businessName}
               onChange={(e) => setForm((f) => ({ ...f, businessName: e.target.value }))}
+              onBlur={(e) => validateField("businessName", e.target.value)}
               required
+              error={!!errorForField("businessName")}
             />
+            {errorForField("businessName") && <p className="mt-1 text-sm text-red-600">{errorForField("businessName")}</p>}
           </div>
 
           <div>
@@ -750,7 +810,15 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
 
           <div>
             <FieldLabel htmlFor="showroom-location">Location</FieldLabel>
-            <Input id="showroom-location" value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} required />
+            <Input
+              id="showroom-location"
+              value={form.location}
+              onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+              onBlur={(e) => validateField("location", e.target.value)}
+              required
+              error={!!errorForField("location")}
+            />
+            {errorForField("location") && <p className="mt-1 text-sm text-red-600">{errorForField("location")}</p>}
           </div>
 
           <div>
@@ -761,10 +829,13 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                 id="showroom-phone"
                 value={form.businessPhone}
                 onChange={(e) => setForm((f) => ({ ...f, businessPhone: e.target.value }))}
+                onBlur={(e) => validateField("businessPhone", e.target.value)}
                 placeholder="712345678"
                 required
+                error={!!errorForField("businessPhone")}
               />
             </div>
+            {errorForField("businessPhone") && <p className="mt-1 text-sm text-red-600">{errorForField("businessPhone")}</p>}
           </div>
 
           <div>
@@ -774,13 +845,23 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
               type="email"
               value={form.businessEmail}
               onChange={(e) => setForm((f) => ({ ...f, businessEmail: e.target.value }))}
+              onBlur={(e) => validateField("businessEmail", e.target.value)}
               required
+              error={!!errorForField("businessEmail")}
             />
+            {errorForField("businessEmail") && <p className="mt-1 text-sm text-red-600">{errorForField("businessEmail")}</p>}
           </div>
 
           <div>
             <FieldLabel htmlFor="showroom-address">Address (optional)</FieldLabel>
-            <Input id="showroom-address" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+            <Input
+              id="showroom-address"
+              value={form.address}
+              onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+              onBlur={(e) => validateField("address", e.target.value)}
+              error={!!errorForField("address")}
+            />
+            {errorForField("address") && <p className="mt-1 text-sm text-red-600">{errorForField("address")}</p>}
           </div>
 
           <div>
@@ -789,9 +870,11 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
               id="showroom-description"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              onBlur={(e) => validateField("description", e.target.value)}
               rows={3}
               className="w-full rounded-md border border-neutral-300 px-3 py-2.5 text-sm outline-none placeholder:text-neutral-400 focus:border-brand focus:ring-1 focus:ring-brand"
             />
+            {errorForField("description") && <p className="mt-1 text-sm text-red-600">{errorForField("description")}</p>}
           </div>
 
           <DialogFormActions pending={crudPending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />
