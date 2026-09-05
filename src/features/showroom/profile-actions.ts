@@ -41,6 +41,7 @@ export async function updateMyShowroomProfileAction(formData: FormData): Promise
   if (!showroom) return { error: "No showroom found for your account." };
 
   const result = await updateShowroomProfile(supabase, showroom.id, parsed.data, logoFile, removeLogo);
+  if (result.error) return result;
 
   revalidatePath("/dashboard/profile");
   revalidatePath("/dashboard");

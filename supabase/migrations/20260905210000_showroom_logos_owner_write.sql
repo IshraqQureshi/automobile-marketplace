@@ -4,9 +4,12 @@
 -- this moment: a showroom-owner-facing profile editor now exists
 -- (self-service showroom profile editing), and its logo upload was
 -- confirmed live to fail with "new row violates row-level security policy"
--- against the admin-only policies. Mirrors vehicle-media's owner-or-admin
--- pattern exactly — path convention is showroom-logos/{showroom_id}/logo-
--- {uuid}.{ext}, so (storage.foldername(name))[1] is the showroom id.
+-- against the admin-only policies. Update/delete mirror vehicle-media's
+-- owner-or-admin pattern exactly; insert is intentionally owner-or-admin
+-- (rather than owner-only like vehicle-media's insert) because an admin can
+-- also create a showroom, with a logo, on an owner's behalf. Path
+-- convention is showroom-logos/{showroom_id}/logo-{uuid}.{ext}, so
+-- (storage.foldername(name))[1] is the showroom id.
 
 drop policy showroom_logos_storage_insert_admin_only on storage.objects;
 drop policy showroom_logos_storage_update_admin_only on storage.objects;

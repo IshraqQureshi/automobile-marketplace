@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { uploadShowroomDocuments } from "@/features/showroom/document-upload";
-import { updateShowroomProfile } from "@/features/showroom/profile";
+import { readShowroomProfileFormFields, updateShowroomProfile } from "@/features/showroom/profile";
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
   BUSINESS_REGISTRATION_DOCUMENT_TYPE,
@@ -83,26 +83,6 @@ export async function getShowroomDocumentUrlAction(storagePath: string): Promise
     return { error: "Failed to open document." };
   }
   return { url: data.signedUrl };
-}
-
-interface ShowroomFormFields {
-  businessName: FormDataEntryValue | null;
-  location: FormDataEntryValue | null;
-  businessPhone: FormDataEntryValue | null;
-  businessEmail: FormDataEntryValue | null;
-  address: FormDataEntryValue | null;
-  description: FormDataEntryValue | null;
-}
-
-function readShowroomFormFields(formData: FormData): ShowroomFormFields {
-  return {
-    businessName: formData.get("businessName"),
-    location: formData.get("location"),
-    businessPhone: formData.get("businessPhone"),
-    businessEmail: formData.get("businessEmail"),
-    address: formData.get("address"),
-    description: formData.get("description"),
-  };
 }
 
 // Shared by every action below that needs the service-role client (bypasses
@@ -191,7 +171,7 @@ async function inviteNewShowroomOwner(formData: FormData): Promise<{ error?: str
 // eliminating; the showroom insert itself could still fail afterward) the
 // window for a dangling invited-but-showroom-less account.
 export async function createShowroomAction(formData: FormData): Promise<ShowroomActionResult> {
-  const parsed = adminShowroomSchema.safeParse(readShowroomFormFields(formData));
+  const parsed = adminShowroomSchema.safeParse(readShowroomProfileFormFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid showroom details." };
 
   const documents = readDocumentFiles(formData);
@@ -286,7 +266,7 @@ export async function updateShowroomAction(formData: FormData): Promise<Showroom
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Missing showroom id." };
 
-  const parsed = adminShowroomSchema.safeParse(readShowroomFormFields(formData));
+  const parsed = adminShowroomSchema.safeParse(readShowroomProfileFormFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid showroom details." };
 
   const logoEntry = formData.get("logo");
@@ -299,6 +279,7 @@ export async function updateShowroomAction(formData: FormData): Promise<Showroom
 
   const supabase = await createClient();
   const result = await updateShowroomProfile(supabase, id, parsed.data, logoFile, removeLogo);
+  if (result.error) return result;
 
   revalidatePath("/admin/showrooms");
   revalidatePath("/admin");
