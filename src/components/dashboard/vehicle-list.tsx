@@ -79,22 +79,24 @@ export function VehicleList({ vehicles }: VehicleListProps) {
         </Link>
       </div>
 
-      <FilterBar>
-        <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search title, make, or model…" />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className={`${filterSelectClassName} w-40`}
-          aria-label="Filter by status"
-        >
-          <option value="ALL">All statuses</option>
-          {(Object.keys(STATUS_LABELS) as VehicleStatus[]).map((status) => (
-            <option key={status} value={status}>
-              {STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
-      </FilterBar>
+      {vehicles.length > 0 && (
+        <FilterBar>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search title, make, or model…" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            className={`${filterSelectClassName} w-40`}
+            aria-label="Filter by status"
+          >
+            <option value="ALL">All statuses</option>
+            {(Object.keys(STATUS_LABELS) as VehicleStatus[]).map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
+        </FilterBar>
+      )}
 
       <TableShell>
         {vehicles.length === 0 ? (

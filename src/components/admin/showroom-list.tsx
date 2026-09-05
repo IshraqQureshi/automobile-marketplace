@@ -424,22 +424,24 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
         onAction={openCreate}
       />
 
-      <FilterBar>
-        <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search business, email, phone, or city…" />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className={`${filterSelectClassName} w-40`}
-          aria-label="Filter by status"
-        >
-          <option value="ALL">All statuses</option>
-          {SHOWROOM_STATUS_OPTIONS.map((status) => (
-            <option key={status} value={status}>
-              {status.charAt(0) + status.slice(1).toLowerCase()}
-            </option>
-          ))}
-        </select>
-      </FilterBar>
+      {items.length > 0 && (
+        <FilterBar>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search business, email, phone, or city…" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            className={`${filterSelectClassName} w-40`}
+            aria-label="Filter by status"
+          >
+            <option value="ALL">All statuses</option>
+            {SHOWROOM_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status.charAt(0) + status.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </FilterBar>
+      )}
 
       <TableShell>
         {items.length === 0 ? (
