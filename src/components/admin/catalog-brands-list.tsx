@@ -2,7 +2,24 @@
 
 import Image from "next/image";
 import { useState, useTransition } from "react";
-import { CatalogCardHeader, CheckIcon, MetaBadge, PencilIcon, PlusIcon, RowIconButton, TagIcon, TrashIcon, UploadIcon, XIcon } from "./catalog-ui";
+import { useIsActiveCatalogTab } from "./catalog-tabs";
+import {
+  CatalogSectionHeader,
+  DialogFormActions,
+  FieldLabel,
+  MetaBadge,
+  PencilIcon,
+  RowIconButton,
+  TableEmptyState,
+  TableShell,
+  TagIcon,
+  TrashIcon,
+  UploadIcon,
+} from "./catalog-ui";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 
 export interface BrandItem {
   id: string;
@@ -29,7 +46,7 @@ interface CatalogBrandsListProps {
 const LOGO_ACCEPT = "image/jpeg,image/png,image/webp,image/svg+xml";
 
 /**
- * Brands get their own CRUD list (rather than reusing CatalogList, which
+ * Brands get their own CRUD table (rather than reusing CatalogList, which
  * Vehicle Types still uses) because a logo upload needs FormData-based
  * actions and a thumbnail/file-input UI that Types doesn't need — same
  * reasoning as why Models has its own component.
@@ -45,179 +62,187 @@ export function CatalogBrandsList({
   onDelete,
   deleteWarning,
 }: CatalogBrandsListProps) {
-  const [newName, setNewName] = useState("");
-  const [newLogo, setNewLogo] = useState<File | null>(null);
-  const [newLogoInputKey, setNewLogoInputKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [editLogo, setEditLogo] = useState<File | null>(null);
-  const [editRemoveLogo, setEditRemoveLogo] = useState(false);
-  const [editLogoInputKey, setEditLogoInputKey] = useState(0);
+  const toast = useToast();
+  const isActive = useIsActiveCatalogTab("brands");
+  const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
+  const [editingItem, setEditingItem] = useState<BrandItem | null>(null);
+  const [name, setName] = useState("");
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoInputKey, setLogoInputKey] = useState(0);
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BrandItem | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function handleCreate() {
-    setError(null);
+  // A Dialog/ConfirmDialog renders via a document.body portal, outside this
+  // component's own (possibly `hidden`) tab panel — so leaving one open
+  // while switching to a different tab would leave its full-viewport
+  // overlay blocking that other tab. Close both the moment this panel
+  // stops being the active one — done as a render-time state adjustment
+  // (React's documented pattern for "reset state when a prop changes")
+  // rather than a useEffect, which this project's lint config flags as a
+  // setState-in-effect anti-pattern.
+  const [prevIsActive, setPrevIsActive] = useState(isActive);
+  if (isActive !== prevIsActive) {
+    setPrevIsActive(isActive);
+    if (!isActive) {
+      setDialogMode(null);
+      setDeleteTarget(null);
+    }
+  }
+
+  function openCreate() {
+    setDialogMode("create");
+    setEditingItem(null);
+    setName("");
+    setLogo(null);
+    setRemoveLogo(false);
+    setLogoInputKey((k) => k + 1);
+    setFormError(null);
+  }
+
+  function openEdit(item: BrandItem) {
+    setDialogMode("edit");
+    setEditingItem(item);
+    setName(item.name);
+    setLogo(null);
+    setRemoveLogo(false);
+    setLogoInputKey((k) => k + 1);
+    setFormError(null);
+  }
+
+  function closeDialog() {
+    setDialogMode(null);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
     startTransition(async () => {
       const formData = new FormData();
-      formData.set("name", newName);
-      if (newLogo) formData.set("logo", newLogo);
-      const result = await onCreate(formData);
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setNewName("");
-        setNewLogo(null);
-        setNewLogoInputKey((k) => k + 1);
+      formData.set("name", name);
+      if (logo) formData.set("logo", logo);
+      if (editingItem) {
+        formData.set("id", editingItem.id);
+        if (removeLogo) formData.set("removeLogo", "true");
       }
+      const result = editingItem ? await onUpdate(formData) : await onCreate(formData);
+      if (result.error) {
+        setFormError(result.error);
+        return;
+      }
+      toast.success(editingItem ? "Brand updated." : "Brand created.");
+      closeDialog();
     });
   }
 
-  function startEditing(item: BrandItem) {
-    setEditingId(item.id);
-    setEditValue(item.name);
-    setEditLogo(null);
-    setEditRemoveLogo(false);
-    setEditLogoInputKey((k) => k + 1);
-    setError(null);
-  }
-
-  function handleSaveEdit(id: string) {
-    setError(null);
+  function handleDelete() {
+    if (!deleteTarget) return;
     startTransition(async () => {
-      const formData = new FormData();
-      formData.set("id", id);
-      formData.set("name", editValue);
-      if (editLogo) formData.set("logo", editLogo);
-      if (editRemoveLogo) formData.set("removeLogo", "true");
-      const result = await onUpdate(formData);
+      const result = await onDelete(deleteTarget.id);
       if (result.error) {
-        setError(result.error);
+        toast.error(result.error);
       } else {
-        setEditingId(null);
+        toast.success("Brand deleted.");
       }
-    });
-  }
-
-  function handleDelete(item: BrandItem) {
-    const message = `Delete "${item.name}"?${deleteWarning ? ` ${deleteWarning}` : ""}`;
-    if (!window.confirm(message)) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await onDelete(item.id);
-      if (result.error) setError(result.error);
+      setDeleteTarget(null);
     });
   }
 
   return (
-    <div data-testid={`catalog-list-${title.toLowerCase()}`} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-      <CatalogCardHeader icon={<TagIcon />} title={title} description={description} count={items.length} />
+    <div>
+      <CatalogSectionHeader icon={<TagIcon />} title={title} description={description} actionLabel="New Brand" onAction={openCreate} />
 
-      <div className="border-b border-neutral-200 px-5 py-3">
-        {error && <p className="mb-2 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600">{error}</p>}
-        <div className="flex min-w-0 gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder={addPlaceholder}
-            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-          />
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={pending || !newName.trim()}
-            className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <PlusIcon />
-            Add
-          </button>
-        </div>
-        <div className="mt-2">
-          <label
-            htmlFor="new-brand-logo"
-            className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-500 hover:border-brand hover:text-brand"
-          >
-            <UploadIcon />
-            <span className="truncate">{newLogo ? newLogo.name : "Upload logo (optional)"}</span>
-          </label>
-          <input
-            key={newLogoInputKey}
-            id="new-brand-logo"
-            type="file"
-            aria-label="Logo"
-            accept={LOGO_ACCEPT}
-            onChange={(e) => setNewLogo(e.target.files?.[0] ?? null)}
-            className="sr-only"
-          />
-        </div>
-      </div>
+      <TableShell>
+        {items.length === 0 ? (
+          <TableEmptyState message={emptyMessage} />
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-xs font-semibold tracking-wide text-neutral-400 uppercase">
+                <th className="px-5 py-3 font-semibold">Name</th>
+                <th className="px-5 py-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <BrandLogoThumbnail logoUrl={item.logoUrl} name={item.name} />
+                      <span className="font-medium text-neutral-800">{item.name}</span>
+                      {item.meta && <MetaBadge>{item.meta}</MetaBadge>}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex justify-end gap-1">
+                      <RowIconButton label="Edit" onClick={() => openEdit(item)}>
+                        <PencilIcon />
+                      </RowIconButton>
+                      <RowIconButton label="Delete" onClick={() => setDeleteTarget(item)} variant="danger">
+                        <TrashIcon />
+                      </RowIconButton>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </TableShell>
 
-      {items.length === 0 ? (
-        <p className="px-5 py-8 text-center text-sm text-neutral-400">{emptyMessage}</p>
-      ) : (
-        <ul className="max-h-80 overflow-y-auto">
-          {items.map((item) => (
-            <li key={item.id} className="flex min-w-0 items-center gap-3 border-b border-neutral-100 px-5 py-3 last:border-b-0 hover:bg-neutral-50">
-              {editingId === item.id ? (
-                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-                      autoFocus
-                    />
-                    <RowIconButton label="Save" onClick={() => handleSaveEdit(item.id)} disabled={pending} variant="brand">
-                      <CheckIcon />
-                    </RowIconButton>
-                    <RowIconButton label="Cancel" onClick={() => setEditingId(null)}>
-                      <XIcon />
-                    </RowIconButton>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label
-                      htmlFor={`edit-brand-logo-${item.id}`}
-                      className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-500 hover:border-brand hover:text-brand"
-                    >
-                      <UploadIcon />
-                      <span className="truncate">{editLogo ? editLogo.name : "Replace logo"}</span>
-                    </label>
-                    <input
-                      key={editLogoInputKey}
-                      id={`edit-brand-logo-${item.id}`}
-                      type="file"
-                      aria-label="Replace logo"
-                      accept={LOGO_ACCEPT}
-                      onChange={(e) => setEditLogo(e.target.files?.[0] ?? null)}
-                      className="sr-only"
-                    />
-                    {item.logoUrl && !editLogo && (
-                      <label className="flex shrink-0 items-center gap-1.5 text-xs text-neutral-500">
-                        <input type="checkbox" checked={editRemoveLogo} onChange={(e) => setEditRemoveLogo(e.target.checked)} />
-                        Remove logo
-                      </label>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <BrandLogoThumbnail logoUrl={item.logoUrl} name={item.name} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-800">{item.name}</span>
-                  {item.meta && <MetaBadge>{item.meta}</MetaBadge>}
-                  <RowIconButton label="Edit" onClick={() => startEditing(item)}>
-                    <PencilIcon />
-                  </RowIconButton>
-                  <RowIconButton label="Delete" onClick={() => handleDelete(item)} disabled={pending} variant="danger">
-                    <TrashIcon />
-                  </RowIconButton>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Dialog
+        open={dialogMode !== null}
+        onClose={closeDialog}
+        title={editingItem ? "Edit Brand" : "New Brand"}
+        description={editingItem ? undefined : "Add a new vehicle manufacturer to the catalog."}
+      >
+        <form onSubmit={handleSubmit}>
+          {formError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
+
+          <FieldLabel htmlFor="brand-name">Name</FieldLabel>
+          <Input id="brand-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={addPlaceholder} autoFocus required />
+
+          <div className="mt-3">
+            <FieldLabel htmlFor="brand-logo">Logo</FieldLabel>
+            <label
+              htmlFor="brand-logo"
+              className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:border-brand hover:text-brand"
+            >
+              <UploadIcon />
+              <span className="truncate">{logo ? logo.name : "Upload logo (optional)"}</span>
+            </label>
+            <input
+              key={logoInputKey}
+              id="brand-logo"
+              type="file"
+              aria-label="Logo"
+              accept={LOGO_ACCEPT}
+              onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
+              className="sr-only"
+            />
+            {editingItem?.logoUrl && !logo && (
+              <label className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
+                <input type="checkbox" checked={removeLogo} onChange={(e) => setRemoveLogo(e.target.checked)} />
+                Remove current logo
+              </label>
+            )}
+          </div>
+
+          <div className="mt-4">
+            <DialogFormActions pending={pending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />
+          </div>
+        </form>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete brand?"
+        description={`Delete "${deleteTarget?.name}"?${deleteWarning ? ` ${deleteWarning}` : ""}`}
+        pending={pending}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

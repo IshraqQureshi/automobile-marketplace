@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { ToastProvider } from "@/components/ui/toast";
 import { currentUserRole } from "@/features/auth/actions";
 import { createClient } from "@/lib/supabase/server";
 
@@ -28,9 +29,11 @@ export default async function AdminProtectedLayout({ children }: AdminProtectedL
   }
 
   return (
-    <div className="grid min-h-screen grid-cols-[248px_1fr] bg-white">
-      <AdminSidebar email={user.email ?? ""} />
-      <div className="flex min-w-0 flex-col">{children}</div>
-    </div>
+    <ToastProvider>
+      <div className="grid min-h-screen grid-cols-[248px_1fr] bg-white">
+        <AdminSidebar email={user.email ?? ""} />
+        <div className="flex min-w-0 flex-col">{children}</div>
+      </div>
+    </ToastProvider>
   );
 }

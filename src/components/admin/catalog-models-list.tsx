@@ -1,7 +1,23 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CarIcon, CatalogCardHeader, CheckIcon, MetaBadge, PencilIcon, PlusIcon, RowIconButton, TrashIcon, XIcon } from "./catalog-ui";
+import { useIsActiveCatalogTab } from "./catalog-tabs";
+import {
+  CarIcon,
+  CatalogSectionHeader,
+  DialogFormActions,
+  FieldLabel,
+  MetaBadge,
+  PencilIcon,
+  RowIconButton,
+  TableEmptyState,
+  TableShell,
+  TrashIcon,
+} from "./catalog-ui";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 
 export interface ModelItem {
   id: string;
@@ -24,144 +40,169 @@ interface CatalogModelsListProps {
 }
 
 export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete }: CatalogModelsListProps) {
-  const [newBrandId, setNewBrandId] = useState(brands[0]?.id ?? "");
-  const [newName, setNewName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editBrandId, setEditBrandId] = useState("");
+  const toast = useToast();
+  const isActive = useIsActiveCatalogTab("models");
+  const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
+  const [editingItem, setEditingItem] = useState<ModelItem | null>(null);
+  const [name, setName] = useState("");
+  const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ModelItem | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function handleCreate() {
-    setError(null);
+  // A Dialog/ConfirmDialog renders via a document.body portal, outside this
+  // component's own (possibly `hidden`) tab panel — so leaving one open
+  // while switching to a different tab would leave its full-viewport
+  // overlay blocking that other tab. Close both the moment this panel
+  // stops being the active one — done as a render-time state adjustment
+  // (React's documented pattern for "reset state when a prop changes")
+  // rather than a useEffect, which this project's lint config flags as a
+  // setState-in-effect anti-pattern.
+  const [prevIsActive, setPrevIsActive] = useState(isActive);
+  if (isActive !== prevIsActive) {
+    setPrevIsActive(isActive);
+    if (!isActive) {
+      setDialogMode(null);
+      setDeleteTarget(null);
+    }
+  }
+
+  function openCreate() {
+    setDialogMode("create");
+    setEditingItem(null);
+    setName("");
+    setBrandId(brands[0]?.id ?? "");
+    setFormError(null);
+  }
+
+  function openEdit(item: ModelItem) {
+    setDialogMode("edit");
+    setEditingItem(item);
+    setName(item.name);
+    setBrandId(item.brandId);
+    setFormError(null);
+  }
+
+  function closeDialog() {
+    setDialogMode(null);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
     startTransition(async () => {
-      const result = await onCreate(newBrandId, newName);
+      const result = editingItem ? await onUpdate(editingItem.id, name, brandId) : await onCreate(brandId, name);
       if (result.error) {
-        setError(result.error);
-      } else {
-        setNewName("");
+        setFormError(result.error);
+        return;
       }
+      toast.success(editingItem ? "Model updated." : "Model created.");
+      closeDialog();
     });
   }
 
-  function startEditing(item: ModelItem) {
-    setEditingId(item.id);
-    setEditName(item.name);
-    setEditBrandId(item.brandId);
-    setError(null);
-  }
-
-  function handleSaveEdit(id: string) {
-    setError(null);
+  function handleDelete() {
+    if (!deleteTarget) return;
     startTransition(async () => {
-      const result = await onUpdate(id, editName, editBrandId);
+      const result = await onDelete(deleteTarget.id);
       if (result.error) {
-        setError(result.error);
+        toast.error(result.error);
       } else {
-        setEditingId(null);
+        toast.success("Model deleted.");
       }
-    });
-  }
-
-  function handleDelete(item: ModelItem) {
-    if (!window.confirm(`Delete "${item.name}"?`)) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await onDelete(item.id);
-      if (result.error) setError(result.error);
+      setDeleteTarget(null);
     });
   }
 
   return (
-    <div data-testid="catalog-list-models" className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-      <CatalogCardHeader icon={<CarIcon />} title="Models" description="Scoped to a Brand" count={items.length} />
+    <div>
+      <CatalogSectionHeader
+        icon={<CarIcon />}
+        title="Models"
+        description="Vehicle models, each scoped to a Brand"
+        actionLabel="New Model"
+        onAction={openCreate}
+      />
 
-      <div className="border-b border-neutral-200 px-5 py-3">
-        {error && <p className="mb-2 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600">{error}</p>}
-        {brands.length === 0 ? (
-          <p className="text-xs text-neutral-400">Add a brand first before adding models.</p>
+      <TableShell>
+        {items.length === 0 ? (
+          <TableEmptyState message="No models yet." />
         ) : (
-          <div className="flex min-w-0 gap-2">
-            <select
-              value={newBrandId}
-              onChange={(e) => setNewBrandId(e.target.value)}
-              className="w-24 min-w-0 shrink-0 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-            >
-              {brands.map((brand) => (
-                <option key={brand.id} value={brand.id}>
-                  {brand.name}
-                </option>
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-xs font-semibold tracking-wide text-neutral-400 uppercase">
+                <th className="px-5 py-3 font-semibold">Name</th>
+                <th className="px-5 py-3 font-semibold">Brand</th>
+                <th className="px-5 py-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50">
+                  <td className="px-5 py-3 font-medium text-neutral-800">{item.name}</td>
+                  <td className="px-5 py-3">
+                    <MetaBadge>{item.brandName}</MetaBadge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex justify-end gap-1">
+                      <RowIconButton label="Edit" onClick={() => openEdit(item)}>
+                        <PencilIcon />
+                      </RowIconButton>
+                      <RowIconButton label="Delete" onClick={() => setDeleteTarget(item)} variant="danger">
+                        <TrashIcon />
+                      </RowIconButton>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </select>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Corolla"
-              className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-            />
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={pending || !newName.trim()}
-              className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <PlusIcon />
-              Add
-            </button>
-          </div>
+            </tbody>
+          </table>
         )}
-      </div>
+      </TableShell>
 
-      {items.length === 0 ? (
-        <p className="px-5 py-8 text-center text-sm text-neutral-400">No models yet.</p>
-      ) : (
-        <ul className="max-h-80 overflow-y-auto">
-          {items.map((item) => (
-            <li key={item.id} className="flex min-w-0 items-center gap-3 border-b border-neutral-100 px-5 py-3 last:border-b-0 hover:bg-neutral-50">
-              {editingId === item.id ? (
-                <>
-                  <select
-                    value={editBrandId}
-                    onChange={(e) => setEditBrandId(e.target.value)}
-                    className="w-24 min-w-0 shrink-0 rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-                  >
-                    {brands.map((brand) => (
-                      <option key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-                    autoFocus
-                  />
-                  <RowIconButton label="Save" onClick={() => handleSaveEdit(item.id)} disabled={pending} variant="brand">
-                    <CheckIcon />
-                  </RowIconButton>
-                  <RowIconButton label="Cancel" onClick={() => setEditingId(null)}>
-                    <XIcon />
-                  </RowIconButton>
-                </>
-              ) : (
-                <>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-800">{item.name}</span>
-                  <MetaBadge>{item.brandName}</MetaBadge>
-                  <RowIconButton label="Edit" onClick={() => startEditing(item)}>
-                    <PencilIcon />
-                  </RowIconButton>
-                  <RowIconButton label="Delete" onClick={() => handleDelete(item)} disabled={pending} variant="danger">
-                    <TrashIcon />
-                  </RowIconButton>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Dialog
+        open={dialogMode !== null}
+        onClose={closeDialog}
+        title={editingItem ? "Edit Model" : "New Model"}
+        description={editingItem ? undefined : "Add a new model to the catalog."}
+      >
+        {brands.length === 0 ? (
+          <p className="text-sm text-neutral-500">Add a brand first before adding models.</p>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            {formError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
+            <div className="mb-3">
+              <FieldLabel htmlFor="model-brand">Brand</FieldLabel>
+              <select
+                id="model-brand"
+                value={brandId}
+                onChange={(e) => setBrandId(e.target.value)}
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+              >
+                {brands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <FieldLabel htmlFor="model-name">Name</FieldLabel>
+            <Input id="model-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Corolla" autoFocus required />
+            <div className="mt-4">
+              <DialogFormActions pending={pending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />
+            </div>
+          </form>
+        )}
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete model?"
+        description={`Delete "${deleteTarget?.name}"?`}
+        pending={pending}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
