@@ -37,7 +37,7 @@ export async function updateMyProfileAction(formData: FormData): Promise<Account
 
   const { data, error } = await supabase
     .from("profiles")
-    .update({ full_name: parsed.data.fullName, phone: `+254${parsed.data.phone}` })
+    .update({ full_name: parsed.data.fullName, phone: parsed.data.phone ? `+254${parsed.data.phone}` : null })
     .eq("id", user.id)
     .select("id");
   if (error) {

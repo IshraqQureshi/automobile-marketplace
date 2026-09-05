@@ -159,6 +159,22 @@ test("an admin can update their own name and phone from /admin/profile", async (
   expect(data?.phone).toBe("+254722333444");
 });
 
+test("a name can be saved even when no phone is on file (e.g. a Google OAuth signup)", async ({ page }) => {
+  await admin().from("profiles").update({ phone: null }).eq("id", ownerId);
+
+  await loginAsFixtureOwner(page);
+  await page.goto("/dashboard/account");
+  await expect(page.locator("#account-phone")).toHaveValue("");
+
+  await page.locator("#account-full-name").fill("E2E Owner No Phone");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Profile updated.")).toBeVisible();
+
+  const { data } = await admin().from("profiles").select("full_name, phone").eq("id", ownerId).single();
+  expect(data?.full_name).toBe("E2E Owner No Phone");
+  expect(data?.phone).toBeNull();
+});
+
 test("required fields show inline validation, not a silent no-op", async ({ page }) => {
   await loginAsFixtureOwner(page);
   await page.goto("/dashboard/account");
@@ -172,49 +188,57 @@ test("required fields show inline validation, not a silent no-op", async ({ page
 test("a showroom owner can change their password and sign in with the new one", async ({ page }) => {
   const newPassword = "E2eNewOwnerPassword123!";
 
-  await loginAsFixtureOwner(page);
-  await page.goto("/dashboard/account");
+  // Wrapped in try/finally — restoring OWNER_PASSWORD must run even if an
+  // assertion below throws, or every later test in this file that logs in
+  // as the owner would fail for the rest of this run.
+  try {
+    await loginAsFixtureOwner(page);
+    await page.goto("/dashboard/account");
 
-  await page.locator("#account-new-password").fill(newPassword);
-  await page.locator("#account-confirm-password").fill(newPassword);
-  await page.getByRole("button", { name: "Update password" }).click();
-  await expect(page.getByText("Password updated.")).toBeVisible();
+    await page.locator("#account-new-password").fill(newPassword);
+    await page.locator("#account-confirm-password").fill(newPassword);
+    await page.getByRole("button", { name: "Update password" }).click();
+    await expect(page.getByText("Password updated.")).toBeVisible();
 
-  // Must actually sign out first — visiting /login with a still-active
-  // session redirects straight to /account instead of showing the form.
-  await page.getByRole("button", { name: "Log out" }).click();
-  await page.waitForURL("**/login");
-  await page.getByLabel("Email address").fill(OWNER_EMAIL);
-  await page.getByLabel("Password", { exact: true }).fill(newPassword);
-  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
-  await page.waitForURL("**/dashboard");
-
-  // Restore the fixture's known password so later/rerun tests in this file
-  // can still log in with OWNER_PASSWORD.
-  await admin().auth.admin.updateUserById(ownerId, { password: OWNER_PASSWORD });
+    // Must actually sign out first — visiting /login with a still-active
+    // session redirects straight to /account instead of showing the form.
+    await page.getByRole("button", { name: "Log out" }).click();
+    await page.waitForURL("**/login");
+    await page.getByLabel("Email address").fill(OWNER_EMAIL);
+    await page.getByLabel("Password", { exact: true }).fill(newPassword);
+    await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+    await page.waitForURL("**/dashboard");
+  } finally {
+    await admin().auth.admin.updateUserById(ownerId, { password: OWNER_PASSWORD });
+  }
 });
 
 test("changing email requires confirming links sent to both the old and new address", async ({ page }) => {
   const newEmail = `e2e-account-profile-owner-new-${Date.now()}@harakagari.local`;
 
-  await loginAsFixtureOwner(page);
-  await page.goto("/dashboard/account");
+  // Wrapped in try/finally — restoring OWNER_EMAIL must run even if an
+  // assertion below throws. Without this, a failed run leaves the fixture
+  // user's real email changed, so the next run's beforeAll (which finds
+  // the fixture by exact OWNER_EMAIL match) would silently create a brand
+  // new auth user instead of reusing this one, orphaning the old one.
+  try {
+    await loginAsFixtureOwner(page);
+    await page.goto("/dashboard/account");
 
-  await page.locator("#account-email").fill(newEmail);
-  await page.getByRole("button", { name: "Change email" }).click();
-  await expect(page.getByText("Confirmation email sent.")).toBeVisible();
+    await page.locator("#account-email").fill(newEmail);
+    await page.getByRole("button", { name: "Change email" }).click();
+    await expect(page.getByText("Confirmation email sent.")).toBeVisible();
 
-  // supabase/config.toml's double_confirm_changes = true — the change isn't
-  // applied until links sent to *both* addresses are clicked.
-  const oldAddressLink = await getLatestEmailLink(OWNER_EMAIL);
-  await page.goto(oldAddressLink);
-  const newAddressLink = await getLatestEmailLink(newEmail);
-  await page.goto(newAddressLink);
+    // supabase/config.toml's double_confirm_changes = true — the change
+    // isn't applied until links sent to *both* addresses are clicked.
+    const oldAddressLink = await getLatestEmailLink(OWNER_EMAIL);
+    await page.goto(oldAddressLink);
+    const newAddressLink = await getLatestEmailLink(newEmail);
+    await page.goto(newAddressLink);
 
-  const { data } = await admin().auth.admin.getUserById(ownerId);
-  expect(data.user?.email).toBe(newEmail);
-
-  // Restore the fixture's known email so later/rerun tests in this file
-  // can still log in with OWNER_EMAIL.
-  await admin().auth.admin.updateUserById(ownerId, { email: OWNER_EMAIL, email_confirm: true });
+    const { data } = await admin().auth.admin.getUserById(ownerId);
+    expect(data.user?.email).toBe(newEmail);
+  } finally {
+    await admin().auth.admin.updateUserById(ownerId, { email: OWNER_EMAIL, email_confirm: true });
+  }
 });

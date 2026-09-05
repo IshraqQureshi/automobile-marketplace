@@ -21,6 +21,14 @@ describe("profileSchema", () => {
     const result = profileSchema.safeParse({ fullName: "Jane Wanjiru", phone: "12345" });
     expect(result.success).toBe(false);
   });
+
+  it("accepts a blank phone — e.g. a Google OAuth signup, which never has one on file", () => {
+    const result = profileSchema.safeParse({ fullName: "Jane Wanjiru", phone: "" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.phone).toBeUndefined();
+    }
+  });
 });
 
 describe("emailSchema", () => {

@@ -68,8 +68,13 @@ function ProfileSection({ initialValues }: { initialValues: AccountProfileInitia
 
     startTransition(async () => {
       const result = await updateMyProfileAction(formData);
-      if (result.error) {
-        setFormError(result.error);
+      // Client-side validation above already mirrors the server's exact
+      // schema, so fieldErrors shouldn't be reachable in practice — but
+      // treat it as a failure too (not just result.error), so a future
+      // server-only rule doesn't silently show a success toast on a
+      // rejected write.
+      if (result.error || result.fieldErrors) {
+        setFormError(result.error ?? "Please fix the highlighted fields and try again.");
         return;
       }
       toast.success("Profile updated.");
@@ -149,8 +154,8 @@ function EmailSection({ initialEmail }: { initialEmail: string }) {
 
     startTransition(async () => {
       const result = await updateMyEmailAction(formData);
-      if (result.error) {
-        setFormError(result.error);
+      if (result.error || result.fieldErrors) {
+        setFormError(result.error ?? "Please fix the highlighted fields and try again.");
         return;
       }
       setConfirmationSent(true);
@@ -226,8 +231,8 @@ function PasswordSection() {
 
     startTransition(async () => {
       const result = await updateMyPasswordAction(formData);
-      if (result.error) {
-        setFormError(result.error);
+      if (result.error || result.fieldErrors) {
+        setFormError(result.error ?? "Please fix the highlighted fields and try again.");
         return;
       }
       setPassword("");

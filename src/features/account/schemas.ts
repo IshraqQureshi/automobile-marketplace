@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { kenyaLocalPhoneSchema } from "@/lib/validation/kenya-phone";
+import { kenyaLocalPhoneOptionalSchema } from "@/lib/validation/kenya-phone";
 import { resetPasswordFieldSchemas, resetPasswordSchema, signUpFieldSchemas } from "@/features/auth/schemas";
 
 // Reuses the exact same field schemas signup/reset-password already
@@ -9,18 +9,22 @@ import { resetPasswordFieldSchemas, resetPasswordSchema, signUpFieldSchemas } fr
 
 export const profileFieldSchemas = {
   fullName: signUpFieldSchemas.fullName,
-  phone: kenyaLocalPhoneSchema,
+  // Optional, not signUpFieldSchemas'/kenyaLocalPhoneSchema's required
+  // variant — Google OAuth (supabase/config.toml's auth.external.google,
+  // enabled) never populates raw_user_meta_data.phone, so handle_new_user
+  // leaves profiles.phone null for any account that signed up that way.
+  // Requiring a valid Kenyan number here would block that user from ever
+  // saving just their name.
+  phone: kenyaLocalPhoneOptionalSchema,
 };
 
-const profileBaseSchema = z.object(profileFieldSchemas);
-export const profileSchema = profileBaseSchema;
+export const profileSchema = z.object(profileFieldSchemas);
 
 export const emailFieldSchemas = {
   email: signUpFieldSchemas.email,
 };
 
-const emailBaseSchema = z.object(emailFieldSchemas);
-export const emailSchema = emailBaseSchema;
+export const emailSchema = z.object(emailFieldSchemas);
 
 // Same shape/refinement as the signed-out reset-password flow — a new
 // password + confirmation, no "current password" field (matches
