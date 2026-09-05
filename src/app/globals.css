@@ -1,17 +1,18 @@
 @import "tailwindcss";
 
 /**
- * Design tokens approximated from the static design exports in /design and
- * the real logo/brand asset in /real-assets (no Figma Dev Mode access — see
- * MVP_PROGRESS.md blocker B-002). Exact hex/spacing values are visual
- * estimates, not measured — refine during visual QA once real design-token
- * access exists.
+ * Design tokens — refined 2026-09-06 against the homepage's real rendered
+ * static HTML (user-supplied, exact computed colors), superseding the
+ * earlier visual estimate from /design's flat image exports (no Figma Dev
+ * Mode access — see MVP_PROGRESS.md blocker B-002). Applied globally (not
+ * just on the homepage) so dashboard/admin buttons, badges, and nav stay
+ * consistent with the corrected brand color rather than diverging from it.
  */
 @theme {
-  --color-brand: #0e6b73;
-  --color-brand-dark: #0a4f55;
+  --color-brand: #007f77;
+  --color-brand-dark: #005f5a;
   --color-accent: #f5a623;
-  --color-ink: #0e1917;
+  --color-ink: #0d1117;
   --font-display: ui-serif, Georgia, Cambria, "Times New Roman", serif;
 }
 
@@ -31,4 +32,27 @@
 
 .animate-toast-in {
   animation: toast-in 0.15s ease-out;
+}
+
+/* Continuous certified-showrooms marquee on the homepage hero
+   (src/components/home/hero-search.tsx) — the track renders its items
+   twice back-to-back and scrolls exactly -50% (one full copy's width) so
+   the loop point is seamless. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 32s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation-play-state: paused;
+  }
 }

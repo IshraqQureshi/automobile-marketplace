@@ -17,18 +17,18 @@ export function PopularModels({ models }: PopularModelsProps) {
   if (models.length === 0) return null;
 
   return (
-    <section className="border-t border-neutral-200 bg-neutral-50 px-4 py-12 sm:px-6">
+    <section className="border-t border-neutral-200 bg-[#f8f9fa] px-6 py-12 md:px-12">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="font-display text-2xl font-semibold text-neutral-900">Popular Models</h2>
-          <button type="button" disabled title="Coming soon" className="text-sm font-medium text-brand disabled:cursor-not-allowed disabled:opacity-60">
+        <div className="mb-8 flex items-end justify-between">
+          <h2 className="font-display text-3xl font-bold text-neutral-900">Popular Models</h2>
+          <button type="button" disabled title="Coming soon" className="text-sm font-medium text-brand disabled:cursor-not-allowed disabled:opacity-70">
             All models →
           </button>
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {models.map((model) => (
-            <div key={model.key} className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <div key={model.key} className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
               <div className="flex h-24 items-center justify-center bg-neutral-100">
                 {model.photoUrl ? (
                   <Image src={model.photoUrl} alt="" width={160} height={96} unoptimized className="h-full w-full object-cover" />
