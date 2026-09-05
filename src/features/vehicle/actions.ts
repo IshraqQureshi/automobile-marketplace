@@ -49,7 +49,7 @@ export async function createVehicleAction(formData: FormData): Promise<VehicleAc
   } = await supabase.auth.getUser();
   if (!user) return { error: "You must be signed in." };
 
-  const showroom = await getOwnerShowroom(supabase, user.id);
+  const showroom = await getOwnerShowroom(user.id);
   if (!showroom) return { error: NO_SHOWROOM_ERROR };
 
   const { error } = await supabase.from("vehicles").insert({
@@ -132,7 +132,7 @@ export async function updateVehicleStatusAction(id: string, status: string): Pro
   if (!user) return { error: "You must be signed in." };
 
   if (parsedStatus.data === "ACTIVE") {
-    const showroom = await getOwnerShowroom(supabase, user.id);
+    const showroom = await getOwnerShowroom(user.id);
     if (!showroom) return { error: NO_SHOWROOM_ERROR };
     if (showroom.status !== "APPROVED") {
       return { error: "Your showroom must be approved before you can publish a listing." };
@@ -196,11 +196,12 @@ export async function setPrimaryVehiclePhotoAction(mediaId: string): Promise<Veh
     return { error: "Failed to update primary photo." };
   }
 
-  const { error } = await supabase.from("vehicle_media").update({ is_primary: true }).eq("id", mediaId);
+  const { data, error } = await supabase.from("vehicle_media").update({ is_primary: true }).eq("id", mediaId).select("id");
   if (error) {
     logger.error("Failed to set primary vehicle photo", error, { mediaId });
     return { error: "Failed to update primary photo." };
   }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/dashboard/vehicles");
   return {};

@@ -15,7 +15,7 @@ export default async function DashboardVehiclesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const showroom = await getOwnerShowroom(supabase, user.id);
+  const showroom = await getOwnerShowroom(user.id);
   if (!showroom) redirect("/ready-to-sell");
   // Vehicle management is approved-only functionality (SHR-004) — the
   // sidebar already hides this link for a non-APPROVED showroom, but a

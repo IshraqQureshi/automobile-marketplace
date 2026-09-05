@@ -122,7 +122,13 @@ export function VehicleList({ vehicles, bodyTypeOptions }: VehicleListProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<VehicleFormState>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
-  const [photosVehicle, setPhotosVehicle] = useState<VehicleListItem | null>(null);
+  // Store only the id, not a snapshot of the vehicle object — a photo
+  // mutation (upload/set-primary/delete) revalidates the page's data, but
+  // this component instance doesn't unmount, so a captured object would
+  // keep showing pre-mutation photos in an already-open dialog. Deriving it
+  // from the current `vehicles` prop on every render keeps it live.
+  const [photosVehicleId, setPhotosVehicleId] = useState<string | null>(null);
+  const photosVehicle = vehicles.find((v) => v.id === photosVehicleId) ?? null;
   const [pending, startTransition] = useTransition();
   const [statusPendingId, setStatusPendingId] = useState<string | null>(null);
 
@@ -168,7 +174,7 @@ export function VehicleList({ vehicles, bodyTypeOptions }: VehicleListProps) {
     setFormError(null);
 
     let hasError = false;
-    for (const field of ["title", "make", "model", "year", "price", "mileage"] as const) {
+    for (const field of ["title", "make", "model", "year", "price", "mileage", "variant", "color", "description"] as const) {
       const schema = vehicleFieldSchemas[field];
       if (!schema.safeParse(form[field]).success) {
         validate(field, form[field]);
@@ -275,7 +281,7 @@ export function VehicleList({ vehicles, bodyTypeOptions }: VehicleListProps) {
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-1">
-                        <RowIconButton label="Photos" onClick={() => setPhotosVehicle(vehicle)}>
+                        <RowIconButton label="Photos" onClick={() => setPhotosVehicleId(vehicle.id)}>
                           <UploadIcon />
                         </RowIconButton>
                         <RowIconButton label="Edit" onClick={() => openEdit(vehicle)}>
@@ -347,7 +353,15 @@ export function VehicleList({ vehicles, bodyTypeOptions }: VehicleListProps) {
 
             <div>
               <FieldLabel htmlFor="vehicle-variant">Variant (optional)</FieldLabel>
-              <Input id="vehicle-variant" value={form.variant} onChange={(e) => setField("variant", e.target.value)} placeholder="e.g. SE" />
+              <Input
+                id="vehicle-variant"
+                value={form.variant}
+                onChange={(e) => setField("variant", e.target.value)}
+                onBlur={(e) => validate("variant", e.target.value)}
+                placeholder="e.g. SE"
+                error={!!errorFor("variant")}
+              />
+              {errorFor("variant") && <p className="mt-1 text-sm text-red-600">{errorFor("variant")}</p>}
             </div>
 
             <div>
@@ -447,7 +461,15 @@ export function VehicleList({ vehicles, bodyTypeOptions }: VehicleListProps) {
 
             <div>
               <FieldLabel htmlFor="vehicle-color">Color (optional)</FieldLabel>
-              <Input id="vehicle-color" value={form.color} onChange={(e) => setField("color", e.target.value)} placeholder="e.g. White" />
+              <Input
+                id="vehicle-color"
+                value={form.color}
+                onChange={(e) => setField("color", e.target.value)}
+                onBlur={(e) => validate("color", e.target.value)}
+                placeholder="e.g. White"
+                error={!!errorFor("color")}
+              />
+              {errorFor("color") && <p className="mt-1 text-sm text-red-600">{errorFor("color")}</p>}
             </div>
 
             <div className="sm:col-span-2">
@@ -456,10 +478,12 @@ export function VehicleList({ vehicles, bodyTypeOptions }: VehicleListProps) {
                 id="vehicle-description"
                 value={form.description}
                 onChange={(e) => setField("description", e.target.value)}
+                onBlur={(e) => validate("description", e.target.value)}
                 rows={4}
                 placeholder="Condition, service history, notable features…"
-                className="w-full rounded-md border border-neutral-300 px-3 py-2.5 text-sm outline-none placeholder:text-neutral-400 focus:border-brand focus:ring-1 focus:ring-brand"
+                className={`w-full rounded-md border px-3 py-2.5 text-sm outline-none placeholder:text-neutral-400 focus:border-brand focus:ring-1 focus:ring-brand ${errorFor("description") ? "border-red-400" : "border-neutral-300"}`}
               />
+              {errorFor("description") && <p className="mt-1 text-sm text-red-600">{errorFor("description")}</p>}
             </div>
           </div>
 
@@ -476,9 +500,7 @@ export function VehicleList({ vehicles, bodyTypeOptions }: VehicleListProps) {
         </form>
       </Dialog>
 
-      {photosVehicle && (
-        <VehiclePhotosDialog vehicle={photosVehicle} onClose={() => setPhotosVehicle(null)} />
-      )}
+      {photosVehicle && <VehiclePhotosDialog vehicle={photosVehicle} onClose={() => setPhotosVehicleId(null)} />}
     </div>
   );
 }

@@ -215,5 +215,38 @@ describe("Vehicle/vehicle_media RLS authorization (integration)", () => {
 
       await admin.from("vehicle_media").delete().eq("id", media.id);
     });
+
+    it("owner B cannot flip owner A's photo to primary (vehicle_media UPDATE)", async () => {
+      const { data: media, error: insertError } = await admin
+        .from("vehicle_media")
+        .insert({ vehicle_id: vehicleId, storage_path: `${showroomA}/${vehicleId}/test3.jpg`, is_primary: false })
+        .select("id")
+        .single();
+      if (insertError || !media) throw insertError ?? new Error("media not created");
+
+      const { data, error } = await ownerB.client.from("vehicle_media").update({ is_primary: true }).eq("id", media.id).select("id");
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+
+      const { data: unchanged } = await admin.from("vehicle_media").select("is_primary").eq("id", media.id).single();
+      expect(unchanged?.is_primary).toBe(false);
+
+      await admin.from("vehicle_media").delete().eq("id", media.id);
+    });
+
+    it("owner A can flip their own photo to primary (vehicle_media UPDATE)", async () => {
+      const { data: media, error: insertError } = await admin
+        .from("vehicle_media")
+        .insert({ vehicle_id: vehicleId, storage_path: `${showroomA}/${vehicleId}/test4.jpg`, is_primary: false })
+        .select("id")
+        .single();
+      if (insertError || !media) throw insertError ?? new Error("media not created");
+
+      const { data, error } = await ownerA.client.from("vehicle_media").update({ is_primary: true }).eq("id", media.id).select("id");
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+
+      await admin.from("vehicle_media").delete().eq("id", media.id);
+    });
   });
 });

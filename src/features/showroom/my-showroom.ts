@@ -1,11 +1,10 @@
-import type { createClient } from "@/lib/supabase/server";
+import { cache } from "react";
+import { createClient } from "@/lib/supabase/server";
 
 // Plain module, not "use server" — shared by the dashboard layout (route
-// guard) and src/features/vehicle/actions.ts (server-side ownership
-// resolution), so the "which showroom does this signed-in user own" lookup
-// isn't duplicated between them.
-
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+// guard), its child pages, and src/features/vehicle/actions.ts, so the
+// "which showroom does this signed-in user own" lookup isn't duplicated
+// between them.
 
 export interface OwnerShowroom {
   id: string;
@@ -22,8 +21,16 @@ export interface OwnerShowroom {
  * Prefer the newest non-REJECTED row; fall back to the newest REJECTED row
  * (so a rejected owner still sees their rejection instead of nothing); null
  * if they've never registered a showroom at all.
+ *
+ * Wrapped in React's `cache()` (keyed by userId) so DashboardLayout's own
+ * guard and every child Server Component under it (page.tsx, vehicles/page.tsx)
+ * share one query per request instead of each re-running it — this is the
+ * standard App Router pattern for exactly this "layout resolved it, page
+ * needs it too" case, since a Client Component boundary would be needed to
+ * pass the result down as a prop instead.
  */
-export async function getOwnerShowroom(supabase: SupabaseServerClient, userId: string): Promise<OwnerShowroom | null> {
+export const getOwnerShowroom = cache(async (userId: string): Promise<OwnerShowroom | null> => {
+  const supabase = await createClient();
   const { data } = await supabase
     .from("showrooms")
     .select("id, business_name, status")
@@ -32,4 +39,4 @@ export async function getOwnerShowroom(supabase: SupabaseServerClient, userId: s
 
   if (!data || data.length === 0) return null;
   return data.find((showroom) => showroom.status !== "REJECTED") ?? data[0] ?? null;
-}
+});

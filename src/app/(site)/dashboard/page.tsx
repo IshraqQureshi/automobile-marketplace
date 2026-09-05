@@ -33,7 +33,7 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const showroom = await getOwnerShowroom(supabase, user.id);
+  const showroom = await getOwnerShowroom(user.id);
   if (!showroom) redirect("/ready-to-sell");
 
   let vehicleCounts = { total: 0, active: 0, draft: 0 };

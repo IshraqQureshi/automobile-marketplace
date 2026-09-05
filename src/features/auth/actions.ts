@@ -154,7 +154,7 @@ export async function signInAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const showroom = user && (await getOwnerShowroom(supabase, user.id));
+  const showroom = user && (await getOwnerShowroom(user.id));
   redirect(showroom ? "/dashboard" : "/account");
 }
 

@@ -28,7 +28,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     redirect("/login");
   }
 
-  const showroom = await getOwnerShowroom(supabase, user.id);
+  const showroom = await getOwnerShowroom(user.id);
   if (!showroom) {
     redirect("/ready-to-sell");
   }

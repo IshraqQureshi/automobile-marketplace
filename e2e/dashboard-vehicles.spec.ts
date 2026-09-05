@@ -215,5 +215,52 @@ test("an approved owner can upload a vehicle photo and it becomes the primary im
     .locator("#vehicle-photo-upload")
     .setInputFiles({ name: "vehicle.png", mimeType: "image/png", buffer: Buffer.from(TINY_PNG_BASE64, "base64") });
   await expect(page.getByText("Photos uploaded.")).toBeVisible();
-  await expect(photosDialog.getByText("Primary")).toBeVisible();
+  await expect(photosDialog.getByText("Primary", { exact: true })).toBeVisible();
+
+  // A second photo, set as primary, then deleting the (now non-primary)
+  // first photo — the dialog stays open across all three mutations and
+  // must reflect each one without being closed and reopened (regression
+  // coverage: the dialog used to hold a stale snapshot of the vehicle's
+  // photos captured only when it was first opened).
+  await photosDialog
+    .locator("#vehicle-photo-upload")
+    .setInputFiles({ name: "vehicle-2.png", mimeType: "image/png", buffer: Buffer.from(TINY_PNG_BASE64, "base64") });
+  await expect(photosDialog.getByRole("button", { name: "Set as primary" })).toHaveCount(1);
+
+  await photosDialog.getByRole("button", { name: "Set as primary" }).click();
+  await expect(photosDialog.getByRole("button", { name: "Set as primary" })).toHaveCount(1);
+
+  await photosDialog.getByRole("button", { name: "Delete photo" }).first().click();
+  await expect(photosDialog.getByRole("button", { name: "Delete photo" })).toHaveCount(1);
+  await expect(photosDialog.getByText("Primary", { exact: true })).toBeVisible();
+});
+
+test("an approved owner can mark a vehicle sold and deactivate it", async ({ page }) => {
+  const unique = Date.now();
+  const title = `E2E Status Vehicle ${unique}`;
+
+  await loginAsFixtureOwner(page);
+  await page.goto("/dashboard/vehicles");
+  await page.getByRole("button", { name: "New vehicle" }).click();
+  const createDialog = page.getByRole("dialog");
+  await createDialog.locator("#vehicle-title").fill(title);
+  await createDialog.locator("#vehicle-make").fill("Toyota");
+  await createDialog.locator("#vehicle-model").fill("Camry");
+  await createDialog.locator("#vehicle-year").fill("2019");
+  await createDialog.locator("#vehicle-price").fill("2500000");
+  await createDialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Vehicle created as a draft.")).toBeVisible();
+
+  const row = page.getByRole("row", { name: new RegExp(title) });
+  const status = row.getByRole("combobox");
+
+  await status.selectOption("SOLD");
+  await expect(page.getByText("Marked as sold.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("SOLD");
+
+  await row.getByRole("combobox").selectOption("INACTIVE");
+  await expect(page.getByText("Marked as removed.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("INACTIVE");
 });

@@ -43,7 +43,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   // doesn't change it — see the note in src/features/showroom/my-showroom.ts),
   // so whether this account owns a showroom has to be checked directly
   // rather than read off role.
-  const showroom = await getOwnerShowroom(supabase, user.id);
+  const showroom = await getOwnerShowroom(user.id);
 
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
