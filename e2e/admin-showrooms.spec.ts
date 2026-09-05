@@ -276,6 +276,37 @@ test("admin can edit a showroom's business details", async ({ page }) => {
   await expect(page.getByRole("row", { name: updatedName })).toBeAttached();
 });
 
+test("rejects an invalid business email or phone client-side, without ever reaching the server", async ({ page }) => {
+  await loginAsFixtureAdmin(page);
+  await page.goto("/admin/showrooms");
+
+  await page.getByRole("button", { name: "New Showroom" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByPlaceholder("Search by email…").fill(OWNER_EMAIL.split("@")[0] ?? OWNER_EMAIL);
+  await expect(dialog.getByText(OWNER_EMAIL).first()).toBeVisible();
+  await dialog.getByText(OWNER_EMAIL).first().click();
+
+  const businessName = `E2E Invalid Input Showroom ${Date.now()}`;
+  await dialog.locator("#showroom-business-name").fill(businessName);
+  await dialog.locator("#showroom-location").fill("Nairobi");
+  await dialog.locator("#showroom-phone").fill("12345");
+  await dialog.locator("#showroom-email").fill("real@example.com");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  // A real, styled application error — not the browser's native
+  // type="email"/required tooltip, which this form deliberately opts out
+  // of (noValidate) so this message is the only thing a user ever sees.
+  await expect(dialog.getByText("Enter a valid phone number (e.g. 712345678)").first()).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole("row", { name: businessName })).toHaveCount(0);
+
+  await dialog.locator("#showroom-phone").fill("712345678");
+  await dialog.locator("#showroom-email").fill("not-an-email");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(dialog.getByText("Enter a valid email address").first()).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole("row", { name: businessName })).toHaveCount(0);
+});
+
 test("admin can delete a showroom", async ({ page }) => {
   const unique = Date.now();
   const businessName = `E2E Deletable Showroom ${unique}`;

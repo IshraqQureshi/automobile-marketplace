@@ -18,6 +18,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { useFieldValidation } from "@/features/auth/use-field-validation";
+import { catalogFieldSchemas, catalogNameSchema } from "@/features/admin/catalog-schemas";
 
 export interface CatalogItem {
   id: string;
@@ -69,10 +71,12 @@ export function CatalogList({
 }: CatalogListProps) {
   const toast = useToast();
   const isActive = useIsActiveCatalogTab(tabKey);
+  const { validate, errorFor } = useFieldValidation(catalogFieldSchemas);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [name, setName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const nameError = errorFor("name");
   const [deleteTarget, setDeleteTarget] = useState<CatalogItem | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -115,6 +119,12 @@ export function CatalogList({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    const parsed = catalogNameSchema.safeParse(name);
+    if (!parsed.success) {
+      validate("name", name);
+      setFormError(parsed.error.issues[0]?.message ?? "Invalid name.");
+      return;
+    }
     startTransition(async () => {
       const result = editingItem ? await onUpdate(editingItem.id, name) : await onCreate(name);
       if (result.error) {
@@ -187,10 +197,20 @@ export function CatalogList({
         title={editingItem ? `Edit ${singular}` : `New ${singular}`}
         description={editingItem ? undefined : `Add a new ${singular.toLowerCase()} to the catalog.`}
       >
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           {formError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
           <FieldLabel htmlFor="catalog-item-name">Name</FieldLabel>
-          <Input id="catalog-item-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={addPlaceholder} autoFocus required />
+          <Input
+            id="catalog-item-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={(e) => validate("name", e.target.value)}
+            placeholder={addPlaceholder}
+            autoFocus
+            required
+            error={!!nameError}
+          />
+          {nameError && <p className="mt-1 text-sm text-red-600">{nameError}</p>}
           <div className="mt-4">
             <DialogFormActions pending={pending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />
           </div>

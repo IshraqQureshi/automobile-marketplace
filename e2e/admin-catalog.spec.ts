@@ -101,6 +101,19 @@ test("admin can create, rename, and delete a brand", async ({ page }) => {
   await expect(page.getByRole("row", { name: renamedName })).toHaveCount(0);
 });
 
+test("rejects an empty brand name client-side, without ever reaching the server", async ({ page }) => {
+  await page.getByRole("button", { name: "New Brand" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Name").fill("");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  // A real, styled application error — not the browser's native "required"
+  // tooltip, which this form deliberately opts out of (noValidate) so this
+  // message is the only thing a user ever sees.
+  await expect(dialog.getByText("Name is required").first()).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(page.getByText("Brand created.")).toHaveCount(0);
+});
+
 test("admin can add a model under a brand and delete it, without deleting the brand", async ({ page }) => {
   const unique = Date.now();
   const brandName = `E2E Model Brand ${unique}`;
@@ -183,6 +196,17 @@ test("admin can create and delete a vehicle type", async ({ page }) => {
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("Type deleted.")).toBeVisible();
   await expect(page.getByRole("row", { name: typeName })).toHaveCount(0);
+});
+
+test("rejects an empty vehicle type name client-side, without ever reaching the server", async ({ page }) => {
+  await page.getByRole("tab", { name: /Types/ }).click();
+  await page.getByRole("button", { name: "New Type" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Name").fill("");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(dialog.getByText("Name is required").first()).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(page.getByText("Type created.")).toHaveCount(0);
 });
 
 test("admin can upload a brand logo, replace it, and remove it", async ({ page }) => {
