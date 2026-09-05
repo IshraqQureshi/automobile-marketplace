@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { ToastProvider } from "@/components/ui/toast";
 import { getOwnerShowroom } from "@/features/showroom/my-showroom";
 import { createClient } from "@/lib/supabase/server";
@@ -35,10 +35,9 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   return (
     <ToastProvider>
-      <div className="grid min-h-screen grid-cols-[248px_1fr] bg-white">
-        <DashboardSidebar email={user.email ?? ""} showroom={showroom} />
-        <div className="flex min-w-0 flex-col">{children}</div>
-      </div>
+      <DashboardShell email={user.email ?? ""} showroom={showroom}>
+        {children}
+      </DashboardShell>
     </ToastProvider>
   );
 }

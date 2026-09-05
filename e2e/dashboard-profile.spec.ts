@@ -77,7 +77,10 @@ async function loginAsFixtureOwner(page: import("@playwright/test").Page) {
 
 test("the dashboard sidebar links to the profile page, and it's pre-filled with the real showroom data", async ({ page }) => {
   await loginAsFixtureOwner(page);
-  await page.getByRole("link", { name: "Profile" }).click();
+  // exact:true — the redesigned dashboard landing page (src/app/dashboard/page.tsx)
+  // also has an "Edit showroom profile" quick-action link, which a
+  // substring match on "Profile" would otherwise also resolve to.
+  await page.getByRole("link", { name: "Profile", exact: true }).click();
   await page.waitForURL("**/dashboard/profile");
 
   await expect(page.locator("#showroom-business-name")).toHaveValue("E2E Profile Fixture Showroom");

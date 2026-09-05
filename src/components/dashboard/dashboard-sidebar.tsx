@@ -17,9 +17,13 @@ interface NavEntry {
 interface DashboardSidebarProps {
   email: string;
   showroom: OwnerShowroom;
+  // Fired on any real nav Link click — DashboardShell uses this to close the
+  // mobile off-canvas drawer after navigating, so it isn't left open over
+  // the new page. Optional/unused on desktop, where the sidebar is static.
+  onNavigate?: () => void;
 }
 
-export function DashboardSidebar({ email, showroom }: DashboardSidebarProps) {
+export function DashboardSidebar({ email, showroom, onNavigate }: DashboardSidebarProps) {
   const pathname = usePathname();
   const approved = showroom.status === "APPROVED";
 
@@ -36,13 +40,13 @@ export function DashboardSidebar({ email, showroom }: DashboardSidebarProps) {
   ];
 
   return (
-    <aside className="flex flex-col gap-7 border-r border-neutral-200 bg-white px-4 py-5">
-      <Link href="/" className="px-2">
+    <aside className="flex h-full flex-col gap-7 overflow-y-auto border-r border-neutral-200 bg-white px-4 py-5">
+      <Link href="/" className="px-2 opacity-90 transition-opacity hover:opacity-100">
         <Image src="/logo.png" alt="HarakaGari — Powered by Arresa" width={130} height={34} priority />
       </Link>
 
       <nav className="flex flex-col gap-0.5">
-        <span className="px-3 pb-1.5 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase">{showroom.business_name}</span>
+        <span className="truncate px-3 pb-1.5 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase">{showroom.business_name}</span>
         {items.map((item) => {
           if (item.href === null) {
             return (
@@ -64,9 +68,10 @@ export function DashboardSidebar({ email, showroom }: DashboardSidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
-                active ? "bg-brand text-white" : "text-neutral-600 hover:bg-neutral-100",
+                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
+                active ? "bg-brand text-white shadow-sm" : "text-neutral-600 hover:bg-neutral-100",
               )}
             >
               <item.icon />
@@ -91,7 +96,7 @@ export function DashboardSidebar({ email, showroom }: DashboardSidebarProps) {
             type="submit"
             title="Log out"
             aria-label="Log out"
-            className="shrink-0 rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="shrink-0 rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
           >
             <SignOutIcon />
           </button>
@@ -112,7 +117,11 @@ function DashboardIcon() {
   );
 }
 
-function ProfileIcon() {
+// Exported (not just used locally) — also used as the dashboard home page's
+// "Edit profile" quick-action icon (src/app/dashboard/page.tsx), same
+// reasoning as admin-ui.tsx's TagIcon/ShowroomIcon comment: one icon shared
+// across two components instead of duplicated.
+export function ProfileIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <circle cx="12" cy="8" r="4" />
