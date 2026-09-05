@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
-import { ALLOWED_LOGO_MIME_TYPES, MAX_LOGO_SIZE_BYTES, catalogNameSchema } from "./catalog-schemas";
+import { uploadEntityLogo, validateLogoFile } from "./logo-upload";
+import { catalogNameSchema } from "./catalog-schemas";
 
 export interface CatalogActionResult {
   error?: string;
@@ -26,46 +27,6 @@ export interface CatalogActionResult {
 // false "success".
 const NOT_FOUND_ERROR = "Not found, or you don't have permission to do that.";
 
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-
-function validateLogoFile(file: File): string | null {
-  if (!ALLOWED_LOGO_MIME_TYPES.includes(file.type as (typeof ALLOWED_LOGO_MIME_TYPES)[number])) {
-    return "Logo must be a JPG, PNG, WEBP, or SVG file.";
-  }
-  if (file.size > MAX_LOGO_SIZE_BYTES) {
-    return "Logo must be smaller than 2MB.";
-  }
-  return null;
-}
-
-// Uploads a new logo file and records its path on the brand row. Not
-// rolled back on failure the way showroom document uploads are — unlike a
-// showroom registration, a brand with no (or an unchanged) logo is a
-// perfectly valid, non-stuck state the admin can freely retry from the
-// same edit form, so there's no unrecoverable dead end to guard against.
-async function uploadBrandLogo(supabase: SupabaseServerClient, brandId: string, file: File) {
-  const extension = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-  const path = `${brandId}/logo-${crypto.randomUUID()}.${extension}`;
-
-  const { error: uploadError } = await supabase.storage.from("brand-logos").upload(path, file, { contentType: file.type, upsert: false });
-  if (uploadError) return { error: uploadError };
-
-  const { error: updateError } = await supabase.from("brands").update({ logo_storage_path: path }).eq("id", brandId);
-  if (updateError) {
-    // The file uploaded but nothing will ever reference it — clean it up
-    // rather than leaving a permanent orphan (a fresh randomUUID path is
-    // generated on retry either way, so this exact object can't become
-    // reachable later).
-    const { error: cleanupError } = await supabase.storage.from("brand-logos").remove([path]);
-    if (cleanupError) {
-      logger.warn("Failed to clean up an orphaned brand logo upload", { brandId, path, error: cleanupError.message });
-    }
-    return { error: updateError };
-  }
-
-  return { error: null };
-}
-
 export async function createBrandAction(formData: FormData): Promise<CatalogActionResult> {
   const parsed = catalogNameSchema.safeParse(formData.get("name"));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
@@ -85,7 +46,7 @@ export async function createBrandAction(formData: FormData): Promise<CatalogActi
   }
 
   if (logoFile) {
-    const { error: logoError } = await uploadBrandLogo(supabase, brand.id, logoFile);
+    const { error: logoError } = await uploadEntityLogo(supabase, "brand-logos", "brands", brand.id, logoFile);
     if (logoError) {
       logger.error("Failed to upload brand logo", logoError, { brandId: brand.id });
       revalidatePath("/admin/catalog");
@@ -132,7 +93,7 @@ export async function updateBrandAction(formData: FormData): Promise<CatalogActi
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   if (logoFile) {
-    const { error: logoError } = await uploadBrandLogo(supabase, id, logoFile);
+    const { error: logoError } = await uploadEntityLogo(supabase, "brand-logos", "brands", id, logoFile);
     if (logoError) {
       logger.error("Failed to upload brand logo", logoError, { brandId: id });
       revalidatePath("/admin/catalog");

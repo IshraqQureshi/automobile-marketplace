@@ -532,6 +532,7 @@ export type Database = {
           email: string
           id: string
           latitude: number | null
+          logo_storage_path: string | null
           longitude: number | null
           opening_hours: Json | null
           owner_user_id: string
@@ -549,6 +550,7 @@ export type Database = {
           email: string
           id?: string
           latitude?: number | null
+          logo_storage_path?: string | null
           longitude?: number | null
           opening_hours?: Json | null
           owner_user_id: string
@@ -566,6 +568,7 @@ export type Database = {
           email?: string
           id?: string
           latitude?: number | null
+          logo_storage_path?: string | null
           longitude?: number | null
           opening_hours?: Json | null
           owner_user_id?: string

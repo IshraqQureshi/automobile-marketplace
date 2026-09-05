@@ -145,8 +145,19 @@ test("admin can review a pending showroom, view its document, and approve it", a
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Business Registration")).toBeVisible();
 
-  const [docPage] = await Promise.all([page.context().waitForEvent("page"), dialog.getByRole("button", { name: "View", exact: true }).click()]);
-  await docPage.close();
+  // Viewing a document opens an inline preview within the same dialog, not
+  // a new browser tab — assert no new page/tab opens and the preview
+  // renders in place, then return to the details view.
+  let newPageOpened = false;
+  page.context().once("page", () => {
+    newPageOpened = true;
+  });
+  await dialog.getByRole("button", { name: "View", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Back to details" })).toBeVisible();
+  await expect(dialog.locator("iframe")).toBeVisible();
+  expect(newPageOpened).toBe(false);
+  await dialog.getByRole("button", { name: "Back to details" }).click();
+  await expect(dialog.getByText("Business Registration")).toBeVisible();
 
   await dialog.getByRole("button", { name: "Approve" }).click();
   await dialog.getByRole("button", { name: "Yes, approve" }).click();
@@ -210,6 +221,40 @@ test("admin can create a showroom for an existing user via the owner search", as
   const row = page.getByRole("row", { name: businessName });
   await expect(row).toBeAttached();
   await expect(row.getByText("Pending")).toBeVisible();
+});
+
+// A minimal valid 1x1 PNG — real image bytes matter here since the browser
+// actually renders it (an <img>/<Image> src pointed at garbage bytes would
+// still attach to the DOM, silently masking a real "logo never uploaded"
+// bug that a text-only fixture wouldn't catch).
+const TINY_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+test("admin can upload a logo when creating a showroom, shown in the row and the review dialog", async ({ page }) => {
+  const unique = Date.now();
+  const businessName = `E2E Logo Showroom ${unique}`;
+
+  await loginAsFixtureAdmin(page);
+  await page.goto("/admin/showrooms");
+
+  await page.getByRole("button", { name: "New Showroom" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByPlaceholder("Search by email…").fill(OWNER_EMAIL.split("@")[0] ?? OWNER_EMAIL);
+  await expect(dialog.getByText(OWNER_EMAIL).first()).toBeVisible();
+  await dialog.getByText(OWNER_EMAIL).first().click();
+
+  await dialog.locator("#showroom-business-name").fill(businessName);
+  await dialog.locator("#showroom-logo").setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: Buffer.from(TINY_PNG_BASE64, "base64") });
+  await dialog.locator("#showroom-location").fill("Nairobi");
+  await dialog.locator("#showroom-phone").fill("712345678");
+  await dialog.locator("#showroom-email").fill(`${unique}@example.com`);
+  await dialog.getByRole("button", { name: "Create" }).click();
+
+  await expect(page.getByText("Showroom created.")).toBeVisible();
+  const row = page.getByRole("row", { name: businessName });
+  await expect(row.locator("img")).toBeVisible();
+
+  await row.getByRole("button", { name: "Review" }).click();
+  await expect(page.getByRole("dialog").locator("img")).toBeVisible();
 });
 
 test("admin can edit a showroom's business details", async ({ page }) => {

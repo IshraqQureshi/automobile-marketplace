@@ -53,6 +53,7 @@ describe("Storage RLS authorization (integration)", () => {
     await admin.storage.from("vehicle-media").remove([`${showroomAId}/test.jpg`, `${showroomBId}/test.jpg`]);
     await admin.storage.from("showroom-documents").remove([`${showroomAId}/doc.pdf`, `${showroomBId}/doc.pdf`]);
     await admin.storage.from("brand-logos").remove([`${brandId}/logo.png`, `${brandId}/hijacked.png`]);
+    await admin.storage.from("showroom-logos").remove([`${showroomAId}/logo.png`, `${showroomAId}/hijacked.png`]);
     if (showroomAId) await admin.from("showrooms").delete().eq("id", showroomAId);
     if (showroomBId) await admin.from("showrooms").delete().eq("id", showroomBId);
     if (brandId) await admin.from("brands").delete().eq("id", brandId);
@@ -145,6 +146,42 @@ describe("Storage RLS authorization (integration)", () => {
       expect(error).toBeNull();
 
       const { data } = await admin.storage.from("brand-logos").list(brandId);
+      expect(data?.some((f) => f.name === "logo.png")).toBe(false);
+    });
+  });
+
+  describe("showroom-logos (public bucket, admin-only write)", () => {
+    it("a non-admin customer cannot upload a showroom logo", async () => {
+      const { error } = await ownerA.client.storage.from("showroom-logos").upload(`${showroomAId}/hijacked.png`, tinyLogo);
+      expect(error).not.toBeNull();
+    });
+
+    it("an admin can upload a showroom logo", async () => {
+      const { error } = await adminUser.client.storage.from("showroom-logos").upload(`${showroomAId}/logo.png`, tinyLogo, { upsert: true });
+      expect(error).toBeNull();
+    });
+
+    it("anon can read from the public bucket", async () => {
+      const { data, error } = await anon.storage.from("showroom-logos").list(showroomAId);
+      expect(error).toBeNull();
+      expect(data?.some((f) => f.name === "logo.png")).toBe(true);
+    });
+
+    it("a non-admin customer cannot delete a showroom logo", async () => {
+      const { error } = await ownerA.client.storage.from("showroom-logos").remove([`${showroomAId}/logo.png`]);
+      // Same Supabase Storage behavior as brand-logos above: an
+      // unauthorized removal reports success with an empty result.
+      expect(error).toBeNull();
+
+      const { data } = await admin.storage.from("showroom-logos").list(showroomAId);
+      expect(data?.some((f) => f.name === "logo.png")).toBe(true);
+    });
+
+    it("an admin can delete a showroom logo", async () => {
+      const { error } = await adminUser.client.storage.from("showroom-logos").remove([`${showroomAId}/logo.png`]);
+      expect(error).toBeNull();
+
+      const { data } = await admin.storage.from("showroom-logos").list(showroomAId);
       expect(data?.some((f) => f.name === "logo.png")).toBe(false);
     });
   });
