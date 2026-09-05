@@ -14,3 +14,21 @@
   --color-ink: #0e1917;
   --font-display: ui-serif, Georgia, Cambria, "Times New Roman", serif;
 }
+
+/* Entrance animation for toast notifications (src/components/ui/toast.tsx)
+   — no animation plugin is installed, so this is a small hand-written
+   keyframe rather than reaching for tailwindcss-animate. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.15s ease-out;
+}

@@ -1,7 +1,22 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CatalogCardHeader, CheckIcon, InitialAvatar, MetaBadge, PencilIcon, PlusIcon, RowIconButton, TrashIcon, XIcon } from "./catalog-ui";
+import {
+  CatalogSectionHeader,
+  DialogFormActions,
+  FieldLabel,
+  InitialAvatar,
+  MetaBadge,
+  PencilIcon,
+  RowIconButton,
+  TableEmptyState,
+  TableShell,
+  TrashIcon,
+} from "./catalog-ui";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 
 export interface CatalogItem {
   id: string;
@@ -12,6 +27,7 @@ export interface CatalogItem {
 interface CatalogListProps {
   icon: React.ReactNode;
   title: string;
+  singular: string;
   description: string;
   items: CatalogItem[];
   addPlaceholder: string;
@@ -27,13 +43,14 @@ interface CatalogListProps {
 }
 
 /**
- * Shared CRUD list for the simple (name-only) catalog entities — currently
+ * Shared CRUD table for the simple (name-only) catalog entities — currently
  * just Vehicle Types. Brands and Models have their own components since
  * they need a logo upload / a Brand selector respectively.
  */
 export function CatalogList({
   icon,
   title,
+  singular,
   description,
   items,
   addPlaceholder,
@@ -43,117 +60,125 @@ export function CatalogList({
   onDelete,
   deleteWarning,
 }: CatalogListProps) {
-  const [newName, setNewName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const toast = useToast();
+  const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+  const [name, setName] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CatalogItem | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function handleCreate() {
-    setError(null);
+  function openCreate() {
+    setDialogMode("create");
+    setEditingItem(null);
+    setName("");
+    setFormError(null);
+  }
+
+  function openEdit(item: CatalogItem) {
+    setDialogMode("edit");
+    setEditingItem(item);
+    setName(item.name);
+    setFormError(null);
+  }
+
+  function closeDialog() {
+    setDialogMode(null);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
     startTransition(async () => {
-      const result = await onCreate(newName);
+      const result = editingItem ? await onUpdate(editingItem.id, name) : await onCreate(name);
       if (result.error) {
-        setError(result.error);
-      } else {
-        setNewName("");
+        setFormError(result.error);
+        return;
       }
+      toast.success(editingItem ? `${singular} updated.` : `${singular} created.`);
+      closeDialog();
     });
   }
 
-  function startEditing(item: CatalogItem) {
-    setEditingId(item.id);
-    setEditValue(item.name);
-    setError(null);
-  }
-
-  function handleSaveEdit(id: string) {
-    setError(null);
+  function handleDelete() {
+    if (!deleteTarget) return;
     startTransition(async () => {
-      const result = await onUpdate(id, editValue);
+      const result = await onDelete(deleteTarget.id);
       if (result.error) {
-        setError(result.error);
+        toast.error(result.error);
       } else {
-        setEditingId(null);
+        toast.success(`${singular} deleted.`);
       }
-    });
-  }
-
-  function handleDelete(item: CatalogItem) {
-    const message = `Delete "${item.name}"?${deleteWarning ? ` ${deleteWarning}` : ""}`;
-    if (!window.confirm(message)) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await onDelete(item.id);
-      if (result.error) setError(result.error);
+      setDeleteTarget(null);
     });
   }
 
   return (
-    <div data-testid={`catalog-list-${title.toLowerCase()}`} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-      <CatalogCardHeader icon={icon} title={title} description={description} count={items.length} />
+    <div>
+      <CatalogSectionHeader icon={icon} title={title} description={description} actionLabel={`New ${singular}`} onAction={openCreate} />
 
-      <div className="border-b border-neutral-200 px-5 py-3">
-        {error && <p className="mb-2 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600">{error}</p>}
-        <div className="flex min-w-0 gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder={addPlaceholder}
-            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-          />
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={pending || !newName.trim()}
-            className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <PlusIcon />
-            Add
-          </button>
-        </div>
-      </div>
+      <TableShell>
+        {items.length === 0 ? (
+          <TableEmptyState message={emptyMessage} />
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-xs font-semibold tracking-wide text-neutral-400 uppercase">
+                <th className="px-5 py-3 font-semibold">Name</th>
+                <th className="px-5 py-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <InitialAvatar name={item.name} />
+                      <span className="font-medium text-neutral-800">{item.name}</span>
+                      {item.meta && <MetaBadge>{item.meta}</MetaBadge>}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex justify-end gap-1">
+                      <RowIconButton label="Edit" onClick={() => openEdit(item)}>
+                        <PencilIcon />
+                      </RowIconButton>
+                      <RowIconButton label="Delete" onClick={() => setDeleteTarget(item)} variant="danger">
+                        <TrashIcon />
+                      </RowIconButton>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </TableShell>
 
-      {items.length === 0 ? (
-        <p className="px-5 py-8 text-center text-sm text-neutral-400">{emptyMessage}</p>
-      ) : (
-        <ul className="max-h-80 overflow-y-auto">
-          {items.map((item) => (
-            <li key={item.id} className="flex min-w-0 items-center gap-3 border-b border-neutral-100 px-5 py-3 last:border-b-0 hover:bg-neutral-50">
-              {editingId === item.id ? (
-                <>
-                  <input
-                    type="text"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-                    autoFocus
-                  />
-                  <RowIconButton label="Save" onClick={() => handleSaveEdit(item.id)} disabled={pending} variant="brand">
-                    <CheckIcon />
-                  </RowIconButton>
-                  <RowIconButton label="Cancel" onClick={() => setEditingId(null)}>
-                    <XIcon />
-                  </RowIconButton>
-                </>
-              ) : (
-                <>
-                  <InitialAvatar name={item.name} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-800">{item.name}</span>
-                  {item.meta && <MetaBadge>{item.meta}</MetaBadge>}
-                  <RowIconButton label="Edit" onClick={() => startEditing(item)}>
-                    <PencilIcon />
-                  </RowIconButton>
-                  <RowIconButton label="Delete" onClick={() => handleDelete(item)} disabled={pending} variant="danger">
-                    <TrashIcon />
-                  </RowIconButton>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Dialog
+        open={dialogMode !== null}
+        onClose={closeDialog}
+        title={editingItem ? `Edit ${singular}` : `New ${singular}`}
+        description={editingItem ? undefined : `Add a new ${singular.toLowerCase()} to the catalog.`}
+      >
+        <form onSubmit={handleSubmit}>
+          {formError && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
+          <FieldLabel htmlFor="catalog-item-name">Name</FieldLabel>
+          <Input id="catalog-item-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={addPlaceholder} autoFocus required />
+          <div className="mt-4">
+            <DialogFormActions pending={pending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />
+          </div>
+        </form>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`Delete ${singular.toLowerCase()}?`}
+        description={`Delete "${deleteTarget?.name}"?${deleteWarning ? ` ${deleteWarning}` : ""}`}
+        pending={pending}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

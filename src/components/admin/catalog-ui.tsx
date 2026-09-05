@@ -7,26 +7,76 @@ import type { ReactNode } from "react";
  * and the name-initial avatar fallback with slightly different markup.
  */
 
-interface CatalogCardHeaderProps {
+interface CatalogSectionHeaderProps {
   icon: ReactNode;
   title: string;
   description: string;
-  count: number;
+  actionLabel: string;
+  onAction: () => void;
 }
 
-export function CatalogCardHeader({ icon, title, description, count }: CatalogCardHeaderProps) {
+/**
+ * Header for a full-width catalog tab panel — icon + title/description on
+ * the left, a primary "+ New X" action on the right that opens that
+ * entity's create dialog.
+ */
+export function CatalogSectionHeader({ icon, title, description, actionLabel, onAction }: CatalogSectionHeaderProps) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-neutral-200 px-5 py-4">
-      <div className="flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">{icon}</span>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">{icon}</span>
         <div>
-          <h2 className="font-display text-base font-semibold text-neutral-900">{title}</h2>
-          <p className="text-xs text-neutral-500">{description}</p>
+          <h2 className="font-display text-lg font-semibold text-neutral-900">{title}</h2>
+          <p className="text-sm text-neutral-500">{description}</p>
         </div>
       </div>
-      <span className="shrink-0 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-500 tabular-nums">{count}</span>
+      <button
+        type="button"
+        onClick={onAction}
+        className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+      >
+        <PlusIcon />
+        {actionLabel}
+      </button>
     </div>
   );
+}
+
+export function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor: string }) {
+  return (
+    <label htmlFor={htmlFor} className="mb-1 block text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+      {children}
+    </label>
+  );
+}
+
+export function DialogFormActions({ pending, submitLabel, onCancel }: { pending: boolean; submitLabel: string; onCancel: () => void }) {
+  return (
+    <div className="flex justify-end gap-2 pt-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="rounded-md border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {pending ? "Saving…" : submitLabel}
+      </button>
+    </div>
+  );
+}
+
+export function TableShell({ children }: { children: ReactNode }) {
+  return <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">{children}</div>;
+}
+
+export function TableEmptyState({ message }: { message: string }) {
+  return <p className="px-5 py-10 text-center text-sm text-neutral-400">{message}</p>;
 }
 
 export function InitialAvatar({ name }: { name: string }) {

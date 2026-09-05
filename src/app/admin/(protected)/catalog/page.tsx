@@ -3,6 +3,7 @@ import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { CatalogBrandsList } from "@/components/admin/catalog-brands-list";
 import { CatalogList } from "@/components/admin/catalog-list";
 import { CatalogModelsList } from "@/components/admin/catalog-models-list";
+import { CatalogTabs } from "@/components/admin/catalog-tabs";
 import { LayersIcon } from "@/components/admin/catalog-ui";
 import {
   createBrandAction,
@@ -68,39 +69,41 @@ export default async function AdminCatalogPage() {
     <>
       <AdminTopbar title="Catalog" />
       <main className="flex-1 px-7 py-6">
-        <div className="grid grid-cols-3 items-start gap-4 *:min-w-0">
-          <CatalogBrandsList
-            title="Brands"
-            description="Vehicle manufacturers"
-            items={brandItems}
-            addPlaceholder="e.g. Toyota"
-            emptyMessage="No brands yet."
-            onCreate={createBrandAction}
-            onUpdate={updateBrandAction}
-            onDelete={deleteBrandAction}
-            deleteWarning="This also deletes all of its models."
-          />
-
-          <CatalogModelsList
-            items={modelItems}
-            brands={brands}
-            onCreate={createModelAction}
-            onUpdate={updateModelAction}
-            onDelete={deleteModelAction}
-          />
-
-          <CatalogList
-            icon={<LayersIcon />}
-            title="Types"
-            description="Body / fuel category"
-            items={typeItems}
-            addPlaceholder="e.g. Sedan"
-            emptyMessage="No types yet."
-            onCreate={createVehicleTypeAction}
-            onUpdate={updateVehicleTypeAction}
-            onDelete={deleteVehicleTypeAction}
-          />
-        </div>
+        <CatalogTabs
+          brandCount={brandItems.length}
+          brands={
+            <CatalogBrandsList
+              title="Brands"
+              description="Vehicle manufacturers"
+              items={brandItems}
+              addPlaceholder="e.g. Toyota"
+              emptyMessage="No brands yet."
+              onCreate={createBrandAction}
+              onUpdate={updateBrandAction}
+              onDelete={deleteBrandAction}
+              deleteWarning="This also deletes all of its models."
+            />
+          }
+          modelCount={modelItems.length}
+          models={
+            <CatalogModelsList items={modelItems} brands={brands} onCreate={createModelAction} onUpdate={updateModelAction} onDelete={deleteModelAction} />
+          }
+          typeCount={typeItems.length}
+          types={
+            <CatalogList
+              icon={<LayersIcon />}
+              title="Types"
+              singular="Type"
+              description="Body / fuel category"
+              items={typeItems}
+              addPlaceholder="e.g. Sedan"
+              emptyMessage="No types yet."
+              onCreate={createVehicleTypeAction}
+              onUpdate={updateVehicleTypeAction}
+              onDelete={deleteVehicleTypeAction}
+            />
+          }
+        />
       </main>
     </>
   );

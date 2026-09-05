@@ -78,25 +78,27 @@ test("admin can create, rename, and delete a brand", async ({ page }) => {
   const brandName = `E2E Brand ${unique}`;
   const renamedName = `E2E Brand Renamed ${unique}`;
 
-  // A brand's name also appears in the Models section (its brand <select>
-  // option and, once a model exists, as that row's meta text) — every
-  // lookup here is scoped to the Brands card specifically to avoid
-  // colliding with those.
-  const brandsCard = page.getByTestId("catalog-list-brands");
+  await page.getByRole("button", { name: "New Brand" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(brandName);
+  await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Brand created.")).toBeVisible();
 
-  await brandsCard.getByPlaceholder("e.g. Toyota").fill(brandName);
-  await brandsCard.getByRole("button", { name: "Add" }).click();
-  await expect(brandsCard.locator("li", { hasText: brandName })).toBeAttached();
+  const row = page.getByRole("row", { name: brandName });
+  await expect(row).toBeAttached();
 
-  await brandsCard.locator("li", { hasText: brandName }).getByRole("button", { name: "Edit" }).click();
-  await brandsCard.locator("input:focus").fill(renamedName);
-  await brandsCard.getByRole("button", { name: "Save" }).click();
-  await expect(brandsCard.locator("li", { hasText: renamedName })).toBeAttached();
-  await expect(brandsCard.locator("li", { hasText: brandName })).toHaveCount(0);
+  await row.getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(renamedName);
+  await page.getByRole("dialog").getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Brand updated.")).toBeVisible();
 
-  page.once("dialog", (dialog) => dialog.accept());
-  await brandsCard.locator("li", { hasText: renamedName }).getByRole("button", { name: "Delete" }).click();
-  await expect(brandsCard.locator("li", { hasText: renamedName })).toHaveCount(0);
+  const renamedRow = page.getByRole("row", { name: renamedName });
+  await expect(renamedRow).toBeAttached();
+  await expect(page.getByRole("row", { name: brandName, exact: true })).toHaveCount(0);
+
+  await renamedRow.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Brand deleted.")).toBeVisible();
+  await expect(page.getByRole("row", { name: renamedName })).toHaveCount(0);
 });
 
 test("admin can add a model under a brand and delete it, without deleting the brand", async ({ page }) => {
@@ -104,26 +106,35 @@ test("admin can add a model under a brand and delete it, without deleting the br
   const brandName = `E2E Model Brand ${unique}`;
   const modelName = `E2E Model ${unique}`;
 
-  const brandsCard = page.getByTestId("catalog-list-brands");
-  const modelsCard = page.getByTestId("catalog-list-models");
+  await page.getByRole("button", { name: "New Brand" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(brandName);
+  await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Brand created.")).toBeVisible();
 
-  await brandsCard.getByPlaceholder("e.g. Toyota").fill(brandName);
-  await brandsCard.getByRole("button", { name: "Add" }).click();
-  await expect(brandsCard.locator("li", { hasText: brandName })).toBeAttached();
+  await page.getByRole("tab", { name: /Models/ }).click();
+  await page.getByRole("button", { name: "New Model" }).click();
+  const createDialog = page.getByRole("dialog");
+  await createDialog.getByLabel("Brand").selectOption({ label: brandName });
+  await createDialog.getByLabel("Name").fill(modelName);
+  await createDialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Model created.")).toBeVisible();
 
-  await modelsCard.locator("select").selectOption({ label: brandName });
-  await modelsCard.getByPlaceholder("e.g. Corolla").fill(modelName);
-  await modelsCard.getByRole("button", { name: "Add" }).click();
-  await expect(modelsCard.locator("li", { hasText: modelName })).toBeAttached();
+  const modelRow = page.getByRole("row", { name: modelName });
+  await expect(modelRow).toBeAttached();
 
-  page.once("dialog", (dialog) => dialog.accept());
-  await modelsCard.locator("li", { hasText: modelName }).getByRole("button", { name: "Delete" }).click();
-  await expect(modelsCard.locator("li", { hasText: modelName })).toHaveCount(0);
+  await modelRow.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Model deleted.")).toBeVisible();
+  await expect(page.getByRole("row", { name: modelName })).toHaveCount(0);
+
   // The brand itself must survive deleting one of its models.
-  await expect(brandsCard.locator("li", { hasText: brandName })).toBeAttached();
+  await page.getByRole("tab", { name: /Brands/ }).click();
+  const brandRow = page.getByRole("row", { name: brandName });
+  await expect(brandRow).toBeAttached();
 
-  page.once("dialog", (dialog) => dialog.accept());
-  await brandsCard.locator("li", { hasText: brandName }).getByRole("button", { name: "Delete" }).click();
+  await brandRow.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Brand deleted.")).toBeVisible();
 });
 
 test("deleting a brand also removes its models", async ({ page }) => {
@@ -131,80 +142,94 @@ test("deleting a brand also removes its models", async ({ page }) => {
   const brandName = `E2E Cascade Brand ${unique}`;
   const modelName = `E2E Cascade Model ${unique}`;
 
-  const brandsCard = page.getByTestId("catalog-list-brands");
-  const modelsCard = page.getByTestId("catalog-list-models");
+  await page.getByRole("button", { name: "New Brand" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(brandName);
+  await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Brand created.")).toBeVisible();
 
-  await brandsCard.getByPlaceholder("e.g. Toyota").fill(brandName);
-  await brandsCard.getByRole("button", { name: "Add" }).click();
-  await expect(brandsCard.locator("li", { hasText: brandName })).toBeAttached();
+  await page.getByRole("tab", { name: /Models/ }).click();
+  await page.getByRole("button", { name: "New Model" }).click();
+  const createDialog = page.getByRole("dialog");
+  await createDialog.getByLabel("Brand").selectOption({ label: brandName });
+  await createDialog.getByLabel("Name").fill(modelName);
+  await createDialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Model created.")).toBeVisible();
+  await expect(page.getByRole("row", { name: modelName })).toBeAttached();
 
-  await modelsCard.locator("select").selectOption({ label: brandName });
-  await modelsCard.getByPlaceholder("e.g. Corolla").fill(modelName);
-  await modelsCard.getByRole("button", { name: "Add" }).click();
-  await expect(modelsCard.locator("li", { hasText: modelName })).toBeAttached();
+  await page.getByRole("tab", { name: /Brands/ }).click();
+  await page.getByRole("row", { name: brandName }).getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Brand deleted.")).toBeVisible();
+  await expect(page.getByRole("row", { name: brandName })).toHaveCount(0);
 
-  page.once("dialog", (dialog) => dialog.accept());
-  await brandsCard.locator("li", { hasText: brandName }).getByRole("button", { name: "Delete" }).click();
-  await expect(brandsCard.locator("li", { hasText: brandName })).toHaveCount(0);
-  await expect(modelsCard.locator("li", { hasText: modelName })).toHaveCount(0);
+  await page.getByRole("tab", { name: /Models/ }).click();
+  await expect(page.getByRole("row", { name: modelName })).toHaveCount(0);
 });
 
 test("admin can create and delete a vehicle type", async ({ page }) => {
   const unique = Date.now();
   const typeName = `E2E Type ${unique}`;
 
-  const typesCard = page.getByTestId("catalog-list-types");
+  await page.getByRole("tab", { name: /Types/ }).click();
+  await page.getByRole("button", { name: "New Type" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(typeName);
+  await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Type created.")).toBeVisible();
 
-  await typesCard.getByPlaceholder("e.g. Sedan").fill(typeName);
-  await typesCard.getByRole("button", { name: "Add" }).click();
-  await expect(typesCard.locator("li", { hasText: typeName })).toBeAttached();
+  const row = page.getByRole("row", { name: typeName });
+  await expect(row).toBeAttached();
 
-  page.once("dialog", (dialog) => dialog.accept());
-  await typesCard.locator("li", { hasText: typeName }).getByRole("button", { name: "Delete" }).click();
-  await expect(typesCard.locator("li", { hasText: typeName })).toHaveCount(0);
+  await row.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Type deleted.")).toBeVisible();
+  await expect(page.getByRole("row", { name: typeName })).toHaveCount(0);
 });
 
 test("admin can upload a brand logo, replace it, and remove it", async ({ page }) => {
   const unique = Date.now();
   const brandName = `E2E Logo Brand ${unique}`;
 
-  const brandsCard = page.getByTestId("catalog-list-brands");
-
-  await brandsCard.getByPlaceholder("e.g. Toyota").fill(brandName);
-  await brandsCard.getByLabel("Logo").setInputFiles({
+  await page.getByRole("button", { name: "New Brand" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(brandName);
+  await page.getByRole("dialog").getByLabel("Logo", { exact: true }).setInputFiles({
     name: "logo.png",
     mimeType: "image/png",
     buffer: Buffer.from("not a real png, just proving the upload path"),
   });
-  await brandsCard.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Brand created.")).toBeVisible();
 
-  const row = brandsCard.locator("li", { hasText: brandName });
+  const row = page.getByRole("row", { name: brandName });
   await expect(row).toBeAttached();
   await expect(row.getByRole("img", { name: `${brandName} logo` })).toBeAttached();
 
   // Replace the logo with a different file.
   await row.getByRole("button", { name: "Edit" }).click();
-  await brandsCard.getByLabel("Replace logo").setInputFiles({
+  await page.getByRole("dialog").getByLabel("Logo", { exact: true }).setInputFiles({
     name: "logo-2.png",
     mimeType: "image/png",
     buffer: Buffer.from("a different fake png"),
   });
-  await brandsCard.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Brand updated.")).toBeVisible();
   await expect(row.getByRole("img", { name: `${brandName} logo` })).toBeAttached();
 
-  // Remove the logo entirely — the row falls back to the initial-letter badge.
+  // Remove the logo entirely — the row falls back to the initial-letter avatar.
   await row.getByRole("button", { name: "Edit" }).click();
-  await brandsCard.getByLabel("Remove logo").check();
-  await brandsCard.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("dialog").getByLabel("Remove current logo").check();
+  await page.getByRole("dialog").getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Brand updated.")).toBeVisible();
   await expect(row.getByRole("img", { name: `${brandName} logo` })).toHaveCount(0);
 
-  page.once("dialog", (dialog) => dialog.accept());
   await row.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Brand deleted.")).toBeVisible();
 });
 
 test("rejects a duplicate brand name with an inline error, not a crash", async ({ page }) => {
-  const brandsCard = page.getByTestId("catalog-list-brands");
-  await brandsCard.getByPlaceholder("e.g. Toyota").fill("Toyota");
-  await brandsCard.getByRole("button", { name: "Add" }).click();
-  await expect(brandsCard.getByText(/already exists/i)).toBeVisible();
+  await page.getByRole("button", { name: "New Brand" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Name").fill("Toyota");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(dialog.getByText(/already exists/i)).toBeVisible();
 });
