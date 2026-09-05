@@ -678,7 +678,13 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
         )}
       </section>
 
-      <div className="sticky bottom-0 -mx-1 border-t border-neutral-200 bg-white/95 px-1 py-4 backdrop-blur">
+      {/* Plain end-of-page actions, not sticky — this form lives on its own
+          page now (not a dialog with its own internal scroll), so a
+          position:sticky footer follows the *viewport* while the page
+          scrolls and ends up overlapping whatever section is currently
+          underneath it (confirmed live: it sat on top of Specifications'
+          Body Type/Engine/Transmission row and the Deposit input). */}
+      <div className="border-t border-neutral-200 pt-4">
         <DialogFormActions
           pending={pending}
           submitLabel={mode === "create" ? "Create vehicle" : "Save changes"}

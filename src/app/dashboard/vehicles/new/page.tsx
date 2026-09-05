@@ -29,6 +29,16 @@ export default async function NewVehiclePage() {
         ← Back to vehicles
       </Link>
       <h1 className="mt-2 mb-6 font-display text-xl font-semibold text-neutral-900">New vehicle</h1>
+
+      {/* A photo needs a real vehicle id for its storage path (see
+          uploadVehicleMedia), so the Photo Gallery section itself only
+          appears on the edit page — shown here as an explicit placeholder
+          instead of omitted outright, so it doesn't read as missing. */}
+      <div className="mb-6 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-6 text-center">
+        <h2 className="font-display text-lg font-semibold text-neutral-400">Photo gallery</h2>
+        <p className="mt-1 text-sm text-neutral-400">Save this vehicle first, then add photos and choose a featured image.</p>
+      </div>
+
       <VehicleForm
         mode="create"
         brands={brands ?? []}
