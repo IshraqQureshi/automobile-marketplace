@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShowroomIcon, TagIcon } from "@/components/admin/admin-ui";
+import { ProfileIcon, ShowroomIcon, TagIcon } from "@/components/admin/admin-ui";
 import { adminSignOutAction } from "@/features/admin/actions";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +24,10 @@ const MARKETPLACE_ITEMS: NavEntry[] = [
   { label: "Vehicles", href: null, icon: VehicleIcon },
 ];
 
-const ADMIN_ITEMS: NavEntry[] = [{ label: "Users", href: null, icon: UsersIcon }];
+const ADMIN_ITEMS: NavEntry[] = [
+  { label: "My Profile", href: "/admin/profile", icon: ProfileIcon },
+  { label: "Users", href: null, icon: UsersIcon },
+];
 
 interface AdminSidebarProps {
   email: string;
