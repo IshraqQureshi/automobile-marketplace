@@ -9,14 +9,24 @@ interface DialogProps {
   title: string;
   description?: string;
   children: ReactNode;
+  // "md" (default) fits every existing create/edit form; "lg"/"xl" are for
+  // content-heavier dialogs (e.g. a review panel with an inline document
+  // preview) that would otherwise feel cramped at max-w-md.
+  size?: "md" | "lg" | "xl";
 }
+
+const SIZE_CLASSES: Record<NonNullable<DialogProps["size"]>, string> = {
+  md: "max-w-md",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+};
 
 /**
  * Minimal accessible modal — no dependency added for this (no Radix/headlessui
  * in the project yet); a portal + Escape-to-close + overlay-click-to-close +
  * initial focus covers what this admin UI actually needs.
  */
-export function Dialog({ open, onClose, title, description, children }: DialogProps) {
+export function Dialog({ open, onClose, title, description, children, size = "md" }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // onClose is a plain function recreated on every render of the caller
@@ -78,7 +88,7 @@ export function Dialog({ open, onClose, title, description, children }: DialogPr
         aria-modal="true"
         aria-labelledby="dialog-title"
         tabIndex={-1}
-        className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-xl outline-none"
+        className={`relative max-h-[90vh] w-full ${SIZE_CLASSES[size]} overflow-y-auto rounded-xl bg-white p-6 shadow-xl outline-none`}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>

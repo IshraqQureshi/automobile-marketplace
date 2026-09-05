@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState, useTransition } from "react";
 import {
   DialogFormActions,
@@ -41,6 +42,7 @@ export interface ShowroomListItem {
   status: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
   createdAt: string;
   documents: ShowroomDocumentItem[];
+  logoUrl: string | null;
 }
 
 interface ShowroomListProps {
@@ -66,8 +68,19 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-KE", { year: "numeric", month: "short", day: "numeric" });
 }
 
+// Storage paths keep their original extension (see uploadShowroomDocuments)
+// — used to decide how to render an inline preview, without needing to
+// store a separate MIME-type column.
+function documentKindFromPath(path: string): "pdf" | "image" | "other" {
+  const extension = path.split(".").pop()?.toLowerCase();
+  if (extension === "pdf") return "pdf";
+  if (extension === "jpg" || extension === "jpeg" || extension === "png" || extension === "webp") return "image";
+  return "other";
+}
+
 const OWNER_SEARCH_DEBOUNCE_MS = 300;
 const DOCUMENT_ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+const LOGO_ACCEPT = "image/jpeg,image/png,image/webp,image/svg+xml";
 
 interface ShowroomFormState {
   businessName: string;
@@ -88,6 +101,12 @@ interface NewOwnerFormState {
 
 const BLANK_NEW_OWNER: NewOwnerFormState = { ownerFullName: "", ownerEmail: "", ownerPhone: "" };
 
+interface PreviewingDocument {
+  url: string;
+  name: string;
+  kind: "pdf" | "image" | "other";
+}
+
 export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwners }: ShowroomListProps) {
   const toast = useToast();
 
@@ -98,6 +117,10 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   const [reviewing, setReviewing] = useState<ShowroomListItem | null>(null);
   const [confirming, setConfirming] = useState<"approve" | "reject" | null>(null);
   const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(null);
+  // A document preview replaces the review details inline, in the same
+  // already-open Dialog, rather than stacking a second portaled modal on
+  // top — same reasoning as the approve/reject inline confirmation swap.
+  const [previewingDocument, setPreviewingDocument] = useState<PreviewingDocument | null>(null);
   const [reviewPending, startReviewTransition] = useTransition();
 
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
@@ -111,6 +134,9 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   const [newOwner, setNewOwner] = useState<NewOwnerFormState>(BLANK_NEW_OWNER);
   const [documents, setDocuments] = useState<File[]>([]);
   const [documentsInputKey, setDocumentsInputKey] = useState(0);
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoInputKey, setLogoInputKey] = useState(0);
+  const [removeLogo, setRemoveLogo] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ShowroomListItem | null>(null);
   const [crudPending, startCrudTransition] = useTransition();
@@ -125,11 +151,13 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   function openReview(item: ShowroomListItem) {
     setReviewing(item);
     setConfirming(null);
+    setPreviewingDocument(null);
   }
 
   function closeReview() {
     setReviewing(null);
     setConfirming(null);
+    setPreviewingDocument(null);
   }
 
   function handleApprove() {
@@ -166,7 +194,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       toast.error(result.error ?? "Failed to open document.");
       return;
     }
-    window.open(result.url, "_blank", "noopener,noreferrer");
+    setPreviewingDocument({ url: result.url, name: formatDocumentType(doc.documentType), kind: documentKindFromPath(doc.storagePath) });
   }
 
   function openCreate() {
@@ -180,6 +208,9 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     setNewOwner(BLANK_NEW_OWNER);
     setDocuments([]);
     setDocumentsInputKey((k) => k + 1);
+    setLogo(null);
+    setRemoveLogo(false);
+    setLogoInputKey((k) => k + 1);
     setFormError(null);
   }
 
@@ -201,6 +232,9 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     setNewOwner(BLANK_NEW_OWNER);
     setDocuments([]);
     setDocumentsInputKey((k) => k + 1);
+    setLogo(null);
+    setRemoveLogo(false);
+    setLogoInputKey((k) => k + 1);
     setFormError(null);
   }
 
@@ -254,8 +288,10 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       formData.set("businessEmail", form.businessEmail);
       formData.set("address", form.address);
       formData.set("description", form.description);
+      if (logo) formData.set("logo", logo);
       if (editingItem) {
         formData.set("id", editingItem.id);
+        if (removeLogo) formData.set("removeLogo", "true");
       } else if (ownerMode === "new") {
         formData.set("ownerMode", "new");
         formData.set("ownerFullName", newOwner.ownerFullName);
@@ -321,7 +357,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                 <tr key={item.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <InitialAvatar name={item.businessName} />
+                      <ShowroomLogo logoUrl={item.logoUrl} name={item.businessName} size={32} />
                       <span className="font-medium text-neutral-800">{item.businessName}</span>
                     </div>
                   </td>
@@ -362,32 +398,72 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
         open={reviewing !== null}
         onClose={closeReview}
         title={reviewing?.businessName ?? ""}
-        description={reviewing ? `Submitted ${formatDate(reviewing.createdAt)}` : undefined}
+        size="lg"
       >
-        {reviewing && (
-          <div className="flex flex-col gap-4">
-            <StatusBadge status={reviewing.status} />
+        {reviewing && previewingDocument && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setPreviewingDocument(null)}
+                className="flex items-center gap-1 text-sm font-medium text-neutral-600 hover:text-neutral-900"
+              >
+                <span aria-hidden="true">←</span> Back to details
+              </button>
+              <a
+                href={previewingDocument.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 text-xs font-medium text-brand hover:underline"
+              >
+                Open in new tab ↗
+              </a>
+            </div>
+            <p className="text-sm font-semibold text-neutral-800">{previewingDocument.name}</p>
+            {previewingDocument.kind === "image" ? (
+              <div className="relative h-[65vh] w-full overflow-hidden rounded-md border border-neutral-200 bg-neutral-50">
+                <Image src={previewingDocument.url} alt={previewingDocument.name} fill unoptimized className="object-contain" />
+              </div>
+            ) : previewingDocument.kind === "pdf" ? (
+              <iframe src={previewingDocument.url} title={previewingDocument.name} className="h-[65vh] w-full rounded-md border border-neutral-200" />
+            ) : (
+              <p className="rounded-md border border-neutral-200 bg-neutral-50 p-8 text-center text-sm text-neutral-500">
+                Preview isn&apos;t available for this file type — use &quot;Open in new tab&quot; instead.
+              </p>
+            )}
+          </div>
+        )}
 
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <div>
-                <dt className="text-xs font-semibold tracking-wide text-neutral-400 uppercase">Email</dt>
-                <dd className="text-neutral-700">{reviewing.email}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold tracking-wide text-neutral-400 uppercase">Phone</dt>
-                <dd className="text-neutral-700">{reviewing.phone}</dd>
-              </div>
-              <div className="col-span-2">
-                <dt className="text-xs font-semibold tracking-wide text-neutral-400 uppercase">Location</dt>
-                <dd className="text-neutral-700">{[reviewing.address, reviewing.city].filter(Boolean).join(", ") || "—"}</dd>
-              </div>
-              {reviewing.description && (
-                <div className="col-span-2">
-                  <dt className="text-xs font-semibold tracking-wide text-neutral-400 uppercase">Description</dt>
-                  <dd className="text-neutral-700">{reviewing.description}</dd>
+        {reviewing && !previewingDocument && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-neutral-50 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <ShowroomLogo logoUrl={reviewing.logoUrl} name={reviewing.businessName} size={40} />
+                <div>
+                  <p className="font-display font-semibold text-neutral-900">{reviewing.businessName}</p>
+                  <p className="text-xs text-neutral-500">Submitted {formatDate(reviewing.createdAt)}</p>
                 </div>
-              )}
-            </dl>
+              </div>
+              <StatusBadge status={reviewing.status} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <InfoField icon={<MailIcon />} label="Email" value={reviewing.email} />
+              <InfoField icon={<PhoneIcon />} label="Phone" value={reviewing.phone} />
+              <InfoField
+                icon={<PinIcon />}
+                label="Location"
+                value={[reviewing.address, reviewing.city].filter(Boolean).join(", ") || "—"}
+                className="col-span-2"
+              />
+            </div>
+
+            {reviewing.description && (
+              <div>
+                <p className="mb-1 text-xs font-semibold tracking-wide text-neutral-400 uppercase">Description</p>
+                <p className="rounded-md bg-neutral-50 p-3 text-sm text-neutral-700">{reviewing.description}</p>
+              </div>
+            )}
 
             <div>
               <p className="mb-1.5 text-xs font-semibold tracking-wide text-neutral-400 uppercase">Documents</p>
@@ -396,13 +472,19 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
               ) : (
                 <ul className="flex flex-col gap-1.5">
                   {reviewing.documents.map((doc) => (
-                    <li key={doc.id} className="flex items-center justify-between gap-2 rounded-md border border-neutral-200 px-3 py-2 text-sm">
-                      <span className="text-neutral-700">{formatDocumentType(doc.documentType)}</span>
+                    <li
+                      key={doc.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-neutral-200 px-3 py-2 text-sm"
+                    >
+                      <span className="flex items-center gap-2 text-neutral-700">
+                        <FileIcon />
+                        {formatDocumentType(doc.documentType)}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleViewDocument(doc)}
                         disabled={openingDocumentId === doc.id}
-                        className="text-xs font-medium text-brand hover:underline disabled:opacity-60"
+                        className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-60"
                       >
                         {openingDocumentId === doc.id ? "Opening…" : "View"}
                       </button>
@@ -597,6 +679,32 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
             />
           </div>
 
+          <div>
+            <FieldLabel htmlFor="showroom-logo">Logo (optional)</FieldLabel>
+            <label
+              htmlFor="showroom-logo"
+              className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:border-brand hover:text-brand"
+            >
+              <UploadIcon />
+              <span className="truncate">{logo ? logo.name : "Upload logo"}</span>
+            </label>
+            <input
+              key={logoInputKey}
+              id="showroom-logo"
+              type="file"
+              aria-label="Logo"
+              accept={LOGO_ACCEPT}
+              onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
+              className="sr-only"
+            />
+            {editingItem?.logoUrl && !logo && (
+              <label className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
+                <input type="checkbox" checked={removeLogo} onChange={(e) => setRemoveLogo(e.target.checked)} />
+                Remove current logo
+              </label>
+            )}
+          </div>
+
           {!editingItem && (
             <div>
               <FieldLabel htmlFor="showroom-documents">License / Registration documents (optional)</FieldLabel>
@@ -699,5 +807,68 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
         onCancel={() => setDeleteTarget(null)}
       />
     </div>
+  );
+}
+
+function ShowroomLogo({ logoUrl, name, size }: { logoUrl: string | null; name: string; size: number }) {
+  if (!logoUrl) return <InitialAvatar name={name} />;
+  return (
+    <Image
+      src={logoUrl}
+      alt={`${name} logo`}
+      width={size}
+      height={size}
+      unoptimized
+      className="shrink-0 rounded-lg border border-neutral-200 object-contain p-0.5"
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+function InfoField({ icon, label, value, className }: { icon: React.ReactNode; label: string; value: string; className?: string }) {
+  return (
+    <div className={`rounded-md border border-neutral-200 px-3 py-2 ${className ?? ""}`}>
+      <dt className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-neutral-400 uppercase">
+        {icon}
+        {label}
+      </dt>
+      <dd className="mt-0.5 text-sm text-neutral-700">{value}</dd>
+    </div>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5" aria-hidden="true">
+      <path d="M15.05 5a5 5 0 0 1 4 4M15.05 1a9 9 0 0 1 8 7.94" />
+      <path d="M3 5c0 9.4 6.6 16 16 16 .9 0 1.6-.7 1.6-1.6v-2.8a1.6 1.6 0 0 0-1.3-1.57l-3.2-.65a1.6 1.6 0 0 0-1.68.73l-.7 1.15A12.6 12.6 0 0 1 8 12.28l1.15-.7a1.6 1.6 0 0 0 .73-1.68l-.65-3.2A1.6 1.6 0 0 0 7.66 5.3H4.86A1.6 1.6 0 0 0 3 6.9Z" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6" />
+    </svg>
   );
 }

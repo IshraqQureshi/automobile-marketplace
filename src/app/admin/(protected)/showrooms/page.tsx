@@ -17,7 +17,7 @@ export default async function AdminShowroomsPage() {
   const supabase = await createClient();
 
   const [showroomsResult, documentsResult] = await Promise.all([
-    supabase.from("showrooms").select("id, business_name, email, phone, city, address, description, status, created_at"),
+    supabase.from("showrooms").select("id, business_name, email, phone, city, address, description, status, created_at, logo_storage_path"),
     supabase.from("showroom_documents").select("id, showroom_id, document_type, storage_path, status, created_at").order("created_at"),
   ]);
 
@@ -49,6 +49,7 @@ export default async function AdminShowroomsPage() {
       status: showroom.status,
       createdAt: showroom.created_at,
       documents: documentsByShowroom.get(showroom.id) ?? [],
+      logoUrl: showroom.logo_storage_path ? supabase.storage.from("showroom-logos").getPublicUrl(showroom.logo_storage_path).data.publicUrl : null,
     }))
     .sort((a, b) => {
       const rankDiff = (STATUS_RANK[a.status] ?? 99) - (STATUS_RANK[b.status] ?? 99);

@@ -12,6 +12,7 @@ import {
   MAX_DOCUMENTS_PER_SUBMISSION,
   MAX_DOCUMENT_SIZE_BYTES,
 } from "@/features/showroom/schemas";
+import { uploadEntityLogo, validateLogoFile } from "./logo-upload";
 import { adminShowroomSchema, newOwnerSchema, ownerUserIdSchema } from "./showroom-schemas";
 
 export interface ShowroomActionResult {
@@ -196,6 +197,13 @@ export async function createShowroomAction(formData: FormData): Promise<Showroom
   const documentsError = validateDocumentFiles(documents);
   if (documentsError) return { error: documentsError };
 
+  const logoEntry = formData.get("logo");
+  const logoFile = logoEntry instanceof File && logoEntry.size > 0 ? logoEntry : null;
+  if (logoFile) {
+    const logoError = validateLogoFile(logoFile);
+    if (logoError) return { error: logoError };
+  }
+
   const isNewOwner = formData.get("ownerMode") === "new";
   let ownerId: string;
   if (isNewOwner) {
@@ -247,19 +255,27 @@ export async function createShowroomAction(formData: FormData): Promise<Showroom
     return { error: error?.code === "23505" ? "This user already has an active showroom." : "Failed to create showroom." };
   }
 
-  let warning: string | undefined;
+  const warnings: string[] = [];
   if (documents.length > 0 && caller) {
     // uploaded_by records the admin performing this action, not the
     // showroom owner — the owner never touched these files.
     const { failedUploads } = await uploadShowroomDocuments(supabase, showroom.id, caller.id, documents, BUSINESS_REGISTRATION_DOCUMENT_TYPE);
     if (failedUploads.length > 0) {
-      warning = `Showroom created, but ${failedUploads.length} document(s) failed to upload (${failedUploads.join(", ")}).`;
+      warnings.push(`${failedUploads.length} document(s) failed to upload (${failedUploads.join(", ")}).`);
+    }
+  }
+
+  if (logoFile) {
+    const { error: logoError } = await uploadEntityLogo(supabase, "showroom-logos", "showrooms", showroom.id, logoFile);
+    if (logoError) {
+      logger.error("Failed to upload showroom logo", logoError, { showroomId: showroom.id });
+      warnings.push("The logo failed to upload — edit the showroom to try again.");
     }
   }
 
   revalidatePath("/admin/showrooms");
   revalidatePath("/admin");
-  return warning ? { warning } : {};
+  return warnings.length > 0 ? { warning: `Showroom created, but ${warnings.join(" ")}` } : {};
 }
 
 // Business-detail edits only — status/verified are untouched here (and are
@@ -272,7 +288,22 @@ export async function updateShowroomAction(formData: FormData): Promise<Showroom
   const parsed = adminShowroomSchema.safeParse(readShowroomFormFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid showroom details." };
 
+  const logoEntry = formData.get("logo");
+  const logoFile = logoEntry instanceof File && logoEntry.size > 0 ? logoEntry : null;
+  const removeLogo = formData.get("removeLogo") === "true";
+  if (logoFile) {
+    const logoError = validateLogoFile(logoFile);
+    if (logoError) return { error: logoError };
+  }
+
   const supabase = await createClient();
+
+  let previousLogoPath: string | null = null;
+  if (logoFile || removeLogo) {
+    const { data: existing } = await supabase.from("showrooms").select("logo_storage_path").eq("id", id).maybeSingle();
+    previousLogoPath = existing?.logo_storage_path ?? null;
+  }
+
   const { data, error } = await supabase
     .from("showrooms")
     .update({
@@ -282,6 +313,7 @@ export async function updateShowroomAction(formData: FormData): Promise<Showroom
       email: parsed.data.businessEmail,
       address: parsed.data.address ?? null,
       description: parsed.data.description ?? null,
+      ...(removeLogo && !logoFile ? { logo_storage_path: null } : {}),
     })
     .eq("id", id)
     .select("id");
@@ -290,6 +322,22 @@ export async function updateShowroomAction(formData: FormData): Promise<Showroom
     return { error: "Failed to update showroom." };
   }
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
+
+  if (logoFile) {
+    const { error: logoError } = await uploadEntityLogo(supabase, "showroom-logos", "showrooms", id, logoFile);
+    if (logoError) {
+      logger.error("Failed to upload showroom logo", logoError, { showroomId: id });
+      revalidatePath("/admin/showrooms");
+      return { warning: "Details updated, but the new logo failed to upload. Try again." };
+    }
+  }
+
+  if ((logoFile || removeLogo) && previousLogoPath) {
+    const { error: removeError } = await supabase.storage.from("showroom-logos").remove([previousLogoPath]);
+    if (removeError) {
+      logger.warn("Failed to remove a showroom's previous logo file", { id, previousLogoPath, error: removeError.message });
+    }
+  }
 
   revalidatePath("/admin/showrooms");
   revalidatePath("/admin");
@@ -300,10 +348,13 @@ export async function deleteShowroomAction(id: string): Promise<ShowroomActionRe
   const supabase = await createClient();
 
   // showroom_documents rows cascade-delete with their parent showroom, but
-  // the Storage objects they point at don't — collect the paths first so
-  // they can be cleaned up after the row delete succeeds, same reasoning as
-  // deleteBrandAction's logo cleanup.
-  const { data: documents } = await supabase.from("showroom_documents").select("storage_path").eq("showroom_id", id);
+  // the Storage objects they point at (documents and the logo) don't —
+  // collect the paths first so they can be cleaned up after the row delete
+  // succeeds, same reasoning as deleteBrandAction's logo cleanup.
+  const [{ data: documents }, { data: showroom }] = await Promise.all([
+    supabase.from("showroom_documents").select("storage_path").eq("showroom_id", id),
+    supabase.from("showrooms").select("logo_storage_path").eq("id", id).maybeSingle(),
+  ]);
 
   const { data, error } = await supabase.from("showrooms").delete().eq("id", id).select("id");
   if (error) {
@@ -317,6 +368,13 @@ export async function deleteShowroomAction(id: string): Promise<ShowroomActionRe
     const { error: removeError } = await supabase.storage.from("showroom-documents").remove(paths);
     if (removeError) {
       logger.warn("Failed to remove a deleted showroom's document files", { id, paths, error: removeError.message });
+    }
+  }
+
+  if (showroom?.logo_storage_path) {
+    const { error: removeLogoError } = await supabase.storage.from("showroom-logos").remove([showroom.logo_storage_path]);
+    if (removeLogoError) {
+      logger.warn("Failed to remove a deleted showroom's logo file", { id, path: showroom.logo_storage_path, error: removeLogoError.message });
     }
   }
 
