@@ -11,6 +11,10 @@ export interface VehicleActionResult {
   error?: string;
 }
 
+export interface CreateVehicleActionResult extends VehicleActionResult {
+  id?: string;
+}
+
 // Ownership is enforced by RLS on every read/write below (vehicles_*_owner_*
 // and vehicle_media_*_owner_* policies — see
 // supabase/migrations/20260903203104_create_rls_policies.sql), using a
@@ -36,10 +40,58 @@ function readVehicleFormData(formData: FormData) {
     bodyType: String(formData.get("bodyType") ?? ""),
     color: String(formData.get("color") ?? ""),
     description: String(formData.get("description") ?? ""),
+    engine: String(formData.get("engine") ?? ""),
+    interior: String(formData.get("interior") ?? ""),
+    doors: String(formData.get("doors") ?? ""),
+    seats: String(formData.get("seats") ?? ""),
+    countryOfOrigin: String(formData.get("countryOfOrigin") ?? ""),
+    installmentEnabled: String(formData.get("installmentEnabled") ?? ""),
+    bankFinanceEnabled: String(formData.get("bankFinanceEnabled") ?? ""),
+    financingDownPaymentType: String(formData.get("financingDownPaymentType") ?? "PERCENT"),
+    financingDownPaymentPercent: String(formData.get("financingDownPaymentPercent") ?? ""),
+    financingDownPaymentAmount: String(formData.get("financingDownPaymentAmount") ?? ""),
+    financingInterestRate: String(formData.get("financingInterestRate") ?? ""),
+    financingInsurancePercent: String(formData.get("financingInsurancePercent") ?? ""),
+    financingPartner: String(formData.get("financingPartner") ?? ""),
+    financingTenureMonths: formData.getAll("financingTenureMonths").map(String),
+    financingTracker1YearPrice: String(formData.get("financingTracker1YearPrice") ?? ""),
+    financingTracker2YearPrice: String(formData.get("financingTracker2YearPrice") ?? ""),
   };
 }
 
-export async function createVehicleAction(formData: FormData): Promise<VehicleActionResult> {
+function vehicleRowFromParsed(parsed: ReturnType<typeof vehicleSchema.parse>) {
+  return {
+    title: parsed.title,
+    make: parsed.make,
+    model: parsed.model,
+    variant: parsed.variant ?? null,
+    year: parsed.year,
+    price: parsed.price,
+    mileage: parsed.mileage ?? null,
+    fuel_type: parsed.fuelType ?? null,
+    transmission: parsed.transmission ?? null,
+    body_type: parsed.bodyType ?? null,
+    color: parsed.color ?? null,
+    description: parsed.description ?? null,
+    engine: parsed.engine ?? null,
+    interior: parsed.interior ?? null,
+    doors: parsed.doors ?? null,
+    seats: parsed.seats ?? null,
+    country_of_origin: parsed.countryOfOrigin ?? null,
+    installment_enabled: parsed.installmentEnabled,
+    bank_finance_enabled: parsed.bankFinanceEnabled,
+    financing_down_payment_type: parsed.financingDownPaymentType,
+    financing_down_payment_percent: parsed.financingDownPaymentPercent ?? null,
+    financing_down_payment_amount: parsed.financingDownPaymentAmount ?? null,
+    financing_interest_rate: parsed.financingInterestRate ?? null,
+    financing_insurance_percent: parsed.financingInsurancePercent ?? null,
+    financing_partner: parsed.financingPartner ?? null,
+    financing_tenure_options_months: parsed.financingTenureMonths ?? null,
+    financing_tracker_options: parsed.financingTrackerOptions ?? null,
+  };
+}
+
+export async function createVehicleAction(formData: FormData): Promise<CreateVehicleActionResult> {
   const parsed = vehicleSchema.safeParse(readVehicleFormData(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid vehicle details" };
 
@@ -52,29 +104,18 @@ export async function createVehicleAction(formData: FormData): Promise<VehicleAc
   const showroom = await getOwnerShowroom(user.id);
   if (!showroom) return { error: NO_SHOWROOM_ERROR };
 
-  const { error } = await supabase.from("vehicles").insert({
-    showroom_id: showroom.id,
-    title: parsed.data.title,
-    make: parsed.data.make,
-    model: parsed.data.model,
-    variant: parsed.data.variant ?? null,
-    year: parsed.data.year,
-    price: parsed.data.price,
-    mileage: parsed.data.mileage ?? null,
-    fuel_type: parsed.data.fuelType ?? null,
-    transmission: parsed.data.transmission ?? null,
-    body_type: parsed.data.bodyType ?? null,
-    color: parsed.data.color ?? null,
-    description: parsed.data.description ?? null,
-    status: "DRAFT",
-  });
-  if (error) {
+  const { data, error } = await supabase
+    .from("vehicles")
+    .insert({ showroom_id: showroom.id, status: "DRAFT", ...vehicleRowFromParsed(parsed.data) })
+    .select("id")
+    .single();
+  if (error || !data) {
     logger.error("Failed to create vehicle", error, { showroomId: showroom.id });
     return { error: "Failed to create vehicle." };
   }
 
   revalidatePath("/dashboard/vehicles");
-  return {};
+  return { id: data.id };
 }
 
 export async function updateVehicleAction(id: string, formData: FormData): Promise<VehicleActionResult> {
@@ -82,24 +123,7 @@ export async function updateVehicleAction(id: string, formData: FormData): Promi
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid vehicle details" };
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("vehicles")
-    .update({
-      title: parsed.data.title,
-      make: parsed.data.make,
-      model: parsed.data.model,
-      variant: parsed.data.variant ?? null,
-      year: parsed.data.year,
-      price: parsed.data.price,
-      mileage: parsed.data.mileage ?? null,
-      fuel_type: parsed.data.fuelType ?? null,
-      transmission: parsed.data.transmission ?? null,
-      body_type: parsed.data.bodyType ?? null,
-      color: parsed.data.color ?? null,
-      description: parsed.data.description ?? null,
-    })
-    .eq("id", id)
-    .select("id");
+  const { data, error } = await supabase.from("vehicles").update(vehicleRowFromParsed(parsed.data)).eq("id", id).select("id");
   if (error) {
     logger.error("Failed to update vehicle", error, { id });
     return { error: "Failed to update vehicle." };
@@ -107,6 +131,7 @@ export async function updateVehicleAction(id: string, formData: FormData): Promi
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/dashboard/vehicles");
+  revalidatePath(`/dashboard/vehicles/${id}/edit`);
   return {};
 }
 

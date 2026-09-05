@@ -120,9 +120,36 @@ async function loginAsPendingOwner(page: import("@playwright/test").Page) {
   await page.waitForURL("**/dashboard");
 }
 
+/**
+ * Fills the minimum required fields on /dashboard/vehicles/new, submits,
+ * and returns the created vehicle's id (parsed from the edit-page redirect
+ * URL). Brand/Model use the real seeded catalog (Toyota/Camry — see
+ * supabase/migrations/20260905010002_seed_catalog_data.sql) rather than
+ * free text, since the form now sources both from admin-managed dropdowns.
+ */
+async function createVehicleViaForm(page: import("@playwright/test").Page, title: string): Promise<string> {
+  await page.goto("/dashboard/vehicles/new");
+  await page.locator("#vehicle-title").fill(title);
+  await page.locator("#vehicle-brand").selectOption({ label: "Toyota" });
+  await page.locator("#vehicle-model").selectOption({ label: "Camry" });
+  await page.locator("#vehicle-year").fill("2019");
+  await page.locator("#vehicle-price").fill("2500000");
+  await page.getByRole("button", { name: "Create vehicle" }).click();
+  await page.waitForURL(/\/dashboard\/vehicles\/[^/]+\/edit$/);
+  const match = /\/dashboard\/vehicles\/([^/]+)\/edit$/.exec(page.url());
+  if (!match?.[1]) throw new Error(`Could not parse vehicle id from URL: ${page.url()}`);
+  return match[1];
+}
+
 test("visiting /dashboard while signed out redirects to /login", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test("the dashboard layout has no site header or footer", async ({ page }) => {
+  await loginAsFixtureOwner(page);
+  await expect(page.locator("header")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Sell your car" })).toHaveCount(0);
 });
 
 test("a pending showroom sees a review-status message and cannot reach vehicle management", async ({ page }) => {
@@ -134,40 +161,35 @@ test("a pending showroom sees a review-status message and cannot reach vehicle m
   await page.goto("/dashboard/vehicles");
   await page.waitForURL("**/dashboard");
   await expect(page.getByText("Your showroom is under review")).toBeVisible();
+
+  await page.goto("/dashboard/vehicles/new");
+  await page.waitForURL("**/dashboard");
 });
 
-test("an approved owner can create a vehicle as a draft, edit it, and publish it", async ({ page }) => {
+test("an approved owner can create a vehicle, land on its edit page, edit it, and publish it", async ({ page }) => {
   const unique = Date.now();
   const title = `E2E Test Vehicle ${unique}`;
 
   await loginAsFixtureOwner(page);
-  await page.goto("/dashboard/vehicles");
-  await page.getByRole("button", { name: "New vehicle" }).click();
-
-  const dialog = page.getByRole("dialog");
-  await dialog.locator("#vehicle-title").fill(title);
-  await dialog.locator("#vehicle-make").fill("Toyota");
-  await dialog.locator("#vehicle-model").fill("Camry");
-  await dialog.locator("#vehicle-year").fill("2019");
-  await dialog.locator("#vehicle-price").fill("2500000");
-  await dialog.getByRole("button", { name: "Create" }).click();
-
+  await createVehicleViaForm(page, title);
   await expect(page.getByText("Vehicle created as a draft.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await expect(page.getByText("Photo gallery")).toBeVisible();
+
+  // Edit, right there on the same page
+  await page.locator("#vehicle-price").fill("2600000");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  // Back on the list, the change and status control are both visible.
+  await page.goto("/dashboard/vehicles");
   const row = page.getByRole("row", { name: new RegExp(title) });
   await expect(row).toBeVisible();
-  await expect(row.getByRole("combobox")).toHaveValue("DRAFT");
-
-  // Edit
-  await row.getByRole("button", { name: "Edit" }).click();
-  const editDialog = page.getByRole("dialog");
-  await editDialog.locator("#vehicle-price").fill("2600000");
-  await editDialog.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("Vehicle updated.")).toBeVisible();
   // Intl.NumberFormat("en-KE", { currency: "KES" }) renders the locale
   // currency symbol "Ksh", not the literal ISO code "KES".
   await expect(row.getByText("Ksh 2,600,000")).toBeVisible();
+  await expect(row.getByRole("combobox")).toHaveValue("DRAFT");
 
-  // Publish
   await row.getByRole("combobox").selectOption("ACTIVE");
   await expect(page.getByText("Marked as published.")).toBeVisible();
   await page.reload();
@@ -176,63 +198,89 @@ test("an approved owner can create a vehicle as a draft, edit it, and publish it
 
 test("required fields show one inline validation message, not a duplicate banner", async ({ page }) => {
   await loginAsFixtureOwner(page);
-  await page.goto("/dashboard/vehicles");
-  await page.getByRole("button", { name: "New vehicle" }).click();
+  await page.goto("/dashboard/vehicles/new");
 
-  const dialog = page.getByRole("dialog");
-  // A brand-new dialog must show no validation error before any interaction
-  // (regression coverage for the Dialog focus-steal bug fixed in PR #25).
-  await expect(dialog.getByText("Title is required")).toHaveCount(0);
+  // The page must show no validation error before any interaction
+  // (regression coverage for the Dialog focus-steal bug fixed in PR #25 —
+  // still relevant now that the form lives on a plain page, not a dialog).
+  await expect(page.getByText("Title is required")).toHaveCount(0);
 
-  await dialog.getByRole("button", { name: "Create" }).click();
-  await expect(dialog.getByText("Title is required")).toHaveCount(1);
-  await expect(dialog.getByText("Make is required")).toHaveCount(1);
-  await expect(dialog.getByText("Model is required")).toHaveCount(1);
+  await page.getByRole("button", { name: "Create vehicle" }).click();
+  await expect(page.getByText("Title is required")).toHaveCount(1);
   await expect(page.getByText("Vehicle created as a draft.")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/dashboard\/vehicles\/new$/);
 });
 
-test("an approved owner can upload a vehicle photo and it becomes the primary image", async ({ page }) => {
+test("specification and financing fields save and reload correctly", async ({ page }) => {
+  const unique = Date.now();
+  const title = `E2E Spec Vehicle ${unique}`;
+
+  await loginAsFixtureOwner(page);
+  await createVehicleViaForm(page, title);
+
+  await page.locator("#vehicle-engine").fill("2.0L Turbo Petrol");
+  await page.locator("#vehicle-interior").fill("Leather");
+  await page.locator("#vehicle-doors").fill("4");
+  await page.locator("#vehicle-seats").fill("5");
+  await page.locator("#vehicle-country-of-origin").fill("Japan");
+
+  await page.getByLabel("Available on installment (HP)").check();
+  await page.locator("#vehicle-down-payment-value").fill("20");
+  await page.locator("#vehicle-interest-rate").fill("13.5");
+  await page.locator("#vehicle-insurance-percent").fill("3");
+  await page.locator("#vehicle-tracker-1yr").fill("15000");
+  await page.getByLabel("24 months").check();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator("#vehicle-engine")).toHaveValue("2.0L Turbo Petrol");
+  await expect(page.locator("#vehicle-doors")).toHaveValue("4");
+  await expect(page.locator("#vehicle-seats")).toHaveValue("5");
+  await expect(page.getByLabel("Available on installment (HP)")).toBeChecked();
+  await expect(page.locator("#vehicle-down-payment-value")).toHaveValue("20");
+  await expect(page.locator("#vehicle-tracker-1yr")).toHaveValue("15000");
+  await expect(page.getByLabel("24 months")).toBeChecked();
+
+  // Switching deposit type to Fixed hides the percent value and shows a
+  // fresh fixed-amount input instead.
+  await page.getByLabel("Deposit type").selectOption("FIXED");
+  await page.locator("#vehicle-down-payment-value").fill("500000");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Deposit type")).toHaveValue("FIXED");
+  await expect(page.locator("#vehicle-down-payment-value")).toHaveValue("500000");
+});
+
+test("an approved owner can upload a vehicle photo and it becomes the featured image", async ({ page }) => {
   const unique = Date.now();
   const title = `E2E Photo Vehicle ${unique}`;
 
   await loginAsFixtureOwner(page);
-  await page.goto("/dashboard/vehicles");
-  await page.getByRole("button", { name: "New vehicle" }).click();
-  const createDialog = page.getByRole("dialog");
-  await createDialog.locator("#vehicle-title").fill(title);
-  await createDialog.locator("#vehicle-make").fill("Toyota");
-  await createDialog.locator("#vehicle-model").fill("Camry");
-  await createDialog.locator("#vehicle-year").fill("2019");
-  await createDialog.locator("#vehicle-price").fill("2500000");
-  await createDialog.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByText("Vehicle created as a draft.")).toBeVisible();
+  await createVehicleViaForm(page, title);
 
-  const row = page.getByRole("row", { name: new RegExp(title) });
-  await row.getByRole("button", { name: "Photos" }).click();
-
-  const photosDialog = page.getByRole("dialog");
-  await photosDialog
+  await page
     .locator("#vehicle-photo-upload")
     .setInputFiles({ name: "vehicle.png", mimeType: "image/png", buffer: Buffer.from(TINY_PNG_BASE64, "base64") });
   await expect(page.getByText("Photos uploaded.")).toBeVisible();
-  await expect(photosDialog.getByText("Primary", { exact: true })).toBeVisible();
+  await expect(page.getByText("Featured", { exact: true })).toBeVisible();
 
-  // A second photo, set as primary, then deleting the (now non-primary)
-  // first photo — the dialog stays open across all three mutations and
-  // must reflect each one without being closed and reopened (regression
-  // coverage: the dialog used to hold a stale snapshot of the vehicle's
-  // photos captured only when it was first opened).
-  await photosDialog
+  // A second photo, set as featured, then deleting the (now non-featured)
+  // first photo — the section stays mounted across all three mutations and
+  // must reflect each one, matching the same "no stale snapshot" coverage
+  // this had when it was a dialog.
+  await page
     .locator("#vehicle-photo-upload")
     .setInputFiles({ name: "vehicle-2.png", mimeType: "image/png", buffer: Buffer.from(TINY_PNG_BASE64, "base64") });
-  await expect(photosDialog.getByRole("button", { name: "Set as primary" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Set as featured image" })).toHaveCount(1);
 
-  await photosDialog.getByRole("button", { name: "Set as primary" }).click();
-  await expect(photosDialog.getByRole("button", { name: "Set as primary" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Set as featured image" }).click();
+  await expect(page.getByRole("button", { name: "Set as featured image" })).toHaveCount(1);
 
-  await photosDialog.getByRole("button", { name: "Delete photo" }).first().click();
-  await expect(photosDialog.getByRole("button", { name: "Delete photo" })).toHaveCount(1);
-  await expect(photosDialog.getByText("Primary", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Delete photo" }).first().click();
+  await expect(page.getByRole("button", { name: "Delete photo" })).toHaveCount(1);
+  await expect(page.getByText("Featured", { exact: true })).toBeVisible();
 });
 
 test("an approved owner can mark a vehicle sold and deactivate it", async ({ page }) => {
@@ -240,16 +288,8 @@ test("an approved owner can mark a vehicle sold and deactivate it", async ({ pag
   const title = `E2E Status Vehicle ${unique}`;
 
   await loginAsFixtureOwner(page);
+  await createVehicleViaForm(page, title);
   await page.goto("/dashboard/vehicles");
-  await page.getByRole("button", { name: "New vehicle" }).click();
-  const createDialog = page.getByRole("dialog");
-  await createDialog.locator("#vehicle-title").fill(title);
-  await createDialog.locator("#vehicle-make").fill("Toyota");
-  await createDialog.locator("#vehicle-model").fill("Camry");
-  await createDialog.locator("#vehicle-year").fill("2019");
-  await createDialog.locator("#vehicle-price").fill("2500000");
-  await createDialog.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByText("Vehicle created as a draft.")).toBeVisible();
 
   const row = page.getByRole("row", { name: new RegExp(title) });
   const status = row.getByRole("combobox");

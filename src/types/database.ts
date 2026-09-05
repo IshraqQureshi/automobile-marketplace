@@ -810,11 +810,17 @@ export type Database = {
       }
       vehicles: {
         Row: {
+          bank_finance_enabled: boolean
           body_type: string | null
           color: string | null
+          country_of_origin: string | null
           created_at: string
           description: string | null
+          doors: number | null
+          engine: string | null
+          financing_down_payment_amount: number | null
           financing_down_payment_percent: number | null
+          financing_down_payment_type: string
           financing_insurance_percent: number | null
           financing_interest_rate: number | null
           financing_partner: string | null
@@ -822,10 +828,13 @@ export type Database = {
           financing_tracker_options: Json | null
           fuel_type: string | null
           id: string
+          installment_enabled: boolean
+          interior: string | null
           make: string
           mileage: number | null
           model: string
           price: number
+          seats: number | null
           showroom_id: string
           status: Database["public"]["Enums"]["vehicle_status"]
           title: string
@@ -835,11 +844,17 @@ export type Database = {
           year: number
         }
         Insert: {
+          bank_finance_enabled?: boolean
           body_type?: string | null
           color?: string | null
+          country_of_origin?: string | null
           created_at?: string
           description?: string | null
+          doors?: number | null
+          engine?: string | null
+          financing_down_payment_amount?: number | null
           financing_down_payment_percent?: number | null
+          financing_down_payment_type?: string
           financing_insurance_percent?: number | null
           financing_interest_rate?: number | null
           financing_partner?: string | null
@@ -847,10 +862,13 @@ export type Database = {
           financing_tracker_options?: Json | null
           fuel_type?: string | null
           id?: string
+          installment_enabled?: boolean
+          interior?: string | null
           make: string
           mileage?: number | null
           model: string
           price: number
+          seats?: number | null
           showroom_id: string
           status?: Database["public"]["Enums"]["vehicle_status"]
           title: string
@@ -860,11 +878,17 @@ export type Database = {
           year: number
         }
         Update: {
+          bank_finance_enabled?: boolean
           body_type?: string | null
           color?: string | null
+          country_of_origin?: string | null
           created_at?: string
           description?: string | null
+          doors?: number | null
+          engine?: string | null
+          financing_down_payment_amount?: number | null
           financing_down_payment_percent?: number | null
+          financing_down_payment_type?: string
           financing_insurance_percent?: number | null
           financing_interest_rate?: number | null
           financing_partner?: string | null
@@ -872,10 +896,13 @@ export type Database = {
           financing_tracker_options?: Json | null
           fuel_type?: string | null
           id?: string
+          installment_enabled?: boolean
+          interior?: string | null
           make?: string
           mileage?: number | null
           model?: string
           price?: number
+          seats?: number | null
           showroom_id?: string
           status?: Database["public"]["Enums"]["vehicle_status"]
           title?: string

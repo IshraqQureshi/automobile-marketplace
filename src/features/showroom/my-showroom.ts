@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 // Plain module, not "use server" — shared by the dashboard layout (route
@@ -40,3 +41,16 @@ export const getOwnerShowroom = cache(async (userId: string): Promise<OwnerShowr
   if (!data || data.length === 0) return null;
   return data.find((showroom) => showroom.status !== "REJECTED") ?? data[0] ?? null;
 });
+
+/**
+ * Shared guard for every approved-only vehicle-management page
+ * (/dashboard/vehicles, .../new, .../[id]/edit) — SHR-004: no showroom at
+ * all sends the user to register one; a showroom that isn't APPROVED sends
+ * them back to the dashboard, where its status is explained.
+ */
+export async function requireApprovedOwnerShowroom(userId: string): Promise<OwnerShowroom> {
+  const showroom = await getOwnerShowroom(userId);
+  if (!showroom) redirect("/ready-to-sell");
+  if (showroom.status !== "APPROVED") redirect("/dashboard");
+  return showroom;
+}

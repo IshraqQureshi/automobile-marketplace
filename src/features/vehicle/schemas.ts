@@ -53,8 +53,53 @@ const optionalTrimmedText = (maxLength: number, label: string) =>
     .transform((value) => value || undefined);
 
 export const vehicleVariantSchema = optionalTrimmedText(60, "Variant");
-export const vehicleColorSchema = optionalTrimmedText(40, "Color");
+export const vehicleColorSchema = optionalTrimmedText(40, "Colour");
 export const vehicleDescriptionSchema = optionalTrimmedText(2000, "Description");
+export const vehicleEngineSchema = optionalTrimmedText(60, "Engine");
+export const vehicleInteriorSchema = optionalTrimmedText(60, "Interior");
+export const vehicleCountryOfOriginSchema = optionalTrimmedText(60, "Country of origin");
+
+const optionalSmallInteger = (max: number, label: string) =>
+  z
+    .string()
+    .trim()
+    .pipe(z.union([z.literal(""), z.string().regex(INTEGER_REGEX, `Enter a valid ${label.toLowerCase()}`)]))
+    .transform((value) => (value === "" ? undefined : Number(value)))
+    .pipe(z.number().max(max, `${label} must be ${max} or fewer`).optional());
+
+export const vehicleDoorsSchema = optionalSmallInteger(10, "Doors");
+export const vehicleSeatsSchema = optionalSmallInteger(20, "Seats");
+
+// Percentages (down payment/interest/insurance) share the same 0-100 shape
+// as the existing DB check constraints — reused here for the per-field
+// onBlur check too, not just the full-object parse.
+const optionalPercent = (label: string) =>
+  z
+    .string()
+    .trim()
+    .pipe(z.union([z.literal(""), z.string().regex(DECIMAL_REGEX, `Enter a valid ${label.toLowerCase()}`)]))
+    .transform((value) => (value === "" ? undefined : Number(value)))
+    .pipe(z.number().min(0, `${label} cannot be negative`).max(100, `${label} cannot exceed 100%`).optional());
+
+const optionalNonNegativeAmount = (label: string) =>
+  z
+    .string()
+    .trim()
+    .pipe(z.union([z.literal(""), z.string().regex(DECIMAL_REGEX, `Enter a valid ${label.toLowerCase()}`)]))
+    .transform((value) => (value === "" ? undefined : Number(value)))
+    .pipe(z.number().min(0, `${label} cannot be negative`).optional());
+
+export const vehicleDownPaymentPercentSchema = optionalPercent("Down payment");
+export const vehicleDownPaymentAmountSchema = optionalNonNegativeAmount("Down payment amount");
+export const vehicleInterestRateSchema = optionalNonNegativeAmount("Interest rate");
+export const vehicleInsurancePercentSchema = optionalPercent("Insurance");
+export const vehicleFinancingPartnerSchema = optionalTrimmedText(100, "Financing partner");
+export const vehicleTracker1YearPriceSchema = optionalNonNegativeAmount("1-year tracker fee");
+export const vehicleTracker2YearPriceSchema = optionalNonNegativeAmount("2-year tracker fee");
+
+export const DOWN_PAYMENT_TYPES = ["PERCENT", "FIXED"] as const;
+export type DownPaymentType = (typeof DOWN_PAYMENT_TYPES)[number];
+export const LOAN_TENURE_OPTIONS_MONTHS = [12, 24, 36, 48, 60, 72] as const;
 
 // Shape object for useFieldValidation (Record<string, ZodType>) — same
 // convention as catalogFieldSchemas/showroomFieldSchemas. Fuel type,
@@ -71,6 +116,18 @@ export const vehicleFieldSchemas = {
   variant: vehicleVariantSchema,
   color: vehicleColorSchema,
   description: vehicleDescriptionSchema,
+  engine: vehicleEngineSchema,
+  interior: vehicleInteriorSchema,
+  doors: vehicleDoorsSchema,
+  seats: vehicleSeatsSchema,
+  countryOfOrigin: vehicleCountryOfOriginSchema,
+  financingDownPaymentPercent: vehicleDownPaymentPercentSchema,
+  financingDownPaymentAmount: vehicleDownPaymentAmountSchema,
+  financingInterestRate: vehicleInterestRateSchema,
+  financingInsurancePercent: vehicleInsurancePercentSchema,
+  financingPartner: vehicleFinancingPartnerSchema,
+  financingTracker1YearPrice: vehicleTracker1YearPriceSchema,
+  financingTracker2YearPrice: vehicleTracker2YearPriceSchema,
 };
 
 // Full-object schema for the server action's authoritative parse. Fuel
@@ -78,26 +135,80 @@ export const vehicleFieldSchemas = {
 // free text server-side (mirroring the `body_type` column itself, which
 // carries no FK/check constraint to vehicle_types) but still trimmed and
 // length-capped.
-export const vehicleSchema = z.object({
-  title: vehicleTitleSchema,
-  make: vehicleMakeSchema,
-  model: vehicleModelSchema,
-  variant: vehicleVariantSchema,
-  year: vehicleYearSchema,
-  price: vehiclePriceSchema,
-  mileage: vehicleMileageOptionalSchema,
-  fuelType: z
-    .union([z.literal(""), z.enum(FUEL_TYPES)])
-    .optional()
-    .transform((value) => value || undefined),
-  transmission: z
-    .union([z.literal(""), z.enum(TRANSMISSIONS)])
-    .optional()
-    .transform((value) => value || undefined),
-  bodyType: optionalTrimmedText(60, "Body type"),
-  color: vehicleColorSchema,
-  description: vehicleDescriptionSchema,
-});
+const booleanFlagSchema = z
+  .string()
+  .optional()
+  .transform((value) => value === "true");
+
+const tenureMonthsSchema = z
+  .array(z.string())
+  .optional()
+  .transform((value) => (value ?? []).map(Number))
+  .pipe(
+    z
+      .array(z.number().int())
+      .refine((months) => months.every((m) => (LOAN_TENURE_OPTIONS_MONTHS as readonly number[]).includes(m)), {
+        message: "Invalid loan tenure option",
+      }),
+  )
+  .transform((months) => (months.length > 0 ? months : undefined));
+
+export const vehicleSchema = z
+  .object({
+    title: vehicleTitleSchema,
+    make: vehicleMakeSchema,
+    model: vehicleModelSchema,
+    variant: vehicleVariantSchema,
+    year: vehicleYearSchema,
+    price: vehiclePriceSchema,
+    mileage: vehicleMileageOptionalSchema,
+    fuelType: z
+      .union([z.literal(""), z.enum(FUEL_TYPES)])
+      .optional()
+      .transform((value) => value || undefined),
+    transmission: z
+      .union([z.literal(""), z.enum(TRANSMISSIONS)])
+      .optional()
+      .transform((value) => value || undefined),
+    bodyType: optionalTrimmedText(60, "Body type"),
+    color: vehicleColorSchema,
+    description: vehicleDescriptionSchema,
+    engine: vehicleEngineSchema,
+    interior: vehicleInteriorSchema,
+    doors: vehicleDoorsSchema,
+    seats: vehicleSeatsSchema,
+    countryOfOrigin: vehicleCountryOfOriginSchema,
+    installmentEnabled: booleanFlagSchema,
+    bankFinanceEnabled: booleanFlagSchema,
+    financingDownPaymentType: z.enum(DOWN_PAYMENT_TYPES).default("PERCENT"),
+    financingDownPaymentPercent: vehicleDownPaymentPercentSchema,
+    financingDownPaymentAmount: vehicleDownPaymentAmountSchema,
+    financingInterestRate: vehicleInterestRateSchema,
+    financingInsurancePercent: vehicleInsurancePercentSchema,
+    financingPartner: vehicleFinancingPartnerSchema,
+    financingTenureMonths: tenureMonthsSchema,
+    financingTracker1YearPrice: vehicleTracker1YearPriceSchema,
+    financingTracker2YearPrice: vehicleTracker2YearPriceSchema,
+  })
+  .transform((data) => {
+    // Only the active down-payment figure (per financingDownPaymentType) is
+    // kept — the inactive one is dropped rather than persisted stale, since
+    // the UI only ever shows one of the two inputs at a time.
+    const financingTrackerOptions =
+      data.financingTracker1YearPrice != null || data.financingTracker2YearPrice != null
+        ? [
+            ...(data.financingTracker1YearPrice != null ? [{ duration: "1 Year", price: data.financingTracker1YearPrice }] : []),
+            ...(data.financingTracker2YearPrice != null ? [{ duration: "2 Years", price: data.financingTracker2YearPrice }] : []),
+          ]
+        : undefined;
+
+    return {
+      ...data,
+      financingDownPaymentPercent: data.financingDownPaymentType === "PERCENT" ? data.financingDownPaymentPercent : undefined,
+      financingDownPaymentAmount: data.financingDownPaymentType === "FIXED" ? data.financingDownPaymentAmount : undefined,
+      financingTrackerOptions,
+    };
+  });
 
 // Statuses an owner may set directly. PENDING_REVIEW and REJECTED are
 // reserved for the Day 4 admin moderation flow (ADM-004) — no such workflow
