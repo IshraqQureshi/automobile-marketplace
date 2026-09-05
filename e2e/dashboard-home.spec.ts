@@ -162,12 +162,33 @@ test.describe("mobile dashboard navigation", () => {
   test("the mobile menu opens the sidebar drawer and closes it after navigating", async ({ page }) => {
     await loginAsFixtureOwner(page);
 
-    await expect(page.getByRole("link", { name: "Vehicles", exact: true })).not.toBeInViewport();
-    await page.getByRole("button", { name: "Open menu" }).click();
-    await expect(page.getByRole("link", { name: "Vehicles", exact: true })).toBeInViewport();
+    const vehiclesLink = page.getByRole("link", { name: "Vehicles", exact: true });
 
-    await page.getByRole("link", { name: "Vehicles", exact: true }).click();
+    // Closed: the drawer's nav must be out of the accessibility tree/tab
+    // order (inert), not just visually off-screen — otherwise a keyboard
+    // user tabs through an invisible nav before reaching real page content.
+    await expect(vehiclesLink).not.toBeInViewport();
+    await expect(vehiclesLink.locator("xpath=ancestor::*[@inert]")).toHaveCount(1);
+
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await expect(page.getByRole("button", { name: "Close menu", exact: true }).first()).toHaveAttribute("aria-expanded", "true");
+    await expect(vehiclesLink).toBeInViewport();
+    await expect(vehiclesLink.locator("xpath=ancestor::*[@inert]")).toHaveCount(0);
+
+    await vehiclesLink.click();
     await page.waitForURL("**/dashboard/vehicles");
     await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
+  });
+
+  test("pressing Escape closes the mobile drawer and returns focus to the menu button", async ({ page }) => {
+    await loginAsFixtureOwner(page);
+
+    const menuButton = page.getByRole("button", { name: "Open menu" });
+    await menuButton.click();
+    await expect(page.getByRole("link", { name: "Vehicles", exact: true })).toBeInViewport();
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("link", { name: "Vehicles", exact: true })).not.toBeInViewport();
+    await expect(page.getByRole("button", { name: "Open menu" })).toBeFocused();
   });
 });

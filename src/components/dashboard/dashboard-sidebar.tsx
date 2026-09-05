@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CarIcon } from "@/components/admin/admin-ui";
+import { CarIcon, ProfileIcon } from "@/components/admin/admin-ui";
 import { signOutAction } from "@/features/auth/actions";
 import type { OwnerShowroom } from "@/features/showroom/my-showroom";
 import { cn } from "@/lib/utils";
@@ -113,19 +113,6 @@ function DashboardIcon() {
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
-    </svg>
-  );
-}
-
-// Exported (not just used locally) — also used as the dashboard home page's
-// "Edit profile" quick-action icon (src/app/dashboard/page.tsx), same
-// reasoning as admin-ui.tsx's TagIcon/ShowroomIcon comment: one icon shared
-// across two components instead of duplicated.
-export function ProfileIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
     </svg>
   );
 }

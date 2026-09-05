@@ -225,6 +225,21 @@ export function CarIcon() {
   );
 }
 
+// Also used as the dashboard sidebar's "Profile" nav icon and the dashboard
+// home page's "Edit showroom profile" quick-action icon (both under
+// src/components/dashboard/, src/app/dashboard/page.tsx) — kept here rather
+// than in dashboard-sidebar.tsx (a "use client" file) so a Server Component
+// importing it doesn't need to pull in a client-component reference for a
+// static SVG, same reasoning as TagIcon/ShowroomIcon above.
+export function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+    </svg>
+  );
+}
+
 export function LayersIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.5 w-4.5" aria-hidden="true">
