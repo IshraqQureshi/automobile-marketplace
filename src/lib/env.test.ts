@@ -55,12 +55,32 @@ describe("publicEnv", () => {
   it("parses valid public env vars at import time", async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
+    delete process.env.NEXT_PUBLIC_SITE_URL;
 
     const { publicEnv } = await import("./env");
     expect(publicEnv).toEqual({
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+      NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
     });
+  });
+
+  it("defaults NEXT_PUBLIC_SITE_URL to localhost when unset", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+
+    const { publicEnv } = await import("./env");
+    expect(publicEnv.NEXT_PUBLIC_SITE_URL).toBe("http://localhost:3000");
+  });
+
+  it("uses NEXT_PUBLIC_SITE_URL when explicitly set", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://harakagari.example.com";
+
+    const { publicEnv } = await import("./env");
+    expect(publicEnv.NEXT_PUBLIC_SITE_URL).toBe("https://harakagari.example.com");
   });
 
   it("throws at import time when NEXT_PUBLIC_SUPABASE_URL is not a valid URL", async () => {

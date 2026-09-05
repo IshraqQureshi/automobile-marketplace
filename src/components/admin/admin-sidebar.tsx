@@ -24,6 +24,8 @@ const MARKETPLACE_ITEMS: NavEntry[] = [
   { label: "Vehicles", href: null, icon: VehicleIcon },
 ];
 
+const CONTENT_ITEMS: NavEntry[] = [{ label: "Homepage Highlights", href: "/admin/highlights", icon: VideoIcon }];
+
 const ADMIN_ITEMS: NavEntry[] = [
   { label: "My Profile", href: "/admin/profile", icon: ProfileIcon },
   { label: "Users", href: null, icon: UsersIcon },
@@ -44,6 +46,7 @@ export function AdminSidebar({ email }: AdminSidebarProps) {
 
       <NavGroup label="Overview" items={OVERVIEW_ITEMS} pathname={pathname} />
       <NavGroup label="Marketplace" items={MARKETPLACE_ITEMS} pathname={pathname} />
+      <NavGroup label="Content" items={CONTENT_ITEMS} pathname={pathname} />
       <NavGroup label="Admin" items={ADMIN_ITEMS} pathname={pathname} />
 
       <div className="flex-1" />
@@ -129,6 +132,15 @@ function DashboardIcon() {
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
+function VideoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <rect x="3" y="5" width="14" height="14" rx="2" />
+      <path d="m17 10 4-3v10l-4-3" />
     </svg>
   );
 }

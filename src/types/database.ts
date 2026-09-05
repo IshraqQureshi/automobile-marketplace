@@ -228,6 +228,53 @@ export type Database = {
           },
         ]
       }
+      homepage_highlights: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          platform: Database["public"]["Enums"]["homepage_highlight_platform"]
+          sort_order: number
+          thumbnail_storage_path: string
+          title: string
+          updated_at: string
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          platform: Database["public"]["Enums"]["homepage_highlight_platform"]
+          sort_order?: number
+          thumbnail_storage_path: string
+          title: string
+          updated_at?: string
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          platform?: Database["public"]["Enums"]["homepage_highlight_platform"]
+          sort_order?: number
+          thumbnail_storage_path?: string
+          title?: string
+          updated_at?: string
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "homepage_highlights_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manual_payments: {
         Row: {
           amount: number
@@ -941,6 +988,7 @@ export type Database = {
         | "DECLINED"
         | "CANCELLED"
         | "COMPLETED"
+      homepage_highlight_platform: "TIKTOK" | "YOUTUBE"
       manual_payment_status: "RECORDED" | "VOIDED"
       notification_channel: "EMAIL" | "WHATSAPP"
       notification_status: "PENDING" | "SENT" | "FAILED"
@@ -1107,6 +1155,7 @@ export const Constants = {
         "CANCELLED",
         "COMPLETED",
       ],
+      homepage_highlight_platform: ["TIKTOK", "YOUTUBE"],
       manual_payment_status: ["RECORDED", "VOIDED"],
       notification_channel: ["EMAIL", "WHATSAPP"],
       notification_status: ["PENDING", "SENT", "FAILED"],
