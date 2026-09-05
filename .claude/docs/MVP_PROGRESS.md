@@ -108,14 +108,14 @@
 
 ## Vehicles
 
-* [ ] Add vehicle
-* [ ] Edit vehicle
-* [ ] Delete vehicle
-* [ ] Vehicle images
-* [ ] Vehicle specifications
-* [ ] Pricing
-* [ ] Vehicle status
-* [ ] Vehicle listing
+* [x] Add vehicle (SHR-005 — `/dashboard/vehicles`, showroom-owner-facing; created as DRAFT — see PR #26)
+* [x] Edit vehicle (SHR-006 — see PR #26)
+* [x] Delete vehicle (SHR-007 — implemented as a status change to INACTIVE ("Removed"), not a hard delete, given `vehicle_media`/`vehicle_inquiries` FK references to a vehicle and the requirement's own "remove/deactivate" wording — see PR #26)
+* [x] Vehicle images (SHR-008 — multi-upload to the existing `vehicle-media` bucket, primary-image selection, delete with automatic primary reassignment — see PR #26)
+* [x] Vehicle specifications (make/model/variant/year/mileage/fuel type/transmission/body type/color — fuel type & transmission are fixed app-level lists, body type reuses the admin `vehicle_types` catalog — see PR #26)
+* [x] Pricing (financing fields — down payment %, interest rate, tenure — intentionally deferred to the Day 4 finance calculator feature, not this PR's scope — see PR #26)
+* [x] Vehicle status (owner-settable subset: Draft/Published/Sold/Removed; PENDING_REVIEW/REJECTED reserved for the not-yet-built Day 4 admin moderation flow — see PR #26)
+* [ ] Vehicle listing (public marketplace browsing — Day 3 MKT scope, not built yet; a vehicle can be "published" but there's nowhere public to see it)
 
 ## Admin
 
@@ -126,20 +126,20 @@
 
 ## Testing
 
-* [ ] Unit tests
-* [ ] Integration tests
-* [ ] E2E showroom flow
-* [ ] E2E vehicle flow
-* [ ] Figma visual QA
+* [x] Unit tests (schema/validation tests across showroom + catalog + vehicle features — 201/201 passing as of PR #26)
+* [x] Integration tests (RLS ownership coverage for showrooms/catalog/vehicles/vehicle_media/storage)
+* [ ] E2E showroom flow (registration + admin approval covered; showroom self-service profile/edit not built yet)
+* [x] E2E vehicle flow (`e2e/dashboard-vehicles.spec.ts` — create/edit/publish/mark sold/deactivate, photo upload/set-primary/delete, pending-showroom gating — see PR #26)
+* [ ] Figma visual QA (no Figma mockup exists for the showroom-owner dashboard/vehicle-management screens — confirmed before implementation; built from the existing admin-panel design system instead, per CLAUDE.md's "don't invent visual patterns where Figma already defines them, but don't fabricate a Figma reference either" spirit)
 
 ### Day 2 Gate
 
-* [ ] Showroom can manage its profile
-* [ ] Showroom can manage vehicles
-* [ ] Admin can manage showroom/vehicle data
-* [ ] Required tests pass
+* [ ] Showroom can manage its profile (self-service profile edit not built — showroom profile is currently admin-editable only, via `/admin/showrooms`)
+* [x] Showroom can manage vehicles (add/edit/publish/mark sold/deactivate/photos — see PR #26)
+* [x] Admin can manage showroom/vehicle data (showroom: PR #20-#23; vehicle catalog taxonomy: PR #15/#17 — admin vehicle *moderation* specifically is Day 4/ADM-004, not yet built)
+* [x] Required tests pass (201/201 unit+integration, 46/46 E2E, typecheck/lint/build all clean as of PR #26)
 
-**Status:** ⬜
+**Status:** 🟡 Day 2 Gate mostly closed — showroom self-service profile editing is the one remaining item
 
 ---
 
@@ -478,6 +478,7 @@ Regression Test
 | [#23](https://github.com/IshraqQureshi/automobile-marketplace/pull/23) | Showroom review dialog redesign, inline document preview, logo (`feature/showroom-review-modal-and-logo` → `main`) | 🟢 APPROVED by Code Review Agent (1 LOW — an unused `"xl"` Dialog size variant with no caller anywhere, removed and re-verified; 1 informational/non-blocking note on a pre-existing, unchanged Content-Type-trust gap in document uploads — see PR comment) | 🟢 typecheck/lint/unit (163/163, incl. 5 new `showroom-logos` Storage RLS integration tests)/E2E (37/37, incl. an updated document-view test asserting no new tab opens and a new logo-upload test using real PNG bytes)/production build all passing | MERGED | 🟢 (squash, `8a0b9ce`) |
 | [#24](https://github.com/IshraqQureshi/automobile-marketplace/pull/24) | Fix: real client-side validation on all admin CRUD forms (`fix/admin-crud-real-client-validation` → `main`) | 🟢 APPROVED by Code Review Agent (no findings — verified all four forms, confirmed no leftover debug logs, confirmed the new E2E assertions correctly use `.first()` for the banner/inline duplicate-message case — see PR comment) | 🟢 typecheck/lint/unit (163/163, unchanged)/E2E (40/40, incl. 3 new client-side-validation-blocks-submission tests)/production build all passing | MERGED | 🟢 (squash, `caed789`) |
 | [#25](https://github.com/IshraqQureshi/automobile-marketplace/pull/25) | Fix: duplicate validation message + Dialog focus-steal + stale error state (`fix/admin-form-validation-duplicate-and-stale-state` → `main`) | 🟢 APPROVED by Code Review Agent (no findings — verified the Dialog focus-skip doesn't regress non-autoFocus dialogs, no reset()/blur race, no leftover banner/inline duplication, E2E assertions correctly dialog-scoped — see PR comment) | 🟢 typecheck/lint/unit (163/163, unchanged)/E2E (40/40, run twice, incl. strengthened toHaveCount(0)/(1) regression assertions)/production build all passing | MERGED | 🟢 (squash, `adadf77`) |
+| [#26](https://github.com/IshraqQureshi/automobile-marketplace/pull/26) | Showroom-owner vehicle management, SHR-004..008 (`feature/vehicle-management` → `main`) | 🟢 APPROVED by Code Review Agent after one fix round (2 HIGH — `setPrimaryVehiclePhotoAction` was missing the `.select("id")` + 0-row check every other mutation in the file already follows, so a non-owned/gone media id was silently reported as success, fixed and re-verified; the Photos dialog stored a one-time snapshot of the vehicle object on open, which went stale after any photo mutation since `revalidatePath` refreshes the parent Server Component but not this component's own local state — fixed by deriving the dialog's vehicle from the live `vehicles` prop by id, verified live via Playwright; 3 MEDIUM/LOW — duplicated `getOwnerShowroom` calls across the layout and its child pages deduped via React `cache()`, a missing `vehicle_media` UPDATE ownership integration test and missing mark-sold/deactivate/set-primary E2E coverage added, missing onBlur validation wired for variant/color/description — all fixed and re-verified — see PR comments) | 🟢 typecheck/lint/unit (201/201, incl. 20 new schema tests + 8 new vehicle/vehicle_media RLS integration tests)/E2E (46/46, incl. 6 new `dashboard-vehicles.spec.ts` tests)/production build all passing | MERGED | 🟢 (squash, `1f4a0c9`) |
 
 ---
 
@@ -600,6 +601,11 @@ Record important scope or architectural decisions here.
 | 2026-09-05 | Every other polished form in this app (login, signup, forgot-password, reset-password, admin login) already used `noValidate` for the same reason — the four admin CRUD forms fixed in PR #24 were the only outliers that had never gotten this treatment | Root-cause note for future admin forms: any new form using `onSubmit`+`e.preventDefault()` (not `action={formAction}`) must include `noValidate` from the start, or its own custom validation will be silently unreachable for the cases native HTML5 already gates |
 | 2026-09-05 | Fixed a real bug (PR #25), found from a user screenshot: PR #24's new validation showed the same message twice — a top banner and an inline per-field error simultaneously. Fixed by only setting the inline error for client-side validation failures with a per-field equivalent, reserving the banner for errors with no field to attach to (choose-a-brand/owner, logo upload, genuine server errors) | User: "Brand Model and Type forms have by default validation message showing under the field and click save with empty field another error on top show the same validation check" (with screenshot) |
 | 2026-09-05 | While verifying the PR #25 fix, found two more real bugs, both in shared primitives rather than the forms themselves: (1) `Dialog`'s own initial-focus effect ran in a `useEffect` (after an `autoFocus` field's focus, which React applies during the commit phase) and stole focus back to the panel, firing a spurious blur that the new onBlur validation then correctly flagged as empty — a brand-new "New Brand" dialog showed "Name is required" before any interaction at all; (2) `useFieldValidation`'s internal touched/liveErrors state lives in a component instance that stays mounted between dialog opens (only `open` toggles), so closing a dialog after a failed attempt and reopening a fresh one showed the previous session's stale error. Fixed both in the shared `Dialog` component (skip panel focus if a descendant already has it) and the shared hook (`reset()`, called from every openCreate/openEdit) rather than patching each form individually | Self-caught while manually re-verifying the reported bug fix, not assumed working from the code alone — confirms both are pre-existing latent bugs in shared primitives, only exposed once real onBlur validation was wired up in PR #24 |
+| 2026-09-05 | Built showroom-owner Vehicle Management (PR #26, SHR-004..008): a new `/dashboard` route group — dashboard home (showroom status + vehicle stat tiles), `/dashboard/vehicles` (create/edit vehicles, publish/mark sold/deactivate via a status dropdown, multi-photo upload with primary-image selection). No new migrations — reused the `vehicles`/`vehicle_media` schema, RLS policies, and `vehicle-media` Storage bucket that already existed from Day 1 foundation work; this PR was the first thing to actually exercise them. `signInAction` now sends a showroom owner straight to `/dashboard` instead of the generic `/account` page | User: "whats next?" → I recommended Vehicle management as the literal Day 2 gate item with no unbuilt dependencies (vs. showroom self-service profile editing); user: "start it" |
+| 2026-09-05 | Confirmed by inspection before implementing: registering a showroom never actually sets `profiles.role` to `SHOWROOM` — it stays `CUSTOMER`. "Which showroom does this user own" is resolved by querying the `showrooms` table directly (`getOwnerShowroom()`, `src/features/showroom/my-showroom.ts`), not by role, matching how the `owns_showroom()` RLS helper itself already works | Root-cause note for any future feature gating on "is this user a showroom owner" — do not add role-based checks for this; the role enum value is currently unused in practice |
+| 2026-09-05 | SHR-007 ("remove/deactivate" a listing) implemented as a status change to INACTIVE, not a hard delete, given `vehicle_media`/`vehicle_inquiries` FK references to a vehicle and the requirement's own "remove/deactivate" wording. Publishing (setting a vehicle ACTIVE) is re-checked server-side against the owning showroom's APPROVED status in `updateVehicleStatusAction`, since RLS itself only enforces ACTIVE+APPROVED at public SELECT time, not at write time — the `/dashboard/vehicles` page is also gated to APPROVED-only, but the action re-checks independently since it can be called directly | Design decision made during implementation planning, not dictated by the user |
+| 2026-09-05 | Financing fields (down payment %, interest rate, tenure, financing partner) intentionally left unset by this feature — deferred to the Day 4 finance calculator, which is documented in the `vehicles` table's own migration comment as the actual consumer of those columns (with `system_settings` platform-default fallbacks when unset) | Code Review Agent's own suggestion to make this sequencing explicit rather than reading as scope silently dropped from SHR-005's acceptance criteria |
+| 2026-09-05 | Code review (PR #26) found 2 HIGH bugs on first pass, both fixed and re-verified: (1) `setPrimaryVehiclePhotoAction` was missing the `.select("id")` + 0-row check that every other mutation in `src/features/vehicle/actions.ts` already follows, so a non-owned/gone media id was silently reported as success instead of `NOT_FOUND_ERROR`; (2) the Photos dialog captured a one-time snapshot of the vehicle object in `useState` when opened, which went stale after any photo mutation (upload/set-primary/delete) since `revalidatePath` refreshes the parent Server Component's data but not this already-mounted component's own local state — fixed by deriving the dialog's vehicle from the live `vehicles` prop by id on every render instead, and verified live via Playwright (upload → set-primary → delete, all within one open dialog, without closing/reopening) | Independent Code Review Agent finding, not self-caught during implementation — same "reviewer must verify independently, not trust the diff" discipline as PR #21's BLOCKER |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
