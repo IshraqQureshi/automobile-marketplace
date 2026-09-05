@@ -172,7 +172,7 @@ test("an approved owner can create a vehicle, land on its edit page, edit it, an
 
   await loginAsFixtureOwner(page);
   await createVehicleViaForm(page, title);
-  await expect(page.getByText("Vehicle created as a draft.")).toBeVisible();
+  await expect(page.getByText("Vehicle created.")).toBeVisible();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await expect(page.getByText("Photo gallery")).toBeVisible();
 
@@ -196,6 +196,79 @@ test("an approved owner can create a vehicle, land on its edit page, edit it, an
   await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("ACTIVE");
 });
 
+test("the vehicle form's own Status field can publish on create and change status on edit", async ({ page }) => {
+  const unique = Date.now();
+  const title = `E2E Status Field Vehicle ${unique}`;
+
+  await loginAsFixtureOwner(page);
+  await page.goto("/dashboard/vehicles/new");
+  await page.locator("#vehicle-title").fill(title);
+  await expect(page.locator("#vehicle-status")).toHaveValue("DRAFT");
+  await page.locator("#vehicle-status").selectOption("ACTIVE");
+  await page.locator("#vehicle-brand").selectOption({ label: "Toyota" });
+  await page.locator("#vehicle-model").selectOption({ label: "Camry" });
+  await page.locator("#vehicle-year").fill("2019");
+  await page.locator("#vehicle-price").fill("2500000");
+  await page.getByRole("button", { name: "Create vehicle" }).click();
+  await page.waitForURL(/\/dashboard\/vehicles\/[^/]+\/edit$/);
+  await expect(page.getByText("Vehicle created.")).toBeVisible();
+
+  // Published immediately, straight from the create form, without ever
+  // touching the list page's status dropdown — reload to confirm this is
+  // real persisted state, not just optimistic local state.
+  await page.reload();
+  await expect(page.locator("#vehicle-status")).toHaveValue("ACTIVE");
+
+  // The Status <select> is present in the very first paint after that
+  // reload (installment-style hydration-race territory — see the Deposit
+  // type note above), so retry the interaction until the DOM genuinely
+  // reflects it rather than trusting one attempt.
+  await expect(async () => {
+    await page.locator("#vehicle-status").selectOption("SOLD");
+    await expect(page.locator("#vehicle-status")).toHaveValue("SOLD");
+  }).toPass({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  await page.goto("/dashboard/vehicles");
+  await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("SOLD");
+});
+
+test("a second status change in the same edit visit (no reload in between) still persists", async ({ page }) => {
+  // Regression test for a real bug found in code review: comparing the
+  // form's status against the initialValues *prop* (frozen at page-load
+  // time, since neither updateVehicleAction nor updateVehicleStatusAction
+  // triggers a navigation/router.refresh) meant a second save in the same
+  // visit compared against the original load-time status instead of the
+  // one just persisted — a Published → Save, then Draft → Save sequence
+  // silently failed to revert the second time, while still showing
+  // "Vehicle updated." as if it had worked.
+  const unique = Date.now();
+  const title = `E2E Repeat Status Vehicle ${unique}`;
+
+  await loginAsFixtureOwner(page);
+  await createVehicleViaForm(page, title);
+  await expect(page.locator("#vehicle-status")).toHaveValue("DRAFT");
+
+  // The Status <select> is present in the very first paint of this
+  // freshly-navigated-to edit page — retry past the same hydration-race
+  // window noted elsewhere in this file, rather than trusting one attempt.
+  await expect(async () => {
+    await page.locator("#vehicle-status").selectOption("ACTIVE");
+    await expect(page.locator("#vehicle-status")).toHaveValue("ACTIVE");
+  }).toPass({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  // No reload here — this is the exact scenario that exposed the bug.
+  await page.locator("#vehicle-status").selectOption("DRAFT");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator("#vehicle-status")).toHaveValue("DRAFT");
+});
+
 test("required fields show one inline validation message, not a duplicate banner", async ({ page }) => {
   await loginAsFixtureOwner(page);
   await page.goto("/dashboard/vehicles/new");
@@ -207,7 +280,7 @@ test("required fields show one inline validation message, not a duplicate banner
 
   await page.getByRole("button", { name: "Create vehicle" }).click();
   await expect(page.getByText("Title is required")).toHaveCount(1);
-  await expect(page.getByText("Vehicle created as a draft.")).toHaveCount(0);
+  await expect(page.getByText("Vehicle created.")).toHaveCount(0);
   await expect(page).toHaveURL(/\/dashboard\/vehicles\/new$/);
 });
 

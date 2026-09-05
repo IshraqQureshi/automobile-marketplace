@@ -6,7 +6,7 @@ import { DialogFormActions, FieldLabel } from "@/components/admin/admin-ui";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
-import { createVehicleAction, updateVehicleAction } from "@/features/vehicle/actions";
+import { createVehicleAction, updateVehicleAction, updateVehicleStatusAction } from "@/features/vehicle/actions";
 import {
   DOWN_PAYMENT_TYPES,
   FUEL_TYPES,
@@ -15,7 +15,14 @@ import {
   vehicleFieldSchemas,
   type DownPaymentType,
 } from "@/features/vehicle/schemas";
-import type { CatalogOption, ModelOption, VehicleListItem } from "@/features/vehicle/types";
+import {
+  OWNER_STATUS_OPTIONS,
+  STATUS_LABELS,
+  type CatalogOption,
+  type ModelOption,
+  type VehicleListItem,
+  type VehicleStatus,
+} from "@/features/vehicle/types";
 
 // Deliberately no width class baked in here — Tailwind's generated
 // stylesheet orders `.w-full` after `.w-32` regardless of the order classes
@@ -29,6 +36,7 @@ const selectClassName =
 
 interface VehicleFormState {
   title: string;
+  status: VehicleStatus;
   brandId: string;
   make: string;
   model: string;
@@ -62,6 +70,7 @@ interface VehicleFormState {
 function emptyForm(): VehicleFormState {
   return {
     title: "",
+    status: "DRAFT",
     brandId: "",
     make: "",
     model: "",
@@ -104,6 +113,7 @@ function formFromVehicle(vehicle: VehicleListItem, brands: CatalogOption[]): Veh
   const matchedBrand = brands.find((b) => b.name === vehicle.make);
   return {
     title: vehicle.title,
+    status: vehicle.status,
     brandId: matchedBrand?.id ?? "",
     make: vehicle.make,
     model: vehicle.model,
@@ -184,6 +194,19 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
   const [form, setForm] = useState<VehicleFormState>(() => (initialValues ? formFromVehicle(initialValues, brands) : emptyForm()));
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // The last status actually confirmed persisted — starts from
+  // initialValues (or DRAFT for a new vehicle) but is updated after every
+  // successful status change, unlike initialValues itself (a prop that
+  // never changes for as long as this page stays mounted, since neither
+  // updateVehicleAction nor updateVehicleStatusAction triggers a
+  // navigation or router.refresh()). Comparing against the stale prop
+  // instead of this would make a second save in the same visit compare
+  // against the *original* load-time status rather than the one just
+  // persisted — confirmed live: set Published → Save (persists), set back
+  // to Draft → Save again compares "DRAFT" against initialValues' frozen
+  // "DRAFT" and silently skips the revert, while still showing "Vehicle
+  // updated." as if it worked.
+  const [lastKnownStatus, setLastKnownStatus] = useState<VehicleStatus>(initialValues?.status ?? "DRAFT");
 
   const modelsForBrand = models.filter((m) => m.brandId === form.brandId);
 
@@ -259,7 +282,21 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
           setFormError(result.error ?? "Failed to create vehicle.");
           return;
         }
-        toast.success("Vehicle created as a draft.");
+
+        // createVehicleAction always inserts as DRAFT — the Status field
+        // above is a separate, explicit choice, applied via the same
+        // updateVehicleStatusAction the vehicle list's status dropdown
+        // uses, so it goes through the same "publishing requires an
+        // APPROVED showroom" server-side check either way.
+        if (form.status !== "DRAFT") {
+          const statusResult = await updateVehicleStatusAction(result.id, form.status);
+          if (statusResult.error) {
+            toast.error(`Vehicle created, but: ${statusResult.error}`);
+            router.push(`/dashboard/vehicles/${result.id}/edit`);
+            return;
+          }
+        }
+        toast.success("Vehicle created.");
         router.push(`/dashboard/vehicles/${result.id}/edit`);
         return;
       }
@@ -268,6 +305,15 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
       if (result.error) {
         setFormError(result.error);
         return;
+      }
+
+      if (form.status !== lastKnownStatus) {
+        const statusResult = await updateVehicleStatusAction(vehicleId!, form.status);
+        if (statusResult.error) {
+          toast.error(statusResult.error);
+          return;
+        }
+        setLastKnownStatus(form.status);
       }
       toast.success("Vehicle updated.");
     });
@@ -293,6 +339,27 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
               error={!!errorFor("title")}
             />
             {errorFor("title") && <p className="mt-1 text-sm text-red-600">{errorFor("title")}</p>}
+          </div>
+
+          <div className="sm:col-span-2">
+            <FieldLabel htmlFor="vehicle-status">Status</FieldLabel>
+            <select
+              id="vehicle-status"
+              value={form.status}
+              onChange={(e) => setField("status", e.target.value as VehicleStatus)}
+              className={`${selectClassName} w-full sm:w-64`}
+            >
+              {OWNER_STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-neutral-400">
+              {mode === "create"
+                ? "Vehicles start as Draft — publish here once you're ready, or later from the vehicle list."
+                : "Publishing requires your showroom to be approved."}
+            </p>
           </div>
 
           <div>
