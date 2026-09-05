@@ -6,17 +6,11 @@ import { Input } from "@/components/ui/input";
 import { registerShowroomAction } from "@/features/showroom/actions";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
 import { initialRegisterShowroomState, registerShowroomFieldSchemas } from "@/features/showroom/schemas";
+import { stripKenyaPrefix } from "@/lib/validation/kenya-phone";
 
 interface RegisterShowroomFormProps {
   defaultEmail: string;
   defaultPhone: string;
-}
-
-// The account's own phone is stored with a "+254" prefix already (see
-// signUpAction) — strip it back off for this form's local-number input,
-// which supplies the same fixed "+254" prefix chip as the signup form.
-function stripKenyaPrefix(phone: string) {
-  return phone.startsWith("+254") ? phone.slice(4) : phone;
 }
 
 export function RegisterShowroomForm({ defaultEmail, defaultPhone }: RegisterShowroomFormProps) {
