@@ -1,18 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useIsActiveCatalogTab } from "./catalog-tabs";
 import {
   CarIcon,
   SectionHeader,
   DialogFormActions,
   FieldLabel,
+  FilterBar,
   MetaBadge,
   PencilIcon,
   RowIconButton,
+  SearchInput,
   TableEmptyState,
   TableShell,
   TrashIcon,
+  filterSelectClassName,
 } from "./admin-ui";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
@@ -53,6 +56,17 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
   const nameError = errorFor("name");
   const [deleteTarget, setDeleteTarget] = useState<ModelItem | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [brandFilter, setBrandFilter] = useState("ALL");
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return items.filter((item) => {
+      if (brandFilter !== "ALL" && item.brandId !== brandFilter) return false;
+      if (!query) return true;
+      return item.name.toLowerCase().includes(query);
+    });
+  }, [items, searchQuery, brandFilter]);
 
   // A Dialog/ConfirmDialog renders via a document.body portal, outside this
   // component's own (possibly `hidden`) tab panel — so leaving one open
@@ -141,9 +155,30 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
         onAction={openCreate}
       />
 
+      {items.length > 0 && (
+        <FilterBar>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search models…" />
+          <select
+            value={brandFilter}
+            onChange={(e) => setBrandFilter(e.target.value)}
+            className={`${filterSelectClassName} w-40`}
+            aria-label="Filter by brand"
+          >
+            <option value="ALL">All brands</option>
+            {brands.map((brand) => (
+              <option key={brand.id} value={brand.id}>
+                {brand.name}
+              </option>
+            ))}
+          </select>
+        </FilterBar>
+      )}
+
       <TableShell>
         {items.length === 0 ? (
           <TableEmptyState message="No models yet." />
+        ) : filteredItems.length === 0 ? (
+          <TableEmptyState message="No models match your search." />
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
@@ -154,7 +189,7 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <tr key={item.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50">
                   <td className="px-5 py-3 font-medium text-neutral-800">{item.name}</td>
                   <td className="px-5 py-3">

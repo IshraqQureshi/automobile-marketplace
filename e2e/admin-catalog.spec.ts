@@ -194,6 +194,82 @@ test("deleting a brand also removes its models", async ({ page }) => {
   await expect(page.getByRole("row", { name: modelName })).toHaveCount(0);
 });
 
+test("each catalog tab's search filters by name, and Models also filters by Brand", async ({ page }) => {
+  const unique = Date.now();
+  const brandA = `E2E Search Toyota ${unique}`;
+  const brandB = `E2E Search Mazda ${unique}`;
+  const modelA = `E2E Search Corolla ${unique}`;
+  const modelB = `E2E Search CX-5 ${unique}`;
+  const typeName = `E2E Search Sedan ${unique}`;
+
+  // Brands tab: create two brands, search should narrow to one.
+  await page.getByRole("button", { name: "New Brand" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(brandA);
+  await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Brand created.")).toBeVisible();
+  await page.getByRole("button", { name: "New Brand" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(brandB);
+  await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Brand created.")).toBeVisible();
+
+  await page.getByPlaceholder("Search brands…").fill("Toyota");
+  await expect(page.getByRole("row", { name: brandA })).toBeAttached();
+  await expect(page.getByRole("row", { name: brandB })).toHaveCount(0);
+  await page.getByPlaceholder("Search brands…").fill("");
+
+  // Models tab: create one model under each brand, then filter by name and
+  // independently by the Brand dropdown.
+  await page.getByRole("tab", { name: /Models/ }).click();
+  await page.getByRole("button", { name: "New Model" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Brand").selectOption({ label: brandA });
+  await dialog.getByLabel("Name").fill(modelA);
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Model created.")).toBeVisible();
+
+  await page.getByRole("button", { name: "New Model" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Brand").selectOption({ label: brandB });
+  await dialog.getByLabel("Name").fill(modelB);
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Model created.")).toBeVisible();
+
+  await page.getByPlaceholder("Search models…").fill("Corolla");
+  await expect(page.getByRole("row", { name: modelA })).toBeAttached();
+  await expect(page.getByRole("row", { name: modelB })).toHaveCount(0);
+  await page.getByPlaceholder("Search models…").fill("");
+
+  await page.getByLabel("Filter by brand").selectOption({ label: brandB });
+  await expect(page.getByRole("row", { name: modelB })).toBeAttached();
+  await expect(page.getByRole("row", { name: modelA })).toHaveCount(0);
+  await page.getByLabel("Filter by brand").selectOption("ALL");
+
+  // Vehicle Types tab (the generic CatalogList component).
+  await page.getByRole("tab", { name: /Types/ }).click();
+  await page.getByRole("button", { name: "New Type" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(typeName);
+  await page.getByRole("dialog").getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Type created.")).toBeVisible();
+
+  await page.getByPlaceholder(/Search types…/i).fill("nonexistent-xyz");
+  await expect(page.getByText("No types match your search.")).toBeVisible();
+  await page.getByPlaceholder(/Search types…/i).fill("Sedan");
+  await expect(page.getByRole("row", { name: typeName })).toBeAttached();
+
+  // Cleanup: delete everything created in this test.
+  await page.getByPlaceholder(/Search types…/i).fill("");
+  await page.getByRole("row", { name: typeName }).getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Type deleted.")).toBeVisible();
+
+  await page.getByRole("tab", { name: /Brands/ }).click();
+  for (const brandName of [brandA, brandB]) {
+    await page.getByRole("row", { name: brandName }).getByRole("button", { name: "Delete" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByText("Brand deleted.")).toBeVisible();
+  }
+});
+
 test("admin can create and delete a vehicle type", async ({ page }) => {
   const unique = Date.now();
   const typeName = `E2E Type ${unique}`;

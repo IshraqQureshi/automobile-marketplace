@@ -426,12 +426,22 @@ test("an approved owner can mark a vehicle sold and deactivate it", async ({ pag
   const row = page.getByRole("row", { name: new RegExp(title) });
   const status = row.getByRole("combobox");
 
-  await status.selectOption("SOLD");
+  // The status <select> is present in the very first paint after
+  // page.goto (same hydration-race territory documented elsewhere in this
+  // file — see the Status field test above), so retry until the DOM
+  // genuinely reflects the change rather than trusting one attempt.
+  await expect(async () => {
+    await status.selectOption("SOLD");
+    await expect(status).toHaveValue("SOLD");
+  }).toPass({ timeout: 10_000 });
   await expect(page.getByText("Marked as sold.")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("SOLD");
 
-  await row.getByRole("combobox").selectOption("INACTIVE");
+  await expect(async () => {
+    await row.getByRole("combobox").selectOption("INACTIVE");
+    await expect(row.getByRole("combobox")).toHaveValue("INACTIVE");
+  }).toPass({ timeout: 10_000 });
   await expect(page.getByText("Marked as removed.")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("INACTIVE");
@@ -462,4 +472,35 @@ test("a vehicle whose make doesn't match any catalog brand keeps its original te
   const { data: updated } = await admin().from("vehicles").select("make, model").eq("id", vehicle.id).single();
   expect(updated?.make).toBe("Discontinued Motors");
   expect(updated?.model).toBe("Old Model");
+});
+
+test("the vehicle list can be searched and filtered by status", async ({ page }) => {
+  await admin()
+    .from("vehicles")
+    .insert([
+      { showroom_id: showroomId, title: "Search Test Highlander", make: "Toyota", model: "Highlander", year: 2021, price: 4200000, status: "ACTIVE" },
+      { showroom_id: showroomId, title: "Search Test Vitz", make: "Toyota", model: "Vitz", year: 2016, price: 700000, status: "DRAFT" },
+    ]);
+
+  await loginAsFixtureOwner(page);
+  await page.goto("/dashboard/vehicles");
+
+  await expect(page.getByRole("row", { name: /Search Test Highlander/ })).toBeAttached();
+  await expect(page.getByRole("row", { name: /Search Test Vitz/ })).toBeAttached();
+
+  // Text search matches title/make/model.
+  await page.getByPlaceholder(/Search title, make, or model/i).fill("Highlander");
+  await expect(page.getByRole("row", { name: /Search Test Highlander/ })).toBeAttached();
+  await expect(page.getByRole("row", { name: /Search Test Vitz/ })).toHaveCount(0);
+  await page.getByPlaceholder(/Search title, make, or model/i).fill("");
+
+  // Status filter narrows independently of the search box.
+  await page.getByLabel("Filter by status").selectOption("DRAFT");
+  await expect(page.getByRole("row", { name: /Search Test Vitz/ })).toBeAttached();
+  await expect(page.getByRole("row", { name: /Search Test Highlander/ })).toHaveCount(0);
+  await page.getByLabel("Filter by status").selectOption("ALL");
+
+  // A search that matches nothing shows the no-results empty state.
+  await page.getByPlaceholder(/Search title, make, or model/i).fill("no-such-vehicle-xyz");
+  await expect(page.getByText("No vehicles match your search.")).toBeVisible();
 });

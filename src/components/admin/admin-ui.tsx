@@ -84,6 +84,49 @@ export function TableEmptyState({ message }: { message: string }) {
   return <p className="px-5 py-10 text-center text-sm text-neutral-400">{message}</p>;
 }
 
+// Shared search-box-plus-filter-dropdown row, used above every list table
+// (admin showrooms/catalog tabs, the showroom-owner's vehicle list) so each
+// list only needs to supply its own filter <select>(s) as children, not
+// rebuild the search input's icon/spacing/focus styling each time.
+export function FilterBar({ children }: { children: ReactNode }) {
+  return <div className="mb-4 flex flex-wrap items-center gap-3">{children}</div>;
+}
+
+export function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+  return (
+    <div className="relative min-w-48 flex-1">
+      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-neutral-400">
+        <SearchIcon />
+      </span>
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-md border border-neutral-300 py-2.5 pr-3 pl-9 text-sm outline-none placeholder:text-neutral-400 focus:border-brand focus:ring-1 focus:ring-brand"
+      />
+    </div>
+  );
+}
+
+// Shared native-<select> styling for a filter dropdown next to SearchInput —
+// each call site supplies its own width via an appended class, same
+// "don't bake a width into a shared constant" reasoning as vehicle-form.tsx's
+// own selectClassName (a shared w-full silently loses to a caller's
+// appended w-32 in Tailwind's generated stylesheet, regardless of class-list
+// order — see that file's own comment for the live-confirmed root cause).
+export const filterSelectClassName =
+  "shrink-0 rounded-md border border-neutral-300 px-3 py-2.5 text-sm text-neutral-700 outline-none focus:border-brand focus:ring-1 focus:ring-brand";
+
+export function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
 const STATUS_BADGE_CLASSES: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-700",
   APPROVED: "bg-emerald-50 text-emerald-700",
