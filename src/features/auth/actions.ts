@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getOwnerShowroom } from "@/features/showroom/my-showroom";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import {
@@ -145,7 +146,16 @@ export async function signInAction(
     return { status: "error", message: "Invalid email or password." };
   }
 
-  redirect("/account");
+  // profiles.role never actually becomes "SHOWROOM" (registering a showroom
+  // doesn't change it — see src/features/showroom/my-showroom.ts), so a
+  // showroom owner is identified by owning a showroom row, not by role.
+  // Send them straight to their dashboard rather than the generic account
+  // page they'd otherwise have to know to navigate away from.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const showroom = user && (await getOwnerShowroom(user.id));
+  redirect(showroom ? "/dashboard" : "/account");
 }
 
 export async function signInWithGoogleAction(): Promise<void> {

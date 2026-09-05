@@ -1,0 +1,139 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { CarIcon } from "@/components/admin/admin-ui";
+import { signOutAction } from "@/features/auth/actions";
+import type { OwnerShowroom } from "@/features/showroom/my-showroom";
+import { cn } from "@/lib/utils";
+
+interface NavEntry {
+  label: string;
+  href: string | null; // null = not built yet, renders inert ("Coming soon")
+  icon: () => React.JSX.Element;
+}
+
+interface DashboardSidebarProps {
+  email: string;
+  showroom: OwnerShowroom;
+}
+
+export function DashboardSidebar({ email, showroom }: DashboardSidebarProps) {
+  const pathname = usePathname();
+  const approved = showroom.status === "APPROVED";
+
+  // Profile/Appointments are real Day 2/4 requirements with no page built
+  // yet — same "coming soon" treatment as the admin sidebar's own
+  // not-yet-built entries, rather than linking somewhere that 404s.
+  const items: NavEntry[] = [
+    { label: "Dashboard", href: "/dashboard", icon: DashboardIcon },
+    { label: "Vehicles", href: approved ? "/dashboard/vehicles" : null, icon: () => <CarIcon /> },
+    { label: "Profile", href: null, icon: ProfileIcon },
+    { label: "Appointments", href: null, icon: CalendarIcon },
+  ];
+
+  return (
+    <aside className="flex flex-col gap-7 border-r border-neutral-200 bg-white px-4 py-5">
+      <Link href="/" className="px-2">
+        <Image src="/logo.png" alt="HarakaGari — Powered by Arresa" width={130} height={34} priority />
+      </Link>
+
+      <nav className="flex flex-col gap-0.5">
+        <span className="px-3 pb-1.5 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase">{showroom.business_name}</span>
+        {items.map((item) => {
+          if (item.href === null) {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                disabled
+                title={item.label === "Vehicles" ? "Available once your showroom is approved" : "Coming soon"}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-600 disabled:cursor-default disabled:opacity-60"
+              >
+                <item.icon />
+                {item.label}
+              </button>
+            );
+          }
+
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
+                active ? "bg-brand text-white" : "text-neutral-600 hover:bg-neutral-100",
+              )}
+            >
+              <item.icon />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="flex-1" />
+
+      <div className="flex items-center gap-2.5 border-t border-neutral-200 pt-4">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+          {email.slice(0, 2).toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-neutral-900">{email}</p>
+          <p className="text-[11px] text-neutral-400">Showroom owner</p>
+        </div>
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            title="Log out"
+            aria-label="Log out"
+            className="shrink-0 rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          >
+            <SignOutIcon />
+          </button>
+        </form>
+      </div>
+    </aside>
+  );
+}
+
+function DashboardIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18M8 2v4M16 2v4" />
+    </svg>
+  );
+}
+
+function SignOutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
+}

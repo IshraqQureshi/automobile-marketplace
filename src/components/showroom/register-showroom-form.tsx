@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,9 @@ export function RegisterShowroomForm({ defaultEmail, defaultPhone }: RegisterSho
       <div className="rounded-xl border border-neutral-200 bg-white p-8 shadow-sm">
         <h2 className="font-display text-lg font-semibold text-neutral-900">Application submitted</h2>
         <p className="mt-2 text-sm text-neutral-500">{state.message}</p>
+        <Link href="/dashboard" className="mt-4 inline-block text-sm font-medium text-brand hover:text-brand-dark">
+          Go to your dashboard →
+        </Link>
       </div>
     );
   }

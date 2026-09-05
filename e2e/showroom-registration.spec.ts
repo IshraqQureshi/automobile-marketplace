@@ -63,7 +63,12 @@ async function loginAsFixtureCustomer(page: import("@playwright/test").Page) {
   await page.getByLabel("Email address").fill(CUSTOMER_EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(CUSTOMER_PASSWORD);
   await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
-  await page.waitForURL("**/account");
+  // Usually /account — but once this fixture owns a showroom (the "second
+  // registration attempt" test below registers one mid-suite before logging
+  // in again), signInAction now sends a showroom owner to /dashboard
+  // instead (see src/features/auth/actions.ts). Every test here navigates
+  // to wherever it actually needs next regardless, so accept either.
+  await page.waitForURL(/\/(account|dashboard)$/);
 }
 
 test("visiting /register-showroom while signed out redirects to /login", async ({ page }) => {
