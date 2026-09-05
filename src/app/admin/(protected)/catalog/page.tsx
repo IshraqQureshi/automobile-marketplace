@@ -4,7 +4,7 @@ import { CatalogBrandsList } from "@/components/admin/catalog-brands-list";
 import { CatalogList } from "@/components/admin/catalog-list";
 import { CatalogModelsList } from "@/components/admin/catalog-models-list";
 import { CatalogTabs } from "@/components/admin/catalog-tabs";
-import { LayersIcon } from "@/components/admin/catalog-ui";
+import { LayersIcon } from "@/components/admin/admin-ui";
 import {
   createBrandAction,
   createModelAction,

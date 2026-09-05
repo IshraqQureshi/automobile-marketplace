@@ -1,26 +1,31 @@
 import type { ReactNode } from "react";
 
 /**
- * Shared visual building blocks for the three catalog CRUD cards
- * (CatalogList, CatalogModelsList, CatalogBrandsList) — kept here so the
- * three components don't each reinvent row-action buttons, header layout,
- * and the name-initial avatar fallback with slightly different markup.
+ * Shared visual building blocks for admin CRUD/review screens — originally
+ * built for the three catalog cards (CatalogList, CatalogModelsList,
+ * CatalogBrandsList) but generic from the start, so also used by the
+ * showroom approval list — kept here so each screen doesn't reinvent
+ * row-action buttons, header layout, and table chrome with slightly
+ * different markup.
  */
 
-interface CatalogSectionHeaderProps {
+interface SectionHeaderProps {
   icon: ReactNode;
   title: string;
   description: string;
-  actionLabel: string;
-  onAction: () => void;
+  // Omitted entirely for screens with no "create" action (e.g. showrooms,
+  // which are only ever created by their owner registering, never by an
+  // admin) — CatalogList/CatalogModelsList/CatalogBrandsList always pass
+  // both.
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 /**
- * Header for a full-width catalog tab panel — icon + title/description on
- * the left, a primary "+ New X" action on the right that opens that
- * entity's create dialog.
+ * Header for a full-width admin panel — icon + title/description on the
+ * left, an optional primary "+ New X" action on the right.
  */
-export function CatalogSectionHeader({ icon, title, description, actionLabel, onAction }: CatalogSectionHeaderProps) {
+export function SectionHeader({ icon, title, description, actionLabel, onAction }: SectionHeaderProps) {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
@@ -30,14 +35,16 @@ export function CatalogSectionHeader({ icon, title, description, actionLabel, on
           <p className="text-sm text-neutral-500">{description}</p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onAction}
-        className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-dark"
-      >
-        <PlusIcon />
-        {actionLabel}
-      </button>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+        >
+          <PlusIcon />
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }
@@ -77,6 +84,21 @@ export function TableShell({ children }: { children: ReactNode }) {
 
 export function TableEmptyState({ message }: { message: string }) {
   return <p className="px-5 py-10 text-center text-sm text-neutral-400">{message}</p>;
+}
+
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  PENDING: "bg-amber-50 text-amber-700",
+  APPROVED: "bg-emerald-50 text-emerald-700",
+  REJECTED: "bg-red-50 text-red-700",
+  SUSPENDED: "bg-neutral-100 text-neutral-500",
+};
+
+export function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${STATUS_BADGE_CLASSES[status] ?? "bg-neutral-100 text-neutral-500"}`}>
+      {status.toLowerCase()}
+    </span>
+  );
 }
 
 export function InitialAvatar({ name }: { name: string }) {
@@ -181,6 +203,17 @@ export function TagIcon({ className = "h-4.5 w-4.5" }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
       <path d="M20.6 12.9 12.9 20.6a2 2 0 0 1-2.8 0l-7.7-7.7a2 2 0 0 1 0-2.8L10.1 2.4a2 2 0 0 1 1.4-.6h5.5a2 2 0 0 1 2 2v5.5a2 2 0 0 1-.4 1.6Z" />
       <circle cx="15.5" cy="6.5" r="1.25" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+// Also used as the admin sidebar's "Showrooms" nav icon — same reasoning as
+// TagIcon above.
+export function ShowroomIcon({ className = "h-4.25 w-4.25" }: { className?: string } = {}) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+      <path d="M3 9.5 12 3l9 6.5" />
+      <path d="M5 9v11h14V9" />
     </svg>
   );
 }
