@@ -44,7 +44,7 @@ export function BrowseByBrand({ brands }: BrowseByBrandProps) {
               ) : (
                 <InitialAvatar name={brand.name} />
               )}
-              <span className="text-center text-[9px] leading-tight font-medium text-neutral-600">{brand.name}</span>
+              <span className="text-center text-[10px] leading-tight font-medium text-neutral-600">{brand.name}</span>
             </button>
           ))}
         </div>

@@ -78,7 +78,12 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
               className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16"
               style={{ background: "linear-gradient(to left, rgba(0,79,75,0.95), transparent)" }}
             />
-            <div className="flex w-max animate-marquee items-center">
+            {/* Names are decorative here (not yet linkable — showroom detail pages don't
+                exist), and the track duplicates every item to loop seamlessly, so the
+                whole scroller is hidden from assistive tech to avoid announcing each
+                name twice; the showroom/vehicle counts above already convey the same
+                information in text. */}
+            <div className="flex w-max animate-marquee items-center" aria-hidden="true">
               {[...showrooms, ...showrooms].map((showroom, index) => (
                 <div key={`${showroom.id}-${index}`} className="mx-7 flex shrink-0 items-center gap-2.5">
                   {showroom.logoUrl ? (
