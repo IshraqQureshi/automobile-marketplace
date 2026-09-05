@@ -15,11 +15,11 @@ export function PopularBrands({ brands }: PopularBrandsProps) {
   if (brands.length === 0) return null;
 
   return (
-    <section className="bg-white px-4 py-12 sm:px-6">
+    <section className="bg-white px-6 py-12 md:px-12">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="font-display text-2xl font-semibold text-neutral-900">Popular Brands</h2>
-          <button type="button" disabled title="Coming soon" className="text-sm font-medium text-brand disabled:cursor-not-allowed disabled:opacity-60">
+        <div className="mb-8 flex items-end justify-between">
+          <h2 className="font-display text-3xl font-bold text-neutral-900">Popular Brands</h2>
+          <button type="button" disabled title="Coming soon" className="text-sm font-medium text-brand disabled:cursor-not-allowed disabled:opacity-70">
             All brands →
           </button>
         </div>

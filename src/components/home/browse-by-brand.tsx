@@ -19,25 +19,32 @@ export function BrowseByBrand({ brands }: BrowseByBrandProps) {
   if (brands.length === 0) return null;
 
   return (
-    <section className="border-b border-neutral-200 bg-white px-4 py-10 sm:px-6">
-      <div className="mx-auto max-w-5xl">
-        <p className="mb-6 text-center text-[10px] font-semibold tracking-[0.2em] text-neutral-400 uppercase">Browse by brand</p>
-        <div className="grid grid-cols-4 gap-x-4 gap-y-6 sm:grid-cols-8">
+    <section className="border-b border-neutral-200 bg-white px-6 py-5 md:px-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="shrink-0 text-[10px] font-semibold tracking-[0.18em] text-neutral-400 uppercase">Browse by Brand</span>
+          <div className="h-px flex-1 bg-neutral-100" />
+        </div>
+        <div className="grid grid-cols-4 gap-1 sm:grid-cols-8">
           {brands.map((brand) => (
             <button
               key={brand.id}
               type="button"
               disabled
               title="Browse by brand — coming soon"
-              className="flex flex-col items-center gap-2 disabled:cursor-not-allowed"
+              className="flex flex-col items-center gap-1.5 rounded-lg py-2 disabled:cursor-not-allowed"
             >
               {brand.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- small decorative brand mark, dozens can render per grid
-                <img src={brand.logoUrl} alt="" className="h-10 w-10 rounded-full border border-neutral-200 object-contain p-1.5" />
+                <img
+                  src={brand.logoUrl}
+                  alt=""
+                  className="h-10 w-10 rounded-full border border-neutral-200 bg-neutral-50 object-contain p-1.5"
+                />
               ) : (
                 <InitialAvatar name={brand.name} />
               )}
-              <span className="text-xs font-medium text-neutral-600">{brand.name}</span>
+              <span className="text-center text-[10px] leading-tight font-medium text-neutral-600">{brand.name}</span>
             </button>
           ))}
         </div>
