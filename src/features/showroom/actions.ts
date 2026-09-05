@@ -4,15 +4,15 @@ import { logger } from "@/lib/logger";
 import { fieldErrorsFrom } from "@/lib/validation/field-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { uploadShowroomDocuments } from "./document-upload";
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
+  BUSINESS_REGISTRATION_DOCUMENT_TYPE,
   MAX_DOCUMENTS_PER_SUBMISSION,
   MAX_DOCUMENT_SIZE_BYTES,
   registerShowroomSchema,
   type RegisterShowroomActionState,
 } from "./schemas";
-
-const BUSINESS_REGISTRATION_DOCUMENT_TYPE = "business_registration";
 
 export async function registerShowroomAction(
   _prevState: RegisterShowroomActionState,
@@ -99,31 +99,7 @@ export async function registerShowroomAction(
     };
   }
 
-  const failedUploads: string[] = [];
-  for (const file of documents) {
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
-    const storagePath = `${showroom.id}/${crypto.randomUUID()}-${safeName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("showroom-documents")
-      .upload(storagePath, file, { contentType: file.type, upsert: false });
-    if (uploadError) {
-      logger.error("Failed to upload showroom document", uploadError, { showroomId: showroom.id, fileName: file.name });
-      failedUploads.push(file.name);
-      continue;
-    }
-
-    const { error: documentError } = await supabase.from("showroom_documents").insert({
-      showroom_id: showroom.id,
-      document_type: BUSINESS_REGISTRATION_DOCUMENT_TYPE,
-      storage_path: storagePath,
-      uploaded_by: user.id,
-    });
-    if (documentError) {
-      logger.error("Failed to record uploaded showroom document", documentError, { showroomId: showroom.id, fileName: file.name });
-      failedUploads.push(file.name);
-    }
-  }
+  const { failedUploads } = await uploadShowroomDocuments(supabase, showroom.id, user.id, documents, BUSINESS_REGISTRATION_DOCUMENT_TYPE);
 
   // If every document failed, the applicant would otherwise be left with a
   // documentless PENDING showroom they have no way to fix themselves — RLS

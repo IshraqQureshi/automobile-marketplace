@@ -21,6 +21,24 @@ function admin() {
   return createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+const MAILPIT_URL = "http://127.0.0.1:54324";
+
+// The invite email's real CTA isn't in msg.Text the way auth.spec.ts's
+// confirmation/recovery links are (see getLatestEmailLink there) — it's an
+// HTML button, so extract it from the href instead.
+async function getLatestInviteLink(email: string): Promise<string> {
+  const searchRes = await fetch(`${MAILPIT_URL}/api/v1/search?query=to:${encodeURIComponent(email)}`);
+  const search = await searchRes.json();
+  const latest = search.messages?.[0];
+  if (!latest) throw new Error(`No invite email found for ${email}`);
+  const msgRes = await fetch(`${MAILPIT_URL}/api/v1/message/${latest.ID}`);
+  const msg = await msgRes.json();
+  const hrefs = [...(msg.HTML as string).matchAll(/href="([^"]+)"/g)].map((m) => (m[1] ?? "").replace(/&amp;/g, "&"));
+  const inviteLink = hrefs.find((h) => h.includes("type=invite"));
+  if (!inviteLink) throw new Error(`No invite link found in email body: ${msg.HTML}`);
+  return inviteLink;
+}
+
 let ownerUserId: string;
 
 test.beforeAll(async () => {
@@ -267,4 +285,96 @@ test("a signed-in customer cannot invoke the owner-search action directly to enu
   expect(body).not.toContain(OWNER_EMAIL);
 
   await customerContext.close();
+});
+
+test("admin can create a showroom for a brand-new owner, who receives an invite and can set up their account", async ({ page, browser }) => {
+  const unique = Date.now();
+  const businessName = `E2E Invited Owner Showroom ${unique}`;
+  const ownerEmail = `e2e-invited-owner-${unique}@harakagari.local`;
+  let newOwnerId: string | undefined;
+
+  try {
+    await loginAsFixtureAdmin(page);
+    await page.goto("/admin/showrooms");
+
+    await page.getByRole("button", { name: "New Showroom" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "New owner" }).click();
+    await dialog.locator("#new-owner-name").fill("E2E Invited Owner");
+    await dialog.locator("#new-owner-email").fill(ownerEmail);
+    await dialog.locator("#new-owner-phone").fill("712345678");
+
+    await dialog.locator("#showroom-business-name").fill(businessName);
+    await dialog.locator("#showroom-documents").setInputFiles({
+      name: "license.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 fake pdf content"),
+    });
+    await dialog.locator("#showroom-location").fill("Nairobi");
+    await dialog.locator("#showroom-phone").fill("722345678");
+    await dialog.locator("#showroom-email").fill(`${unique}@example.com`);
+    await dialog.getByRole("button", { name: "Create" }).click();
+
+    await expect(page.getByText("Showroom created.")).toBeVisible();
+    const row = page.getByRole("row", { name: businessName });
+    await expect(row).toBeAttached();
+
+    const { data: showroom } = await admin().from("showrooms").select("id, owner_user_id").eq("business_name", businessName).single();
+    if (!showroom) throw new Error("showroom not found after creation");
+    newOwnerId = showroom.owner_user_id;
+    const { data: documents } = await admin().from("showroom_documents").select("id").eq("showroom_id", showroom.id);
+    expect(documents?.length).toBe(1);
+
+    // The invited owner clicks their email link, sets a password, and
+    // reaches their account — in a separate browser context, since they're
+    // a different user than the admin.
+    const inviteLink = await getLatestInviteLink(ownerEmail);
+    const ownerContext = await browser.newContext();
+    const ownerPage = await ownerContext.newPage();
+    await ownerPage.goto(inviteLink);
+    await ownerPage.waitForURL("**/reset-password");
+    await ownerPage.getByLabel("New password", { exact: true }).fill("E2eInvitedOwner123!");
+    await ownerPage.getByLabel("Confirm new password").fill("E2eInvitedOwner123!");
+    await ownerPage.getByRole("button", { name: "Update password" }).click();
+    await ownerPage.waitForURL("**/account");
+    await expect(ownerPage.getByRole("heading", { name: "Welcome, E2E Invited Owner" })).toBeVisible();
+    await ownerContext.close();
+  } finally {
+    if (newOwnerId) {
+      await admin().from("showrooms").delete().eq("owner_user_id", newOwnerId);
+      await admin().auth.admin.deleteUser(newOwnerId);
+    }
+  }
+});
+
+test("admin can attach documents when creating a showroom for an existing owner", async ({ page }) => {
+  const unique = Date.now();
+  const businessName = `E2E Existing Owner Docs Showroom ${unique}`;
+
+  await loginAsFixtureAdmin(page);
+  await page.goto("/admin/showrooms");
+
+  await page.getByRole("button", { name: "New Showroom" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByPlaceholder("Search by email…").fill(OWNER_EMAIL.split("@")[0] ?? OWNER_EMAIL);
+  await expect(dialog.getByText(OWNER_EMAIL).first()).toBeVisible();
+  await dialog.getByText(OWNER_EMAIL).first().click();
+
+  await dialog.locator("#showroom-business-name").fill(businessName);
+  await dialog.locator("#showroom-documents").setInputFiles({
+    name: "reg.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4 fake pdf content"),
+  });
+  await dialog.locator("#showroom-location").fill("Mombasa");
+  await dialog.locator("#showroom-phone").fill("733345678");
+  await dialog.locator("#showroom-email").fill(`${unique}@example.com`);
+  await dialog.getByRole("button", { name: "Create" }).click();
+
+  await expect(page.getByText("Showroom created.")).toBeVisible();
+
+  const { data: showroom } = await admin().from("showrooms").select("id").eq("business_name", businessName).single();
+  if (!showroom) throw new Error("showroom not found after creation");
+  const { data: documents } = await admin().from("showroom_documents").select("id").eq("showroom_id", showroom.id);
+  expect(documents?.length).toBe(1);
 });

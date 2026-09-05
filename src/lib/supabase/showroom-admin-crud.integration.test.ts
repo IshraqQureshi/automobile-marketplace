@@ -161,4 +161,60 @@ describe("Admin showroom CRUD (integration)", () => {
     const { data: verify } = await admin.from("showrooms").select("id").eq("id", showroom.id).maybeSingle();
     expect(verify).not.toBeNull();
   });
+
+  describe("admin-attached documents (showroom_documents_insert_admin / _storage_insert_admin)", () => {
+    let showroomId: string;
+
+    beforeAll(async () => {
+      const { data: showroom } = await adminUser.client
+        .from("showrooms")
+        .insert({
+          owner_user_id: owner.id,
+          business_name: `Admin Document Showroom ${testId}`,
+          phone: "+254712345678",
+          email: `admin-document-${testId}@example.com`,
+          city: "Nairobi",
+        })
+        .select()
+        .single();
+      if (!showroom) throw new Error("showroom not created");
+      showroomId = showroom.id;
+    });
+
+    afterAll(async () => {
+      await admin.storage.from("showroom-documents").remove([`${showroomId}/admin-doc.pdf`]);
+      await admin.from("showrooms").delete().eq("id", showroomId);
+    });
+
+    it("an admin can upload a document to Storage and record it for a showroom they don't own", async () => {
+      const path = `${showroomId}/admin-doc.pdf`;
+      const { error: uploadError } = await adminUser.client.storage
+        .from("showroom-documents")
+        .upload(path, new Blob(["admin-attached document"], { type: "application/pdf" }), { upsert: true });
+      expect(uploadError).toBeNull();
+
+      const { data, error } = await adminUser.client
+        .from("showroom_documents")
+        .insert({ showroom_id: showroomId, document_type: "business_registration", storage_path: path, uploaded_by: adminUser.id })
+        .select();
+      expect(error).toBeNull();
+      expect(data?.[0]?.showroom_id).toBe(showroomId);
+    });
+
+    it("a non-admin, non-owner customer cannot upload a document to Storage for someone else's showroom", async () => {
+      const { error } = await otherCustomer.client.storage
+        .from("showroom-documents")
+        .upload(`${showroomId}/intruder-doc.pdf`, new Blob(["nope"], { type: "application/pdf" }));
+      expect(error).not.toBeNull();
+    });
+
+    it("a non-admin, non-owner customer cannot record a showroom_documents row for someone else's showroom", async () => {
+      const { data, error } = await otherCustomer.client
+        .from("showroom_documents")
+        .insert({ showroom_id: showroomId, document_type: "business_registration", storage_path: `${showroomId}/never.pdf`, uploaded_by: otherCustomer.id })
+        .select();
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    });
+  });
 });

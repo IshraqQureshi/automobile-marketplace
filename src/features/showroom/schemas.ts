@@ -9,6 +9,10 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = ["application/pdf", "image/jpeg", "im
 export const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10MB, matches the bucket's file_size_limit
 export const MAX_DOCUMENTS_PER_SUBMISSION = 5;
 
+// The only document category collected today, by both self-registration
+// and the admin-created showroom flow (src/features/admin/showroom-actions.ts).
+export const BUSINESS_REGISTRATION_DOCUMENT_TYPE = "business_registration";
+
 // Base object (not yet refined) so `.shape` stays available for per-field
 // client-side validation, same reasoning as auth/schemas.ts.
 const registerShowroomBaseSchema = z.object({
