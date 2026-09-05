@@ -475,6 +475,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                 <button
                   type="button"
                   id="owner-mode-existing"
+                  aria-pressed={ownerMode === "existing"}
                   onClick={() => setOwnerMode("existing")}
                   className={`rounded px-3 py-1.5 font-medium ${ownerMode === "existing" ? "bg-brand text-white" : "text-neutral-600 hover:bg-neutral-50"}`}
                 >
@@ -482,6 +483,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                 </button>
                 <button
                   type="button"
+                  aria-pressed={ownerMode === "new"}
                   onClick={() => setOwnerMode("new")}
                   className={`rounded px-3 py-1.5 font-medium ${ownerMode === "new" ? "bg-brand text-white" : "text-neutral-600 hover:bg-neutral-50"}`}
                 >
@@ -553,6 +555,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                       id="new-owner-name"
                       value={newOwner.ownerFullName}
                       onChange={(e) => setNewOwner((o) => ({ ...o, ownerFullName: e.target.value }))}
+                      required
                       autoFocus
                     />
                   </div>
@@ -563,6 +566,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                       type="email"
                       value={newOwner.ownerEmail}
                       onChange={(e) => setNewOwner((o) => ({ ...o, ownerEmail: e.target.value }))}
+                      required
                     />
                   </div>
                   <div>
