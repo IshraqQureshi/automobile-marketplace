@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useIsActiveCatalogTab } from "./catalog-tabs";
 import {
   CarIcon,
-  CatalogSectionHeader,
+  SectionHeader,
   DialogFormActions,
   FieldLabel,
   MetaBadge,
@@ -13,7 +13,7 @@ import {
   TableEmptyState,
   TableShell,
   TrashIcon,
-} from "./catalog-ui";
+} from "./admin-ui";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -116,7 +116,7 @@ export function CatalogModelsList({ items, brands, onCreate, onUpdate, onDelete 
 
   return (
     <div>
-      <CatalogSectionHeader
+      <SectionHeader
         icon={<CarIcon />}
         title="Models"
         description="Vehicle models, each scoped to a Brand"

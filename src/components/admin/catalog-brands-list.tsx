@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useState, useTransition } from "react";
 import { useIsActiveCatalogTab } from "./catalog-tabs";
 import {
-  CatalogSectionHeader,
+  SectionHeader,
   DialogFormActions,
   FieldLabel,
   MetaBadge,
@@ -15,7 +15,7 @@ import {
   TagIcon,
   TrashIcon,
   UploadIcon,
-} from "./catalog-ui";
+} from "./admin-ui";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -151,7 +151,7 @@ export function CatalogBrandsList({
 
   return (
     <div>
-      <CatalogSectionHeader icon={<TagIcon />} title={title} description={description} actionLabel="New Brand" onAction={openCreate} />
+      <SectionHeader icon={<TagIcon />} title={title} description={description} actionLabel="New Brand" onAction={openCreate} />
 
       <TableShell>
         {items.length === 0 ? (

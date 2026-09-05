@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
@@ -25,11 +26,12 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
   // OR'd into each table's SELECT policy, so an authenticated admin gets an
   // unrestricted count here through the regular (RLS-scoped) client —
   // verified against the actual policy SQL, no service-role client needed.
-  const [pendingShowrooms, approvedShowrooms, activeVehicles, users] = await Promise.all([
+  const [pendingShowrooms, approvedShowrooms, activeVehicles, users, recentPendingShowrooms] = await Promise.all([
     supabase.from("showrooms").select("*", { count: "exact", head: true }).eq("status", "PENDING"),
     supabase.from("showrooms").select("*", { count: "exact", head: true }).eq("status", "APPROVED"),
     supabase.from("vehicles").select("*", { count: "exact", head: true }).eq("status", "ACTIVE"),
     supabase.from("profiles").select("*", { count: "exact", head: true }),
+    supabase.from("showrooms").select("id, business_name, city, created_at").eq("status", "PENDING").order("created_at").limit(5),
   ]);
 
   for (const [label, result] of [
@@ -37,6 +39,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
     ["approved showrooms", approvedShowrooms],
     ["active vehicles", activeVehicles],
     ["users", users],
+    ["recent pending showrooms", recentPendingShowrooms],
   ] as const) {
     if (result.error) {
       logger.error(`Admin dashboard: failed to count ${label}`, result.error);
@@ -80,14 +83,40 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
 
           <section className="grid grid-cols-[2fr_300px] gap-4">
             <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-              <div className="border-b border-neutral-200 px-5 py-4">
-                <h2 className="font-display text-base font-semibold text-neutral-900">Pending approvals</h2>
-                <p className="text-xs text-neutral-500">New showroom and listing submissions</p>
+              <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-4">
+                <div>
+                  <h2 className="font-display text-base font-semibold text-neutral-900">Pending approvals</h2>
+                  <p className="text-xs text-neutral-500">New showroom submissions</p>
+                </div>
+                {(recentPendingShowrooms.data?.length ?? 0) > 0 && (
+                  <Link href="/admin/showrooms" className="shrink-0 text-xs font-medium text-brand hover:underline">
+                    View all
+                  </Link>
+                )}
               </div>
-              <div className="flex flex-col items-center justify-center gap-1 px-5 py-14 text-center">
-                <p className="text-sm font-medium text-neutral-500">No pending submissions yet</p>
-                <p className="text-xs text-neutral-400">Showroom and vehicle management launches in Day 2.</p>
-              </div>
+              {recentPendingShowrooms.data && recentPendingShowrooms.data.length > 0 ? (
+                <ul>
+                  {recentPendingShowrooms.data.map((showroom) => (
+                    <li key={showroom.id} className="flex items-center justify-between gap-3 border-b border-neutral-100 px-5 py-3 last:border-b-0">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-neutral-800">{showroom.business_name}</p>
+                        <p className="text-xs text-neutral-400">{showroom.city ?? "—"}</p>
+                      </div>
+                      <Link
+                        href="/admin/showrooms"
+                        className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                      >
+                        Review
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-1 px-5 py-14 text-center">
+                  <p className="text-sm font-medium text-neutral-500">No pending submissions</p>
+                  <p className="text-xs text-neutral-400">New showroom registrations will show up here.</p>
+                </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { TagIcon } from "@/components/admin/catalog-ui";
+import { ShowroomIcon, TagIcon } from "@/components/admin/admin-ui";
 import { adminSignOutAction } from "@/features/admin/actions";
 import { cn } from "@/lib/utils";
 
@@ -15,13 +15,12 @@ interface NavEntry {
 
 const OVERVIEW_ITEMS: NavEntry[] = [{ label: "Dashboard", href: "/admin", icon: DashboardIcon }];
 
-// Showroom/vehicle/user management are Day 2/4 scope — no pages exist yet
-// (href: null). Same "coming soon" treatment as the public header's
-// Brands/Model/Type nav (src/components/layout/header.tsx) rather than
-// linking somewhere that 404s.
+// Vehicle management is Day 4 scope — no page exists yet (href: null). Same
+// "coming soon" treatment as the public header's Brands/Model/Type nav
+// (src/components/layout/header.tsx) rather than linking somewhere that 404s.
 const MARKETPLACE_ITEMS: NavEntry[] = [
   { label: "Catalog", href: "/admin/catalog", icon: () => <TagIcon className="h-4.25 w-4.25" /> },
-  { label: "Showrooms", href: null, icon: ShowroomIcon },
+  { label: "Showrooms", href: "/admin/showrooms", icon: ShowroomIcon },
   { label: "Vehicles", href: null, icon: VehicleIcon },
 ];
 
@@ -96,9 +95,11 @@ function NavGroup({ label, items, pathname }: NavGroupProps) {
         }
 
         // Exact match is correct today (every real NavEntry is a top-level
-        // page). Once a real /admin/showrooms-style section gets nested
-        // detail routes (Day 2/4), this needs pathname.startsWith(item.href)
-        // instead, or a detail sub-page won't highlight its parent nav item.
+        // page — /admin/showrooms included, since its review UI is a modal
+        // on that one page, not a nested route). Once a section gets a real
+        // nested detail route (e.g. Day 4 vehicle management), this needs
+        // pathname.startsWith(item.href) instead, or a detail sub-page
+        // won't highlight its parent nav item.
         const active = pathname === item.href;
         return (
           <Link
@@ -125,15 +126,6 @@ function DashboardIcon() {
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
-    </svg>
-  );
-}
-
-function ShowroomIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
-      <path d="M3 9.5 12 3l9 6.5" />
-      <path d="M5 9v11h14V9" />
     </svg>
   );
 }

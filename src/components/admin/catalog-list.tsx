@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useIsActiveCatalogTab } from "./catalog-tabs";
 import {
-  CatalogSectionHeader,
+  SectionHeader,
   DialogFormActions,
   FieldLabel,
   InitialAvatar,
@@ -13,7 +13,7 @@ import {
   TableEmptyState,
   TableShell,
   TrashIcon,
-} from "./catalog-ui";
+} from "./admin-ui";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -141,7 +141,7 @@ export function CatalogList({
 
   return (
     <div>
-      <CatalogSectionHeader icon={icon} title={title} description={description} actionLabel={`New ${singular}`} onAction={openCreate} />
+      <SectionHeader icon={icon} title={title} description={description} actionLabel={`New ${singular}`} onAction={openCreate} />
 
       <TableShell>
         {items.length === 0 ? (
