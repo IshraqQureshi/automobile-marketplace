@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/features/auth/actions";
+import { getOwnerShowroom } from "@/features/showroom/my-showroom";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
@@ -37,6 +39,12 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     logger.error("Failed to load profile for authenticated user", profileError, { userId: user.id });
   }
 
+  // profiles.role never actually becomes "SHOWROOM" (registering a showroom
+  // doesn't change it — see the note in src/features/showroom/my-showroom.ts),
+  // so whether this account owns a showroom has to be checked directly
+  // rather than read off role.
+  const showroom = await getOwnerShowroom(supabase, user.id);
+
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="font-display text-2xl font-semibold text-neutral-900">
@@ -51,9 +59,13 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           Logging out failed. Please try again.
         </p>
       )}
-      <p className="text-sm text-neutral-400">
-        Full customer dashboard (AUTH-004) not yet implemented.
-      </p>
+      {showroom ? (
+        <Link href="/dashboard" className="text-sm font-medium text-brand hover:text-brand-dark">
+          Go to your showroom dashboard →
+        </Link>
+      ) : (
+        <p className="text-sm text-neutral-400">Full customer dashboard (AUTH-004) not yet implemented.</p>
+      )}
       <form action={signOutAction}>
         <Button type="submit" variant="outline">
           Log out
