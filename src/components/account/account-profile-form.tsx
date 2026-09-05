@@ -103,7 +103,7 @@ function ProfileSection({ initialValues }: { initialValues: AccountProfileInitia
         </div>
 
         <div>
-          <FieldLabel htmlFor="account-phone">Phone</FieldLabel>
+          <FieldLabel htmlFor="account-phone">Phone (optional)</FieldLabel>
           <div className="flex items-center gap-2">
             <span className="flex items-center rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-500">+254</span>
             <Input
@@ -112,7 +112,6 @@ function ProfileSection({ initialValues }: { initialValues: AccountProfileInitia
               onChange={(e) => setPhone(e.target.value)}
               onBlur={(e) => validate("phone", e.target.value)}
               placeholder="712345678"
-              required
               error={!!errorFor("phone")}
             />
           </div>
