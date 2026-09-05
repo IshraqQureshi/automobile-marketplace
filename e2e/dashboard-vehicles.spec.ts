@@ -234,6 +234,41 @@ test("the vehicle form's own Status field can publish on create and change statu
   await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("SOLD");
 });
 
+test("a second status change in the same edit visit (no reload in between) still persists", async ({ page }) => {
+  // Regression test for a real bug found in code review: comparing the
+  // form's status against the initialValues *prop* (frozen at page-load
+  // time, since neither updateVehicleAction nor updateVehicleStatusAction
+  // triggers a navigation/router.refresh) meant a second save in the same
+  // visit compared against the original load-time status instead of the
+  // one just persisted — a Published → Save, then Draft → Save sequence
+  // silently failed to revert the second time, while still showing
+  // "Vehicle updated." as if it had worked.
+  const unique = Date.now();
+  const title = `E2E Repeat Status Vehicle ${unique}`;
+
+  await loginAsFixtureOwner(page);
+  await createVehicleViaForm(page, title);
+  await expect(page.locator("#vehicle-status")).toHaveValue("DRAFT");
+
+  // The Status <select> is present in the very first paint of this
+  // freshly-navigated-to edit page — retry past the same hydration-race
+  // window noted elsewhere in this file, rather than trusting one attempt.
+  await expect(async () => {
+    await page.locator("#vehicle-status").selectOption("ACTIVE");
+    await expect(page.locator("#vehicle-status")).toHaveValue("ACTIVE");
+  }).toPass({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  // No reload here — this is the exact scenario that exposed the bug.
+  await page.locator("#vehicle-status").selectOption("DRAFT");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator("#vehicle-status")).toHaveValue("DRAFT");
+});
+
 test("required fields show one inline validation message, not a duplicate banner", async ({ page }) => {
   await loginAsFixtureOwner(page);
   await page.goto("/dashboard/vehicles/new");

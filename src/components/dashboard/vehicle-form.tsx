@@ -194,6 +194,19 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
   const [form, setForm] = useState<VehicleFormState>(() => (initialValues ? formFromVehicle(initialValues, brands) : emptyForm()));
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // The last status actually confirmed persisted — starts from
+  // initialValues (or DRAFT for a new vehicle) but is updated after every
+  // successful status change, unlike initialValues itself (a prop that
+  // never changes for as long as this page stays mounted, since neither
+  // updateVehicleAction nor updateVehicleStatusAction triggers a
+  // navigation or router.refresh()). Comparing against the stale prop
+  // instead of this would make a second save in the same visit compare
+  // against the *original* load-time status rather than the one just
+  // persisted — confirmed live: set Published → Save (persists), set back
+  // to Draft → Save again compares "DRAFT" against initialValues' frozen
+  // "DRAFT" and silently skips the revert, while still showing "Vehicle
+  // updated." as if it worked.
+  const [lastKnownStatus, setLastKnownStatus] = useState<VehicleStatus>(initialValues?.status ?? "DRAFT");
 
   const modelsForBrand = models.filter((m) => m.brandId === form.brandId);
 
@@ -294,12 +307,13 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
         return;
       }
 
-      if (initialValues && form.status !== initialValues.status) {
+      if (form.status !== lastKnownStatus) {
         const statusResult = await updateVehicleStatusAction(vehicleId!, form.status);
         if (statusResult.error) {
           toast.error(statusResult.error);
           return;
         }
+        setLastKnownStatus(form.status);
       }
       toast.success("Vehicle updated.");
     });
