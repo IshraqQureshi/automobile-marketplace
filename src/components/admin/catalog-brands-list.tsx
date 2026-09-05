@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState, useTransition } from "react";
+import { useIsActiveCatalogTab } from "./catalog-tabs";
 import {
   CatalogSectionHeader,
   DialogFormActions,
@@ -50,8 +51,19 @@ const LOGO_ACCEPT = "image/jpeg,image/png,image/webp,image/svg+xml";
  * actions and a thumbnail/file-input UI that Types doesn't need — same
  * reasoning as why Models has its own component.
  */
-export function CatalogBrandsList({ title, description, items, addPlaceholder, emptyMessage, onCreate, onUpdate, onDelete, deleteWarning }: CatalogBrandsListProps) {
+export function CatalogBrandsList({
+  title,
+  description,
+  items,
+  addPlaceholder,
+  emptyMessage,
+  onCreate,
+  onUpdate,
+  onDelete,
+  deleteWarning,
+}: CatalogBrandsListProps) {
   const toast = useToast();
+  const isActive = useIsActiveCatalogTab("brands");
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<BrandItem | null>(null);
   const [name, setName] = useState("");
@@ -61,6 +73,23 @@ export function CatalogBrandsList({ title, description, items, addPlaceholder, e
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BrandItem | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // A Dialog/ConfirmDialog renders via a document.body portal, outside this
+  // component's own (possibly `hidden`) tab panel — so leaving one open
+  // while switching to a different tab would leave its full-viewport
+  // overlay blocking that other tab. Close both the moment this panel
+  // stops being the active one — done as a render-time state adjustment
+  // (React's documented pattern for "reset state when a prop changes")
+  // rather than a useEffect, which this project's lint config flags as a
+  // setState-in-effect anti-pattern.
+  const [prevIsActive, setPrevIsActive] = useState(isActive);
+  if (isActive !== prevIsActive) {
+    setPrevIsActive(isActive);
+    if (!isActive) {
+      setDialogMode(null);
+      setDeleteTarget(null);
+    }
+  }
 
   function openCreate() {
     setDialogMode("create");

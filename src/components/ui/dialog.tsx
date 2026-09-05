@@ -19,15 +19,53 @@ interface DialogProps {
 export function Dialog({ open, onClose, title, description, children }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // onClose is a plain function recreated on every render of the caller
+  // (e.g. `function closeDialog() {...}` inside a component body, not
+  // wrapped in useCallback) — every keystroke in a form field inside this
+  // dialog re-renders the caller and hands Dialog a new onClose reference.
+  // Keeping it out of the effect's dependency array (via a ref that always
+  // holds the latest callback) means the effect below only re-runs on a
+  // genuine open/close transition, not on every keystroke — otherwise
+  // `panelRef.current?.focus()` re-fires on every render while typing,
+  // stealing focus from the input back to the dialog panel after the very
+  // first character (confirmed live: typing "Toyota" produced "T").
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
+      // Basic focus trap: without this, Tab/Shift+Tab can walk focus out of
+      // the panel into the (visually covered, but not actually inert)
+      // background page — including the tab bar behind this dialog on the
+      // catalog page, whose button still responds to a keyboard-triggered
+      // click even though a mouse click on the same spot is correctly
+      // blocked by the overlay below. A real modal must not allow that.
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
     document.addEventListener("keydown", onKeyDown);
     panelRef.current?.focus();
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 

@@ -92,6 +92,7 @@ export default async function AdminCatalogPage() {
           types={
             <CatalogList
               icon={<LayersIcon />}
+              tabKey="types"
               title="Types"
               singular="Type"
               description="Body / fuel category"

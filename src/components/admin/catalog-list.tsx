@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useIsActiveCatalogTab } from "./catalog-tabs";
 import {
   CatalogSectionHeader,
   DialogFormActions,
@@ -40,6 +41,11 @@ interface CatalogListProps {
   // ("Functions cannot be passed directly to Client Components" unless
   // it's a Server Action specifically).
   deleteWarning?: string;
+  // Which CatalogTabs panel this instance lives in — CatalogList is reused
+  // across different tabs (currently just "types"), unlike
+  // CatalogBrandsList/CatalogModelsList which always represent one fixed
+  // tab, so this can't be hardcoded the way theirs is.
+  tabKey: "brands" | "models" | "types";
 }
 
 /**
@@ -59,14 +65,34 @@ export function CatalogList({
   onUpdate,
   onDelete,
   deleteWarning,
+  tabKey,
 }: CatalogListProps) {
   const toast = useToast();
+  const isActive = useIsActiveCatalogTab(tabKey);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [name, setName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CatalogItem | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // A Dialog/ConfirmDialog renders via a document.body portal, outside this
+  // component's own (possibly `hidden`) tab panel — so leaving one open
+  // while switching to a different tab would leave its full-viewport
+  // overlay blocking that other tab. Close both the moment this panel
+  // stops being the active one — done as a render-time state adjustment
+  // (React's documented pattern for "reset state when a prop changes",
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders)
+  // rather than a useEffect, which this project's lint config flags as a
+  // setState-in-effect anti-pattern.
+  const [prevIsActive, setPrevIsActive] = useState(isActive);
+  if (isActive !== prevIsActive) {
+    setPrevIsActive(isActive);
+    if (!isActive) {
+      setDialogMode(null);
+      setDeleteTarget(null);
+    }
+  }
 
   function openCreate() {
     setDialogMode("create");
