@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { CarIcon, PencilIcon, SectionHeader, TableEmptyState, TableShell } from "@/components/admin/admin-ui";
+import { useMemo, useState, useTransition } from "react";
+import { CarIcon, FilterBar, PencilIcon, SearchInput, SectionHeader, TableEmptyState, TableShell, filterSelectClassName } from "@/components/admin/admin-ui";
 import { useToast } from "@/components/ui/toast";
 import { updateVehicleStatusAction } from "@/features/vehicle/actions";
 import {
@@ -34,6 +34,26 @@ export function VehicleList({ vehicles }: VehicleListProps) {
   const [, startTransition] = useTransition();
   const [statusPendingId, setStatusPendingId] = useState<string | null>(null);
 
+  // Client-side only — a showroom's own vehicles are already fetched in one
+  // shot server-side (no pagination at this scale), so filtering the
+  // already-loaded array in memory is simplest; no new query/round-trip.
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | VehicleStatus>("ALL");
+
+  const filteredVehicles = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return vehicles.filter((vehicle) => {
+      if (statusFilter !== "ALL" && vehicle.status !== statusFilter) return false;
+      if (!query) return true;
+      return (
+        vehicle.title.toLowerCase().includes(query) ||
+        vehicle.make.toLowerCase().includes(query) ||
+        vehicle.model.toLowerCase().includes(query) ||
+        (vehicle.variant ?? "").toLowerCase().includes(query)
+      );
+    });
+  }, [vehicles, searchQuery, statusFilter]);
+
   function handleStatusChange(vehicleId: string, status: VehicleStatus) {
     setStatusPendingId(vehicleId);
     startTransition(async () => {
@@ -59,9 +79,30 @@ export function VehicleList({ vehicles }: VehicleListProps) {
         </Link>
       </div>
 
+      {vehicles.length > 0 && (
+        <FilterBar>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search title, make, or model…" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            className={`${filterSelectClassName} w-40`}
+            aria-label="Filter by status"
+          >
+            <option value="ALL">All statuses</option>
+            {(Object.keys(STATUS_LABELS) as VehicleStatus[]).map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
+        </FilterBar>
+      )}
+
       <TableShell>
         {vehicles.length === 0 ? (
           <TableEmptyState message="No vehicles yet. Add your first listing to get started." />
+        ) : filteredVehicles.length === 0 ? (
+          <TableEmptyState message="No vehicles match your search." />
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
@@ -73,7 +114,7 @@ export function VehicleList({ vehicles }: VehicleListProps) {
               </tr>
             </thead>
             <tbody>
-              {vehicles.map((vehicle) => {
+              {filteredVehicles.map((vehicle) => {
                 const primaryPhoto = vehicle.photos.find((p) => p.isPrimary) ?? vehicle.photos[0];
                 return (
                   <tr key={vehicle.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50">

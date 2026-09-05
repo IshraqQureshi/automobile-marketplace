@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useIsActiveCatalogTab } from "./catalog-tabs";
 import {
   SectionHeader,
   DialogFormActions,
   FieldLabel,
+  FilterBar,
   InitialAvatar,
   MetaBadge,
   PencilIcon,
   RowIconButton,
+  SearchInput,
   TableEmptyState,
   TableShell,
   TrashIcon,
@@ -79,6 +81,13 @@ export function CatalogList({
   const nameError = errorFor("name");
   const [deleteTarget, setDeleteTarget] = useState<CatalogItem | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => item.name.toLowerCase().includes(query));
+  }, [items, searchQuery]);
 
   // A Dialog/ConfirmDialog renders via a document.body portal, outside this
   // component's own (possibly `hidden`) tab panel — so leaving one open
@@ -156,9 +165,17 @@ export function CatalogList({
     <div>
       <SectionHeader icon={icon} title={title} description={description} actionLabel={`New ${singular}`} onAction={openCreate} />
 
+      {items.length > 0 && (
+        <FilterBar>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder={`Search ${title.toLowerCase()}…`} />
+        </FilterBar>
+      )}
+
       <TableShell>
         {items.length === 0 ? (
           <TableEmptyState message={emptyMessage} />
+        ) : filteredItems.length === 0 ? (
+          <TableEmptyState message={`No ${title.toLowerCase()} match your search.`} />
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
@@ -168,7 +185,7 @@ export function CatalogList({
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <tr key={item.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">

@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import {
   DialogFormActions,
   FieldLabel,
+  FilterBar,
   InitialAvatar,
   PencilIcon,
   RowIconButton,
+  SearchInput,
   SectionHeader,
   ShowroomIcon,
   StatusBadge,
@@ -15,6 +17,7 @@ import {
   TableShell,
   TrashIcon,
   UploadIcon,
+  filterSelectClassName,
 } from "./admin-ui";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
@@ -110,8 +113,30 @@ interface PreviewingDocument {
   kind: "pdf" | "image" | "other";
 }
 
+const SHOWROOM_STATUS_OPTIONS = ["PENDING", "APPROVED", "REJECTED", "SUSPENDED"] as const;
+
 export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwners }: ShowroomListProps) {
   const toast = useToast();
+
+  // Client-side only — the full showroom list is already fetched in one
+  // shot server-side (no pagination exists at this scale), so filtering the
+  // already-loaded array in memory is simplest; no new query/round-trip.
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | (typeof SHOWROOM_STATUS_OPTIONS)[number]>("ALL");
+
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return items.filter((item) => {
+      if (statusFilter !== "ALL" && item.status !== statusFilter) return false;
+      if (!query) return true;
+      return (
+        item.businessName.toLowerCase().includes(query) ||
+        item.email.toLowerCase().includes(query) ||
+        item.phone.toLowerCase().includes(query) ||
+        (item.city ?? "").toLowerCase().includes(query)
+      );
+    });
+  }, [items, searchQuery, statusFilter]);
 
   // Approve/reject inside the Review dialog and the create/edit/delete CRUD
   // dialogs are independent transitions — the two dialogs never open at the
@@ -399,9 +424,30 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
         onAction={openCreate}
       />
 
+      {items.length > 0 && (
+        <FilterBar>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search business, email, phone, or city…" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            className={`${filterSelectClassName} w-40`}
+            aria-label="Filter by status"
+          >
+            <option value="ALL">All statuses</option>
+            {SHOWROOM_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status.charAt(0) + status.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </FilterBar>
+      )}
+
       <TableShell>
         {items.length === 0 ? (
           <TableEmptyState message="No showroom registrations yet." />
+        ) : filteredItems.length === 0 ? (
+          <TableEmptyState message="No showrooms match your search." />
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
@@ -415,7 +461,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <tr key={item.id} className="border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">

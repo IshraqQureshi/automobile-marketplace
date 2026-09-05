@@ -182,6 +182,83 @@ test("admin can reject a pending showroom", async ({ page }) => {
   await expect(page.getByRole("row", { name: businessName }).getByText("Rejected")).toBeVisible();
 });
 
+test("the showrooms list can be searched and filtered by status", async ({ page }) => {
+  const unique = Date.now();
+  const pendingName = `E2E Search Pending ${unique}`;
+  const approvedName = `E2E Search Approved ${unique}`;
+  await createPendingShowroom(pendingName);
+
+  // A second, ad-hoc owner — showrooms_owner_user_id_active_unique allows
+  // only one PENDING/APPROVED/SUSPENDED showroom per owner, and this test
+  // needs two simultaneously active showrooms (one of each status) to
+  // exercise the status filter, so it can't reuse this file's single
+  // shared `ownerUserId` fixture for both.
+  const supabase = admin();
+  const secondOwnerEmail = `e2e-admin-showrooms-search-owner-${unique}@harakagari.local`;
+  const { data: secondOwner, error: secondOwnerError } = await supabase.auth.admin.createUser({
+    email: secondOwnerEmail,
+    password: "e2e-admin-showrooms-search-owner-password-123",
+    email_confirm: true,
+  });
+  if (secondOwnerError || !secondOwner.user) throw secondOwnerError ?? new Error("second owner not created");
+
+  // Wrapped in try/finally from here — same reasoning as the invited-owner
+  // test above: several assertions run between creating this ad-hoc owner
+  // and cleaning it up, and a thrown assertion must not leave it (or its
+  // showroom) orphaned in the database.
+  try {
+    const { data: approvedShowroom, error: approvedError } = await supabase
+      .from("showrooms")
+      .insert({
+        owner_user_id: secondOwner.user.id,
+        business_name: approvedName,
+        phone: "+254712345680",
+        email: `${approvedName.toLowerCase().replace(/\s+/g, "-")}@example.com`,
+        city: "Mombasa",
+        status: "APPROVED",
+        verified: true,
+      })
+      .select("id")
+      .single();
+    if (approvedError || !approvedShowroom) throw approvedError ?? new Error("approved showroom not created");
+
+    await loginAsFixtureAdmin(page);
+    await page.goto("/admin/showrooms");
+
+    await expect(page.getByRole("row", { name: pendingName })).toBeAttached();
+    await expect(page.getByRole("row", { name: approvedName })).toBeAttached();
+
+    // Text search narrows to the matching business name only.
+    await page.getByPlaceholder(/Search business, email, phone, or city/i).fill(pendingName);
+    await expect(page.getByRole("row", { name: pendingName })).toBeAttached();
+    await expect(page.getByRole("row", { name: approvedName })).toHaveCount(0);
+
+    // Searching by city (not business name) also matches.
+    await page.getByPlaceholder(/Search business, email, phone, or city/i).fill("Mombasa");
+    await expect(page.getByRole("row", { name: approvedName })).toBeAttached();
+    await expect(page.getByRole("row", { name: pendingName })).toHaveCount(0);
+    await page.getByPlaceholder(/Search business, email, phone, or city/i).fill("");
+
+    // Status filter narrows independently of the search box.
+    await page.getByLabel("Filter by status").selectOption("APPROVED");
+    await expect(page.getByRole("row", { name: approvedName })).toBeAttached();
+    await expect(page.getByRole("row", { name: pendingName })).toHaveCount(0);
+    await page.getByLabel("Filter by status").selectOption("ALL");
+
+    // A search that matches nothing shows the no-results empty state, not a
+    // blank table (and not the "no registrations at all" message either).
+    await page.getByPlaceholder(/Search business, email, phone, or city/i).fill("no-such-showroom-xyz");
+    await expect(page.getByText("No showrooms match your search.")).toBeVisible();
+  } finally {
+    // The PENDING showroom itself is cleaned up by this file's own
+    // afterEach (it deletes every showroom owned by the shared
+    // ownerUserId fixture) — only the ad-hoc second owner/showroom
+    // created in this test need explicit cleanup here.
+    await admin().from("showrooms").delete().eq("owner_user_id", secondOwner.user.id);
+    await admin().auth.admin.deleteUser(secondOwner.user.id);
+  }
+});
+
 test("an approved or rejected showroom has no approve/reject actions in its review dialog", async ({ page }) => {
   const unique = Date.now();
   const businessName = `E2E Approved Showroom ${unique}`;
