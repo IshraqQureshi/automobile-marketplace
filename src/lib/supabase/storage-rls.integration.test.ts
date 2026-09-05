@@ -150,15 +150,25 @@ describe("Storage RLS authorization (integration)", () => {
     });
   });
 
-  describe("showroom-logos (public bucket, admin-only write)", () => {
-    it("a non-admin customer cannot upload a showroom logo", async () => {
-      const { error } = await ownerA.client.storage.from("showroom-logos").upload(`${showroomAId}/hijacked.png`, tinyLogo);
+  describe("showroom-logos (public bucket, owner-or-admin write)", () => {
+    // Owner write was added alongside self-service showroom profile
+    // editing — previously admin-only (see this migration's own comment:
+    // 20260905210000_showroom_logos_owner_write.sql), confirmed live to
+    // 403 for a real showroom owner before that migration existed.
+    it("the owning showroom can upload its own logo", async () => {
+      const { error } = await ownerA.client.storage.from("showroom-logos").upload(`${showroomAId}/logo.png`, tinyLogo, { upsert: true });
+      expect(error).toBeNull();
+    });
+
+    it("a different showroom cannot upload into another showroom's logo folder", async () => {
+      const { error } = await ownerB.client.storage.from("showroom-logos").upload(`${showroomAId}/hijacked.png`, tinyLogo);
       expect(error).not.toBeNull();
     });
 
-    it("an admin can upload a showroom logo", async () => {
-      const { error } = await adminUser.client.storage.from("showroom-logos").upload(`${showroomAId}/logo.png`, tinyLogo, { upsert: true });
+    it("an admin can also upload a showroom logo", async () => {
+      const { error } = await adminUser.client.storage.from("showroom-logos").upload(`${showroomAId}/admin-logo.png`, tinyLogo, { upsert: true });
       expect(error).toBeNull();
+      await admin.storage.from("showroom-logos").remove([`${showroomAId}/admin-logo.png`]);
     });
 
     it("anon can read from the public bucket", async () => {
@@ -167,18 +177,18 @@ describe("Storage RLS authorization (integration)", () => {
       expect(data?.some((f) => f.name === "logo.png")).toBe(true);
     });
 
-    it("a non-admin customer cannot delete a showroom logo", async () => {
-      const { error } = await ownerA.client.storage.from("showroom-logos").remove([`${showroomAId}/logo.png`]);
-      // Same Supabase Storage behavior as brand-logos above: an
-      // unauthorized removal reports success with an empty result.
+    it("a different showroom cannot delete another showroom's logo", async () => {
+      const { error } = await ownerB.client.storage.from("showroom-logos").remove([`${showroomAId}/logo.png`]);
+      // Same Supabase Storage behavior as brand-logos/vehicle-media above:
+      // an unauthorized removal reports success with an empty result.
       expect(error).toBeNull();
 
       const { data } = await admin.storage.from("showroom-logos").list(showroomAId);
       expect(data?.some((f) => f.name === "logo.png")).toBe(true);
     });
 
-    it("an admin can delete a showroom logo", async () => {
-      const { error } = await adminUser.client.storage.from("showroom-logos").remove([`${showroomAId}/logo.png`]);
+    it("the owning showroom can delete its own logo", async () => {
+      const { error } = await ownerA.client.storage.from("showroom-logos").remove([`${showroomAId}/logo.png`]);
       expect(error).toBeNull();
 
       const { data } = await admin.storage.from("showroom-logos").list(showroomAId);

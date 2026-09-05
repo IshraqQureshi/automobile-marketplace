@@ -23,13 +23,15 @@ export function DashboardSidebar({ email, showroom }: DashboardSidebarProps) {
   const pathname = usePathname();
   const approved = showroom.status === "APPROVED";
 
-  // Profile/Appointments are real Day 2/4 requirements with no page built
-  // yet — same "coming soon" treatment as the admin sidebar's own
-  // not-yet-built entries, rather than linking somewhere that 404s.
+  // Appointments is a real Day 4 requirement with no page built yet — same
+  // "coming soon" treatment as the admin sidebar's own not-yet-built
+  // entries, rather than linking somewhere that 404s. Profile editing is
+  // allowed regardless of approval status (unlike Vehicles), so it's never
+  // gated behind `approved` here.
   const items: NavEntry[] = [
     { label: "Dashboard", href: "/dashboard", icon: DashboardIcon },
     { label: "Vehicles", href: approved ? "/dashboard/vehicles" : null, icon: () => <CarIcon /> },
-    { label: "Profile", href: null, icon: ProfileIcon },
+    { label: "Profile", href: "/dashboard/profile", icon: ProfileIcon },
     { label: "Appointments", href: null, icon: CalendarIcon },
   ];
 

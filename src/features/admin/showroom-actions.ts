@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { uploadShowroomDocuments } from "@/features/showroom/document-upload";
+import { updateShowroomProfile } from "@/features/showroom/profile";
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
   BUSINESS_REGISTRATION_DOCUMENT_TYPE,
@@ -297,51 +298,11 @@ export async function updateShowroomAction(formData: FormData): Promise<Showroom
   }
 
   const supabase = await createClient();
-
-  let previousLogoPath: string | null = null;
-  if (logoFile || removeLogo) {
-    const { data: existing } = await supabase.from("showrooms").select("logo_storage_path").eq("id", id).maybeSingle();
-    previousLogoPath = existing?.logo_storage_path ?? null;
-  }
-
-  const { data, error } = await supabase
-    .from("showrooms")
-    .update({
-      business_name: parsed.data.businessName,
-      city: parsed.data.location,
-      phone: `+254${parsed.data.businessPhone}`,
-      email: parsed.data.businessEmail,
-      address: parsed.data.address ?? null,
-      description: parsed.data.description ?? null,
-      ...(removeLogo && !logoFile ? { logo_storage_path: null } : {}),
-    })
-    .eq("id", id)
-    .select("id");
-  if (error) {
-    logger.error("Failed to update showroom", error, { id });
-    return { error: "Failed to update showroom." };
-  }
-  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
-
-  if (logoFile) {
-    const { error: logoError } = await uploadEntityLogo(supabase, "showroom-logos", "showrooms", id, logoFile);
-    if (logoError) {
-      logger.error("Failed to upload showroom logo", logoError, { showroomId: id });
-      revalidatePath("/admin/showrooms");
-      return { warning: "Details updated, but the new logo failed to upload. Try again." };
-    }
-  }
-
-  if ((logoFile || removeLogo) && previousLogoPath) {
-    const { error: removeError } = await supabase.storage.from("showroom-logos").remove([previousLogoPath]);
-    if (removeError) {
-      logger.warn("Failed to remove a showroom's previous logo file", { id, previousLogoPath, error: removeError.message });
-    }
-  }
+  const result = await updateShowroomProfile(supabase, id, parsed.data, logoFile, removeLogo);
 
   revalidatePath("/admin/showrooms");
   revalidatePath("/admin");
-  return {};
+  return result;
 }
 
 export async function deleteShowroomAction(id: string): Promise<ShowroomActionResult> {
