@@ -22,6 +22,22 @@ const validFullVehicle = {
   bodyType: "Sedan",
   color: "White",
   description: "Well maintained, full service history.",
+  engine: "2.0L Turbo Petrol",
+  interior: "Leather",
+  doors: "4",
+  seats: "5",
+  countryOfOrigin: "Japan",
+  installmentEnabled: "true",
+  bankFinanceEnabled: "false",
+  financingDownPaymentType: "PERCENT",
+  financingDownPaymentPercent: "20",
+  financingDownPaymentAmount: "",
+  financingInterestRate: "12.5",
+  financingInsurancePercent: "3",
+  financingPartner: "KCB Bank",
+  financingTenureMonths: ["12", "24"],
+  financingTracker1YearPrice: "15000",
+  financingTracker2YearPrice: "",
 };
 
 describe("vehicleTitleSchema", () => {
@@ -139,13 +155,73 @@ describe("vehicleSchema (full object)", () => {
       bodyType: "",
       color: "",
       description: "",
+      engine: "",
+      interior: "",
+      doors: "",
+      seats: "",
+      countryOfOrigin: "",
+      installmentEnabled: "",
+      bankFinanceEnabled: "",
+      financingDownPaymentPercent: "",
+      financingDownPaymentAmount: "",
+      financingInterestRate: "",
+      financingInsurancePercent: "",
+      financingPartner: "",
+      financingTenureMonths: [],
+      financingTracker1YearPrice: "",
+      financingTracker2YearPrice: "",
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.variant).toBeUndefined();
       expect(result.data.fuelType).toBeUndefined();
       expect(result.data.transmission).toBeUndefined();
+      expect(result.data.installmentEnabled).toBe(false);
+      expect(result.data.financingDownPaymentType).toBe("PERCENT");
     }
+  });
+
+  it("accepts a fixed down payment amount and drops the unused percent field", () => {
+    const result = vehicleSchema.safeParse({
+      ...validFullVehicle,
+      financingDownPaymentType: "FIXED",
+      financingDownPaymentAmount: "500000",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.financingDownPaymentAmount).toBe(500000);
+      expect(result.data.financingDownPaymentPercent).toBeUndefined();
+    }
+  });
+
+  it("rejects an invalid loan tenure option", () => {
+    const result = vehicleSchema.safeParse({ ...validFullVehicle, financingTenureMonths: ["13"] });
+    expect(result.success).toBe(false);
+  });
+
+  it("combines tracker fees into financingTrackerOptions", () => {
+    const result = vehicleSchema.safeParse({
+      ...validFullVehicle,
+      financingTracker1YearPrice: "15000",
+      financingTracker2YearPrice: "28000",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.financingTrackerOptions).toEqual([
+        { duration: "1 Year", price: 15000 },
+        { duration: "2 Years", price: 28000 },
+      ]);
+    }
+  });
+
+  it("rejects doors/seats above their valid range", () => {
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, doors: "11" }).success).toBe(false);
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, seats: "21" }).success).toBe(false);
+  });
+
+  it("rejects a zero value for doors/seats — a vehicle has at least one of each", () => {
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, doors: "0" }).success).toBe(false);
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, seats: "0" }).success).toBe(false);
   });
 
   it("rejects a fuel type outside the fixed list", () => {
