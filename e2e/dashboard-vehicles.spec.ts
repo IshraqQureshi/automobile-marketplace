@@ -304,3 +304,30 @@ test("an approved owner can mark a vehicle sold and deactivate it", async ({ pag
   await page.reload();
   await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("INACTIVE");
 });
+
+test("a vehicle whose make doesn't match any catalog brand keeps its original text on save", async ({ page }) => {
+  // Simulates a listing that predates the Brand catalog dropdown, or whose
+  // brand was since renamed/removed from the catalog — the dropdown should
+  // start unselected without silently discarding the original make/model.
+  const { data: vehicle, error } = await admin()
+    .from("vehicles")
+    .insert({ showroom_id: showroomId, title: "Legacy Listing", make: "Discontinued Motors", model: "Old Model", year: 2015, price: 800000 })
+    .select("id")
+    .single();
+  if (error || !vehicle) throw error ?? new Error("vehicle not created");
+
+  await loginAsFixtureOwner(page);
+  await page.goto(`/dashboard/vehicles/${vehicle.id}/edit`);
+
+  await expect(page.locator("#vehicle-brand")).toHaveValue("");
+  await expect(page.getByText("Current value: Discontinued Motors (not in the catalog)")).toBeVisible();
+  await expect(page.getByText("Current value: Old Model (not in the catalog)")).toBeVisible();
+
+  await page.locator("#vehicle-price").fill("850000");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  const { data: updated } = await admin().from("vehicles").select("make, model").eq("id", vehicle.id).single();
+  expect(updated?.make).toBe("Discontinued Motors");
+  expect(updated?.model).toBe("Old Model");
+});

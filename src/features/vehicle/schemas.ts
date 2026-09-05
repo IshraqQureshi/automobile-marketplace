@@ -65,7 +65,13 @@ const optionalSmallInteger = (max: number, label: string) =>
     .trim()
     .pipe(z.union([z.literal(""), z.string().regex(INTEGER_REGEX, `Enter a valid ${label.toLowerCase()}`)]))
     .transform((value) => (value === "" ? undefined : Number(value)))
-    .pipe(z.number().max(max, `${label} must be ${max} or fewer`).optional());
+    .pipe(
+      z
+        .number()
+        .min(1, `${label} must be at least 1`)
+        .max(max, `${label} must be ${max} or fewer`)
+        .optional(),
+    );
 
 export const vehicleDoorsSchema = optionalSmallInteger(10, "Doors");
 export const vehicleSeatsSchema = optionalSmallInteger(20, "Seats");

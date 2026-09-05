@@ -128,7 +128,29 @@ function formFromVehicle(vehicle: VehicleListItem, brands: CatalogOption[]): Veh
   };
 }
 
-const VALIDATED_FIELDS = ["title", "make", "model", "year", "price", "mileage", "variant", "color", "description"] as const;
+const VALIDATED_FIELDS = [
+  "title",
+  "make",
+  "model",
+  "year",
+  "price",
+  "mileage",
+  "variant",
+  "color",
+  "description",
+  "engine",
+  "interior",
+  "doors",
+  "seats",
+  "countryOfOrigin",
+  "financingDownPaymentPercent",
+  "financingDownPaymentAmount",
+  "financingInterestRate",
+  "financingInsurancePercent",
+  "financingPartner",
+  "financingTracker1YearPrice",
+  "financingTracker2YearPrice",
+] as const;
 
 interface VehicleFormProps {
   mode: "create" | "edit";
@@ -376,7 +398,15 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
 
           <div>
             <FieldLabel htmlFor="vehicle-engine">Engine (optional)</FieldLabel>
-            <Input id="vehicle-engine" value={form.engine} onChange={(e) => setField("engine", e.target.value)} placeholder="e.g. 2.0L Turbo Petrol" />
+            <Input
+              id="vehicle-engine"
+              value={form.engine}
+              onChange={(e) => setField("engine", e.target.value)}
+              onBlur={(e) => validate("engine", e.target.value)}
+              placeholder="e.g. 2.0L Turbo Petrol"
+              error={!!errorFor("engine")}
+            />
+            {errorFor("engine") && <p className="mt-1 text-sm text-red-600">{errorFor("engine")}</p>}
           </div>
 
           <div>
@@ -410,7 +440,15 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
 
           <div>
             <FieldLabel htmlFor="vehicle-interior">Interior (optional)</FieldLabel>
-            <Input id="vehicle-interior" value={form.interior} onChange={(e) => setField("interior", e.target.value)} placeholder="e.g. Leather" />
+            <Input
+              id="vehicle-interior"
+              value={form.interior}
+              onChange={(e) => setField("interior", e.target.value)}
+              onBlur={(e) => validate("interior", e.target.value)}
+              placeholder="e.g. Leather"
+              error={!!errorFor("interior")}
+            />
+            {errorFor("interior") && <p className="mt-1 text-sm text-red-600">{errorFor("interior")}</p>}
           </div>
 
           <div>
@@ -460,8 +498,11 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
               id="vehicle-country-of-origin"
               value={form.countryOfOrigin}
               onChange={(e) => setField("countryOfOrigin", e.target.value)}
+              onBlur={(e) => validate("countryOfOrigin", e.target.value)}
               placeholder="e.g. Japan"
+              error={!!errorFor("countryOfOrigin")}
             />
+            {errorFor("countryOfOrigin") && <p className="mt-1 text-sm text-red-600">{errorFor("countryOfOrigin")}</p>}
           </div>
         </div>
       </section>
@@ -597,8 +638,11 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
                 id="vehicle-financing-partner"
                 value={form.financingPartner}
                 onChange={(e) => setField("financingPartner", e.target.value)}
+                onBlur={(e) => validate("financingPartner", e.target.value)}
                 placeholder="e.g. KCB Bank"
+                error={!!errorFor("financingPartner")}
               />
+              {errorFor("financingPartner") && <p className="mt-1 text-sm text-red-600">{errorFor("financingPartner")}</p>}
             </div>
 
             <div className="sm:col-span-3">

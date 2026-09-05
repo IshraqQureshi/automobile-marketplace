@@ -214,9 +214,14 @@ describe("vehicleSchema (full object)", () => {
     }
   });
 
-  it("rejects doors/seats outside their valid range", () => {
+  it("rejects doors/seats above their valid range", () => {
     expect(vehicleSchema.safeParse({ ...validFullVehicle, doors: "11" }).success).toBe(false);
     expect(vehicleSchema.safeParse({ ...validFullVehicle, seats: "21" }).success).toBe(false);
+  });
+
+  it("rejects a zero value for doors/seats — a vehicle has at least one of each", () => {
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, doors: "0" }).success).toBe(false);
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, seats: "0" }).success).toBe(false);
   });
 
   it("rejects a fuel type outside the fixed list", () => {
