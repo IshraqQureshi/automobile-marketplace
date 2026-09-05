@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { ShowroomList, type ShowroomListItem } from "@/components/admin/showroom-list";
+import { createShowroomAction, deleteShowroomAction, searchShowroomOwnerCandidatesAction, updateShowroomAction } from "@/features/admin/showroom-actions";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,7 +60,13 @@ export default async function AdminShowroomsPage() {
     <>
       <AdminTopbar title="Showrooms" />
       <main className="flex-1 px-7 py-6">
-        <ShowroomList items={items} />
+        <ShowroomList
+          items={items}
+          onCreate={createShowroomAction}
+          onUpdate={updateShowroomAction}
+          onDelete={deleteShowroomAction}
+          onSearchOwners={searchShowroomOwnerCandidatesAction}
+        />
       </main>
     </>
   );

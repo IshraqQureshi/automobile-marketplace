@@ -13,10 +13,8 @@ interface SectionHeaderProps {
   icon: ReactNode;
   title: string;
   description: string;
-  // Omitted entirely for screens with no "create" action (e.g. showrooms,
-  // which are only ever created by their owner registering, never by an
-  // admin) — CatalogList/CatalogModelsList/CatalogBrandsList always pass
-  // both.
+  // Omitted entirely for screens with no "create" action — every other
+  // admin CRUD screen (catalog, showrooms) always passes both.
   actionLabel?: string;
   onAction?: () => void;
 }

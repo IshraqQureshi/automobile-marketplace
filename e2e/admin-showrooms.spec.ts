@@ -162,3 +162,63 @@ test("an approved or rejected showroom has no approve/reject actions in its revi
   await expect(dialog.getByRole("button", { name: "Approve" })).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Reject" })).toHaveCount(0);
 });
+
+test("admin can create a showroom for an existing user via the owner search", async ({ page }) => {
+  const unique = Date.now();
+  const businessName = `E2E Created Showroom ${unique}`;
+
+  await loginAsFixtureAdmin(page);
+  await page.goto("/admin/showrooms");
+
+  await page.getByRole("button", { name: "New Showroom" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByPlaceholder("Search by email…").fill("e2e-showroom-owner-fixture");
+  await expect(dialog.getByText("e2e-showroom-owner-fixture@harakagari.local").first()).toBeVisible();
+  await dialog.getByText("e2e-showroom-owner-fixture@harakagari.local").first().click();
+
+  await dialog.locator("#showroom-business-name").fill(businessName);
+  await dialog.locator("#showroom-location").fill("Nairobi");
+  await dialog.locator("#showroom-phone").fill("712345678");
+  await dialog.locator("#showroom-email").fill(`${unique}@example.com`);
+  await dialog.getByRole("button", { name: "Create" }).click();
+
+  await expect(page.getByText("Showroom created.")).toBeVisible();
+  const row = page.getByRole("row", { name: businessName });
+  await expect(row).toBeAttached();
+  await expect(row.getByText("Pending")).toBeVisible();
+});
+
+test("admin can edit a showroom's business details", async ({ page }) => {
+  const unique = Date.now();
+  const businessName = `E2E Editable Showroom ${unique}`;
+  const updatedName = `E2E Edited Showroom ${unique}`;
+  await createPendingShowroom(businessName);
+
+  await loginAsFixtureAdmin(page);
+  await page.goto("/admin/showrooms");
+
+  const row = page.getByRole("row", { name: businessName });
+  await row.getByRole("button", { name: "Edit" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator("#showroom-business-name").fill(updatedName);
+  await dialog.getByRole("button", { name: "Save changes" }).click();
+
+  await expect(page.getByText("Showroom updated.")).toBeVisible();
+  await expect(page.getByRole("row", { name: updatedName })).toBeAttached();
+});
+
+test("admin can delete a showroom", async ({ page }) => {
+  const unique = Date.now();
+  const businessName = `E2E Deletable Showroom ${unique}`;
+  await createPendingShowroom(businessName);
+
+  await loginAsFixtureAdmin(page);
+  await page.goto("/admin/showrooms");
+
+  const row = page.getByRole("row", { name: businessName });
+  await row.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+
+  await expect(page.getByText("Showroom deleted.")).toBeVisible();
+  await expect(page.getByRole("row", { name: businessName })).toHaveCount(0);
+});
