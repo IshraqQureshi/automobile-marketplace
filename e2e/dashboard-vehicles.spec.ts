@@ -225,6 +225,16 @@ test("specification and financing fields save and reload correctly", async ({ pa
   await page.locator("#vehicle-country-of-origin").fill("Japan");
 
   await page.getByLabel("Available on installment (HP)").check();
+  // Regression coverage for a real layout bug (PR #29): the Deposit type
+  // <select> and its value <input> sit in one flex row, and a shared
+  // `selectClassName` constant baking in `w-full` silently beat an explicit
+  // `w-32` appended in the template string (Tailwind's generated stylesheet
+  // orders `.w-full` after `.w-32` regardless of class-list order), leaving
+  // the select full-width and the input squeezed to ~26px, overlapping the
+  // next grid column. A reasonable minimum width on the input is the
+  // cheapest regression check without screenshot diffing.
+  const depositInputBox = await page.locator("#vehicle-down-payment-value").boundingBox();
+  expect(depositInputBox?.width ?? 0).toBeGreaterThan(80);
   await page.locator("#vehicle-down-payment-value").fill("20");
   await page.locator("#vehicle-interest-rate").fill("13.5");
   await page.locator("#vehicle-insurance-percent").fill("3");
@@ -306,6 +316,30 @@ test("an approved owner can upload a vehicle photo and it becomes the featured i
   await page.getByRole("button", { name: "Delete photo" }).first().click();
   await expect(page.getByRole("button", { name: "Delete photo" })).toHaveCount(1);
   await expect(page.getByText("Featured", { exact: true })).toBeVisible();
+});
+
+test("uploading a photo larger than Next's 1MB default Server Action body limit still succeeds", async ({ page }) => {
+  const unique = Date.now();
+  const title = `E2E Large Photo Vehicle ${unique}`;
+
+  await loginAsFixtureOwner(page);
+  await createVehicleViaForm(page, title);
+
+  // A real PNG signature followed by ~2MB of filler bytes — big enough to
+  // exceed Next.js Server Actions' 1MB default body limit (this repo raises
+  // it via experimental.serverActions.bodySizeLimit in next.config.ts) but
+  // well under the vehicle-media bucket's own 10MB-per-file cap. The upload
+  // path (validateVehicleImageFile, the bucket's allowed_mime_types) only
+  // checks MIME type and byte size, not that the pixel data decodes, so a
+  // filler buffer is a faithful test of the size-limit configuration
+  // without needing a real image asset.
+  const pngSignature = Buffer.from("89504e470d0a1a0a", "hex");
+  const filler = Buffer.alloc(2 * 1024 * 1024, 0);
+  const largeFile = Buffer.concat([pngSignature, filler]);
+
+  await page.locator("#vehicle-photo-upload").setInputFiles({ name: "large-vehicle.png", mimeType: "image/png", buffer: largeFile });
+  await expect(page.getByText("Photos uploaded.")).toBeVisible();
+  await expect(page.getByText(/Body exceeded/i)).toHaveCount(0);
 });
 
 test("an approved owner can mark a vehicle sold and deactivate it", async ({ page }) => {
