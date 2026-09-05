@@ -9,6 +9,8 @@ test.describe.configure({ mode: "serial" });
 
 const ADMIN_EMAIL = "e2e-admin-showrooms-fixture@harakagari.local";
 const ADMIN_PASSWORD = "e2e-admin-showrooms-fixture-password-123";
+const OWNER_EMAIL = "e2e-showroom-owner-fixture@harakagari.local";
+const OWNER_PASSWORD = "e2e-showroom-owner-fixture-password-123";
 
 function admin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -45,17 +47,21 @@ test.beforeAll(async () => {
 
   // A single reusable "showroom owner" fixture — showrooms created for it
   // are cleaned up after each test, not the user itself, per showroom.spec.ts.
-  const ownerEmail = "e2e-showroom-owner-fixture@harakagari.local";
-  let existingOwnerId = (await findFixtureUser(ownerEmail))?.id;
+  // Given a real, known password (unlike a typical read-only fixture) so it
+  // can also log in as an ordinary customer — used below to verify the
+  // owner-search action rejects a non-admin caller directly, not just via
+  // page-level gating.
+  let existingOwnerId = (await findFixtureUser(OWNER_EMAIL))?.id;
   if (!existingOwnerId) {
-    const { data: created, error } = await supabase.auth.admin.createUser({ email: ownerEmail, password: "not-used-directly-123", email_confirm: true });
+    const { data: created, error } = await supabase.auth.admin.createUser({ email: OWNER_EMAIL, password: OWNER_PASSWORD, email_confirm: true });
     if (created.user) {
       existingOwnerId = created.user.id;
     } else {
-      existingOwnerId = (await findFixtureUser(ownerEmail))?.id;
+      existingOwnerId = (await findFixtureUser(OWNER_EMAIL))?.id;
       if (!existingOwnerId) throw new Error(`Failed to create showroom owner fixture: ${error?.message}`);
     }
   }
+  await supabase.auth.admin.updateUserById(existingOwnerId, { password: OWNER_PASSWORD });
   ownerUserId = existingOwnerId;
 });
 
@@ -221,4 +227,44 @@ test("admin can delete a showroom", async ({ page }) => {
 
   await expect(page.getByText("Showroom deleted.")).toBeVisible();
   await expect(page.getByRole("row", { name: businessName })).toHaveCount(0);
+});
+
+test("a signed-in customer cannot invoke the owner-search action directly to enumerate user emails", async ({ page, browser }) => {
+  await loginAsFixtureAdmin(page);
+  await page.goto("/admin/showrooms");
+  await page.getByRole("button", { name: "New Showroom" }).click();
+
+  // Capture the real browser-generated Server Action request (headers +
+  // raw body) for a legitimate admin search, so it can be byte-for-byte
+  // replayed under a different, non-admin session below — this tests the
+  // action's own server-side authorization, not just that the admin page
+  // itself is gated (the /admin/(protected) layout guard doesn't protect a
+  // Server Action's own endpoint from being invoked directly).
+  const capturedRequestPromise = page.waitForRequest((req) => !!req.headers()["next-action"]);
+  await page.getByPlaceholder("Search by email…").fill(OWNER_EMAIL.split("@")[0] ?? OWNER_EMAIL);
+  const capturedRequest = await capturedRequestPromise;
+  const capturedHeaders = capturedRequest.headers();
+  const capturedBody = capturedRequest.postDataBuffer();
+
+  const customerContext = await browser.newContext();
+  const customerPage = await customerContext.newPage();
+  await customerPage.goto("/login");
+  await customerPage.getByLabel("Email address").fill(OWNER_EMAIL);
+  await customerPage.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
+  await customerPage.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await customerPage.waitForURL("**/account");
+
+  const replayHeaders = { ...capturedHeaders };
+  delete replayHeaders.cookie;
+  delete replayHeaders["content-length"];
+  delete replayHeaders.host;
+
+  const replay = await customerContext.request.post(capturedRequest.url(), {
+    headers: replayHeaders,
+    data: capturedBody ?? undefined,
+  });
+  const body = await replay.text();
+  expect(body).not.toContain(OWNER_EMAIL);
+
+  await customerContext.close();
 });

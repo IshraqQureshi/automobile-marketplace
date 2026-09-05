@@ -89,6 +89,12 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   const [deleteTarget, setDeleteTarget] = useState<ShowroomListItem | null>(null);
   const [crudPending, startCrudTransition] = useTransition();
   const ownerSearchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // clearTimeout only cancels a not-yet-fired debounce timer — it doesn't
+  // stop two already-in-flight searches from resolving out of order (a
+  // slower response for an earlier keystroke landing after a faster one for
+  // a later keystroke). Each search call captures the current id; a
+  // response is only applied if it's still the latest one requested.
+  const ownerSearchRequestId = useRef(0);
 
   function openReview(item: ShowroomListItem) {
     setReviewing(item);
@@ -174,13 +180,16 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     setSelectedOwner(null);
     if (ownerSearchDebounce.current) clearTimeout(ownerSearchDebounce.current);
     if (value.trim().length < 2) {
+      ownerSearchRequestId.current += 1;
       setOwnerResults([]);
       setOwnerSearchLoading(false);
       return;
     }
     setOwnerSearchLoading(true);
+    const requestId = ++ownerSearchRequestId.current;
     ownerSearchDebounce.current = setTimeout(async () => {
       const result = await onSearchOwners(value);
+      if (requestId !== ownerSearchRequestId.current) return;
       setOwnerResults(result.users);
       setOwnerSearchLoading(false);
     }, OWNER_SEARCH_DEBOUNCE_MS);

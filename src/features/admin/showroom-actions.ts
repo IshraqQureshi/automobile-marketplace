@@ -215,6 +215,20 @@ export async function searchShowroomOwnerCandidatesAction(query: string): Promis
   const trimmed = query.trim().toLowerCase();
   if (trimmed.length < OWNER_SEARCH_MIN_QUERY_LENGTH) return { users: [] };
 
+  // Unlike every other action in this file, this one calls createAdminClient()
+  // (service-role, bypasses RLS entirely) rather than the RLS-scoped
+  // createClient() — so, unlike those, RLS's own is_admin() checks provide
+  // no protection here regardless of who invokes this Server Action. A role
+  // check has to happen explicitly, in-process, before ever touching the
+  // admin client.
+  const supabase = await createClient();
+  const {
+    data: { user: caller },
+  } = await supabase.auth.getUser();
+  if (!caller) return { users: [] };
+  const { data: callerProfile } = await supabase.from("profiles").select("role").eq("id", caller.id).maybeSingle();
+  if (callerProfile?.role !== "ADMIN") return { users: [] };
+
   const admin = createAdminClient();
   const [usersResult, activeShowroomsResult] = await Promise.all([
     admin.auth.admin.listUsers({ page: 1, perPage: OWNER_SEARCH_PAGE_SIZE }),
