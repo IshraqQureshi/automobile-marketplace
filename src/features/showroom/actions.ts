@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { renderShowroomRegistrationAdminNotificationEmail, renderShowroomRegistrationReceivedEmail } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
 import { publicEnv } from "@/lib/env";
@@ -138,7 +139,14 @@ export async function registerShowroomAction(
   // matters here specifically — with dozens of ADMIN-role accounts, even
   // parallelized sends can hit the (dev-only) Mailtrap sandbox's per-second
   // rate limit, and awaiting that would otherwise stall this response.
-  void (async () => {
+  //
+  // Uses next/server's after() rather than a bare unawaited call — on
+  // Vercel's serverless runtime, the function can be frozen/terminated
+  // immediately once the response is sent, which would silently kill a
+  // plain fire-and-forget promise before it finishes; after() is the
+  // platform-supported way to keep the function alive until this
+  // background work completes.
+  after(async () => {
     const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
     await sendRegistrationEmails({
       showroomId: showroom.id,
@@ -146,7 +154,7 @@ export async function registerShowroomAction(
       ownerFullName: profile?.full_name || "the applicant",
       ownerEmail: parsed.data.businessEmail,
     });
-  })();
+  });
 
   if (failedUploads.length > 0) {
     logger.warn("Showroom registration submitted with partial document upload failure", {
