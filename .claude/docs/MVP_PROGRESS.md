@@ -28,7 +28,7 @@
 | Showrooms          | 🟡           | ⬜  | 🟢  | ⬜          |
 | Vehicles           | ⬜           | ⬜  | ⬜  | ⬜          |
 | Marketplace        | 🟡           | ⬜  | 🟢  | ⬜          |
-| Finance Calculator | ⬜           | ⬜  | ⬜  | ⬜          |
+| Finance Calculator | 🟢           | ⬜  | 🟢  | ⬜          |
 | WhatsApp Inquiry   | 🟡           | ⬜  | 🟢  | ⬜          |
 | Admin              | 🟡           | ⬜  | 🟢  | ⬜          |
 
@@ -198,10 +198,10 @@
 
 Core calculation logic and the on-vehicle-detail-page UI landed early as
 part of PR #40's detail-page redesign (`src/features/vehicle/finance-calculator.ts`
-+ `src/components/vehicle/financing-calculator.tsx`) — the remaining Day 4
-gate item is a dedicated E2E flow (`Vehicle Details → Finance Calculator →
-Enter Inputs → Calculate → Verify Result`) per CLAUDE.md §11, which
-`e2e/vehicle-discovery.spec.ts` doesn't yet cover in isolation.
++ `src/components/vehicle/financing-calculator.tsx`); PR #44 closed the one
+remaining gate item, a dedicated E2E flow (`Vehicle Details → Finance
+Calculator → Enter Inputs → Calculate → Verify Result`) per CLAUDE.md §11,
+which `e2e/vehicle-discovery.spec.ts` never covered in isolation.
 
 * [x] Vehicle price (real, from the vehicle's own `price`)
 * [x] Down payment (percent or fixed amount, from the vehicle's own real `financing_down_payment_*` fields)
@@ -211,7 +211,7 @@ Enter Inputs → Calculate → Verify Result`) per CLAUDE.md §11, which
 * [x] Monthly payment (computed, simple/flat interest prorated by term — documented as an estimate, not amortization-schedule precision)
 * [x] Input validation (existing dashboard vehicle-form schemas already validate these fields at entry; the calculator itself clamps negative/null inputs to zero rather than producing NaN/negative results)
 * [x] Edge cases (9 unit tests: zero/negative/boundary/large/decimal values, zero tenure — see `finance-calculator.test.ts`)
-* [ ] Dedicated E2E flow (Vehicle Details → Finance Calculator → Enter Inputs → Calculate → Verify Result)
+* [x] Dedicated E2E flow (`e2e/finance-calculator.spec.ts`, PR #44 — real calculator renders with showroom-configured financing, changing loan term/tracker recalculates correctly, both independently verified against `calculateFinanceEstimate`; a vehicle with no financing configured still shows the honest empty state)
 
 ## WhatsApp Inquiry
 
@@ -239,10 +239,10 @@ pending an explicit ask — not fabricated or silently dropped.
 
 ## Testing
 
-* [ ] Finance tests
+* [x] Finance tests (9 unit tests — `finance-calculator.test.ts`, pre-existing from PR #40)
 * [x] Inquiry tests (14 unit tests — `src/features/inquiry/schemas.test.ts`)
 * [x] Admin tests (vehicle moderation: 5 unit tests — `src/features/vehicle/schemas.test.ts`)
-* [ ] E2E finance flow
+* [x] E2E finance flow (`e2e/finance-calculator.spec.ts`, PR #44 — 3 tests)
 * [x] E2E inquiry flow (`e2e/vehicle-inquiry.spec.ts` — 4 tests: anonymous submission, validation, admin mark-read + badge, showroom-scoping)
 * [x] E2E admin flow (`e2e/vehicle-moderation.spec.ts` — 3 tests: multi-showroom visibility + search/filter, moderation reflected publicly, unauthorized-owner rejection)
 * [ ] Figma visual QA
@@ -684,6 +684,9 @@ Record important scope or architectural decisions here.
 | 2026-09-06 | Built admin vehicle moderation (ADM-004, PR #43): a new `/admin/vehicles` page giving an admin a platform-wide view of every showroom's vehicle listings (search by title/make/model/showroom name, filter by status), and authority to set any of the six real `vehicle_status` values on any vehicle via a new `updateVehicleStatusAsAdminAction` — including `PENDING_REVIEW`/`REJECTED`, which `OWNER_SETTABLE_VEHICLE_STATUSES` has deliberately excluded from the owner-facing action since Day 2 specifically pending this feature. No migration was needed: `vehicles_update_owner_or_admin`/`vehicles_select_public_or_owner_or_admin` already granted admins full read/write via `is_admin()`, and the `vehicle_status` enum already had all six values from Day 1 — confirmed by reading both migrations directly rather than assuming. Deactivating an `ACTIVE` listing removes it from the public marketplace immediately with no separate "unpublish" step, since every public-facing query already filters on `status = 'ACTIVE'` — verified live (DB row + the vehicle's own public detail page immediately 404ing) before writing the automated E2E test | User: "Start Admin: Vehicle moderation. Key rules: Filters and Search, Form Validation, Professional UI" |
 | 2026-09-06 | Self-caught, real hydration-race bug while writing `e2e/vehicle-moderation.spec.ts`: the per-row status `<select>` is present in the very first paint after navigating to `/admin/vehicles`, so a `selectOption()` fired the instant the page becomes actionable can land before React attaches its change handler and get silently reverted on the next render — the exact same bug class already documented and fixed in `dashboard-vehicles.spec.ts` for a different `<select>`. Confirmed live via a standalone debug script (`selectOption("INACTIVE")` followed by `inputValue()` still reading `"ACTIVE"`), not assumed. Fixed the same way as that prior instance: retry `selectOption` + assert the value inside `toPass()` rather than trusting one attempt, instead of adding an app-level workaround for a general controlled-`<select>`-vs-hydration timing characteristic | Self-caught during E2E authoring — a reminder that this hydration-race class recurs on any `<select>` present in a page's first paint, not just the one instance already documented, and the fix belongs in the test (retry), not the component |
 | 2026-09-06 | Code review (PR #43) found no BLOCKER/HIGH/MEDIUM issues — approved as-is. One LOW noted and left unfixed: the new `EyeIcon` (`admin-ui.tsx`) has effectively identical path data to an already-existing, unexported `EyeIcon` local to the `[brand]/[slug]` detail page — coincidental, not a real oversight, since this codebase already keeps public-site-page icons and shared admin-panel icons in separate modules by design (no existing precedent of cross-importing between them); consolidating would mean introducing a new cross-cutting icons module for one glyph, which CLAUDE.md §14 treats as unnecessary abstraction. Also independently re-verified (not just re-stated from the PR description): both "no migration needed" claims by reading the actual migration files, that the "View live listing" `<Link>` was built as a plain styled link rather than a `<button>` nested inside an `<a>` (a real accessibility footgun that was deliberately avoided during implementation, not just claimed), and that the two pre-existing E2E flakes hit during regression testing reproduce identically on unmodified `main` via `git stash` | Independent Code Review Agent finding — a clean pass, recorded to show what was actually checked (including two things the PR description merely claimed) rather than "looks fine" |
+
+| 2026-09-06 | Closed the last Finance Calculator gap (PR #44, test-only): a dedicated E2E flow matching CLAUDE.md §11's required journey, which `e2e/vehicle-discovery.spec.ts` had never covered in isolation — only its "no financing configured" empty state. New `e2e/finance-calculator.spec.ts` (own dedicated fixture showroom/vehicle) drives a real showroom-configured-financing vehicle through the browser and independently re-verifies the rendered "Est. Monthly Payment"/"Total payable" figures against `calculateFinanceEstimate` (the same pure function already unit-tested), both at initial load and after changing loan term/tracker duration — not just "a number appeared." No application code changed; the calculator itself and its 9 unit tests were already built and correct from PR #40 | User picked this as the next task from a choice between it and Admin User Management, since it required no new design decisions and closed out an already-built feature |
+| 2026-09-06 | Code review (PR #44) found no issues — independently re-ran the full suite rather than trusting the PR description (`tsc --noEmit`, lint, 300/300 unit tests, the new E2E file alongside `vehicle-discovery.spec.ts` running concurrently to confirm no fixture collision between the two files' independent unique-per-run showrooms), and confirmed via `git diff --stat` this was a genuinely pure one-file test-only diff | Independent Code Review Agent finding — a clean pass |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
