@@ -222,3 +222,10 @@ export const vehicleSchema = z
 // until they explicitly publish it.
 export const OWNER_SETTABLE_VEHICLE_STATUSES = ["DRAFT", "ACTIVE", "SOLD", "INACTIVE"] as const;
 export const ownerVehicleStatusSchema = z.enum(OWNER_SETTABLE_VEHICLE_STATUSES);
+
+// ADM-004 (Vehicle Moderation): the full status range, settable only by an
+// admin — enforced by vehicles_update_owner_or_admin's RLS policy, not by
+// this schema (this only validates the *value* is one of the six real
+// statuses; see updateVehicleStatusAsAdminAction for the authorization side).
+export const ADMIN_SETTABLE_VEHICLE_STATUSES = ["DRAFT", "PENDING_REVIEW", "ACTIVE", "SOLD", "INACTIVE", "REJECTED"] as const;
+export const adminVehicleStatusSchema = z.enum(ADMIN_SETTABLE_VEHICLE_STATUSES);

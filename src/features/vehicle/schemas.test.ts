@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminVehicleStatusSchema,
+  ownerVehicleStatusSchema,
   vehicleMakeSchema,
   vehicleMileageOptionalSchema,
   vehicleModelSchema,
@@ -237,5 +239,35 @@ describe("vehicleSchema (full object)", () => {
   it("rejects a missing required field", () => {
     const result = vehicleSchema.safeParse({ ...validFullVehicle, make: "" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("ownerVehicleStatusSchema", () => {
+  it("accepts every owner-settable status", () => {
+    for (const status of ["DRAFT", "ACTIVE", "SOLD", "INACTIVE"]) {
+      expect(ownerVehicleStatusSchema.safeParse(status).success).toBe(true);
+    }
+  });
+
+  it("rejects the admin-only moderation statuses", () => {
+    expect(ownerVehicleStatusSchema.safeParse("PENDING_REVIEW").success).toBe(false);
+    expect(ownerVehicleStatusSchema.safeParse("REJECTED").success).toBe(false);
+  });
+
+  it("rejects a nonsense value", () => {
+    expect(ownerVehicleStatusSchema.safeParse("PUBLISHED").success).toBe(false);
+  });
+});
+
+describe("adminVehicleStatusSchema", () => {
+  it("accepts every real vehicle status, including the admin-only moderation ones", () => {
+    for (const status of ["DRAFT", "PENDING_REVIEW", "ACTIVE", "SOLD", "INACTIVE", "REJECTED"]) {
+      expect(adminVehicleStatusSchema.safeParse(status).success).toBe(true);
+    }
+  });
+
+  it("rejects a nonsense value", () => {
+    expect(adminVehicleStatusSchema.safeParse("PUBLISHED").success).toBe(false);
+    expect(adminVehicleStatusSchema.safeParse("").success).toBe(false);
   });
 });
