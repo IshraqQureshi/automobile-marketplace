@@ -152,6 +152,7 @@
 * [x] Admin-manageable homepage highlights (`/admin/highlights` — admin uploads a thumbnail + pastes a TikTok/YouTube video URL; static/manually-curated per MVP_REQUIREMENTS.md §4.1/§29.1, no live API integration — see PR #35)
 * [x] SEO (per-page metadata incl. OpenGraph/Twitter, `metadataBase` via a new `NEXT_PUBLIC_SITE_URL` env var, JSON-LD `WebSite` structured data, `sitemap.ts`/`robots.ts` — see PR #35)
 * [x] Homepage refinements from live review (PR #37): real Arresa logo (`public/aresa-logo.jpg`) replacing the text-only "Powered by Arresa" caption; certified-showrooms marquee now gated on a real `showroomCount >= 10` (was rendering with just 1 real showroom, looking broken); TikTok/YouTube highlight cards now open the real video in an in-page modal (reusing the existing `Dialog` component, new `src/lib/video-embed.ts` derives the embed URL) instead of navigating away
+* [x] Hero logo follow-up (PR #38): removed the "Powered by" caption text, Arresa logo now shown alone at a fixed 105×45px per user request
 
 ## Vehicle Discovery
 
