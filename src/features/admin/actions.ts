@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
-import { currentUserRole } from "@/features/auth/actions";
+import { currentUserRole, isCurrentUserActive } from "@/features/auth/actions";
 import { type AuthActionState, fieldErrorsFrom, signInSchema } from "@/features/auth/schemas";
 
 const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password.";
@@ -43,6 +43,15 @@ export async function adminSignInAction(
     // just because someone tried it on the admin login form.
     await supabase.auth.signOut({ scope: "local" });
     return { status: "error", message: INVALID_CREDENTIALS_MESSAGE };
+  }
+
+  // Role is already confirmed ADMIN at this point, so a specific message
+  // here doesn't weaken the generic-message protection above (that one
+  // hides whether an account is an admin at all; this one only applies once
+  // that's already established).
+  if (!(await isCurrentUserActive(supabase))) {
+    await supabase.auth.signOut({ scope: "local" });
+    return { status: "error", message: "This account has been suspended." };
   }
 
   redirect("/admin");

@@ -134,6 +134,39 @@ describe("RLS authorization (integration)", () => {
       // Restore for the rest of the suite.
       await admin.from("profiles").update({ is_active: true }).eq("id", customerA.id);
     });
+
+    it("an admin (via their own RLS-scoped session, not the service-role client) can change another user's role and active status (ADM-003)", async () => {
+      const { data: roleData, error: roleError } = await adminUser.client
+        .from("profiles")
+        .update({ role: "ADMIN" })
+        .eq("id", customerB.id)
+        .select();
+      expect(roleError).toBeNull();
+      expect(roleData).toHaveLength(1);
+
+      const { data: statusData, error: statusError } = await adminUser.client
+        .from("profiles")
+        .update({ is_active: false })
+        .eq("id", customerB.id)
+        .select();
+      expect(statusError).toBeNull();
+      expect(statusData).toHaveLength(1);
+
+      // Restore for the rest of the suite.
+      await admin.from("profiles").update({ role: "CUSTOMER", is_active: true }).eq("id", customerB.id);
+    });
+
+    it("an admin cannot change their own role or active status, even via their own RLS-scoped session (ADM-003)", async () => {
+      const { error: roleError } = await adminUser.client.from("profiles").update({ role: "CUSTOMER" }).eq("id", adminUser.id).select();
+      expect(roleError).not.toBeNull();
+
+      const { error: statusError } = await adminUser.client.from("profiles").update({ is_active: false }).eq("id", adminUser.id).select();
+      expect(statusError).not.toBeNull();
+
+      const { data: after } = await admin.from("profiles").select("role, is_active").eq("id", adminUser.id).single();
+      expect(after?.role).toBe("ADMIN");
+      expect(after?.is_active).toBe(true);
+    });
   });
 
   describe("showrooms", () => {

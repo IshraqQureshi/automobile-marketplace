@@ -36,7 +36,24 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Do not run code between createServerClient and getUser — see note above.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // ADM-003 (User Management): an admin can suspend a user's account
+  // (profiles.is_active = false) at any time, including mid-session. RLS
+  // alone doesn't enforce this for anything other than the profiles table
+  // itself, so without a check here a suspended user's existing session
+  // would otherwise keep working until its refresh token naturally expires
+  // (effectively indefinitely) — this is the one chokepoint that already
+  // runs on every request, so it's where "suspended" actually takes effect
+  // immediately rather than only blocking a future login attempt.
+  if (user) {
+    const { data: profile } = await supabase.from("profiles").select("is_active").eq("id", user.id).single();
+    if (profile && !profile.is_active) {
+      await supabase.auth.signOut();
+    }
+  }
 
   return supabaseResponse;
 }

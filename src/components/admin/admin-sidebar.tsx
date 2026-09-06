@@ -26,7 +26,7 @@ const CONTENT_ITEMS: NavEntry[] = [{ label: "Homepage Highlights", href: "/admin
 
 const ADMIN_ITEMS: NavEntry[] = [
   { label: "My Profile", href: "/admin/profile", icon: ProfileIcon },
-  { label: "Users", href: null, icon: UsersIcon },
+  { label: "Users", href: "/admin/users", icon: UsersIcon },
 ];
 
 interface AdminSidebarProps {
