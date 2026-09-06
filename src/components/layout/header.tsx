@@ -6,12 +6,13 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Nav dropdowns (Brands/Model/Type) and search are visually present per the
- * design but not yet wired to real data — no vehicle taxonomy or search
- * exists until MKT-001/MKT-002/MKT-003. They render as inert (no dropdown
- * content, search has no destination) rather than being omitted, since the
- * user asked for header fidelity to the design; functionality lands with
- * those features.
+ * Nav dropdowns (Brands/Model/Type) are visually present per the design but
+ * not yet wired to real submenu content — MKT-002 (the /vehicles listing +
+ * filters) now exists and is the real destination for a category browse, but
+ * building a full mega-menu of brand/model/type links is a larger, separate
+ * UI piece than the listing page itself; deliberately deferred (see
+ * MVP_PROGRESS.md decisions log). The search icon is wired to /vehicles
+ * (MKT-002) now that a real destination exists.
  */
 const NAV_ITEMS = ["Brands", "Model", "Type"] as const;
 
@@ -41,9 +42,9 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-4 md:flex">
-          <button type="button" disabled title="Search coming soon" aria-label="Search" className="text-neutral-500 disabled:opacity-60">
+          <Link href="/vehicles" aria-label="Search vehicles" className="text-neutral-500 hover:text-neutral-700">
             <SearchIcon />
-          </button>
+          </Link>
           <Link href="/ready-to-sell" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
             Sell your car
           </Link>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { InitialAvatar } from "@/components/admin/admin-ui";
 
 export interface BrandTileItem {
@@ -11,9 +12,9 @@ interface BrowseByBrandProps {
 }
 
 /**
- * Each tile would filter the vehicle listing by brand — that page (MKT-002)
- * doesn't exist yet, so these render as inert buttons ("coming soon"),
- * same convention as the header's own disabled Brands/Model/Type nav.
+ * Each tile filters the marketplace vehicle listing (MKT-002, /vehicles) by
+ * brand name — vehicles.make is a plain text column, not FK'd to the brands
+ * catalog table, so this links on the brand's real name rather than its id.
  */
 export function BrowseByBrand({ brands }: BrowseByBrandProps) {
   if (brands.length === 0) return null;
@@ -27,12 +28,10 @@ export function BrowseByBrand({ brands }: BrowseByBrandProps) {
         </div>
         <div className="grid grid-cols-4 gap-1 sm:grid-cols-8">
           {brands.map((brand) => (
-            <button
+            <Link
               key={brand.id}
-              type="button"
-              disabled
-              title="Browse by brand — coming soon"
-              className="flex flex-col items-center gap-1.5 rounded-lg py-2 disabled:cursor-not-allowed"
+              href={`/vehicles?make=${encodeURIComponent(brand.name)}`}
+              className="flex flex-col items-center gap-1.5 rounded-lg py-2 no-underline hover:bg-neutral-50"
             >
               {brand.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- small decorative brand mark, dozens can render per grid
@@ -45,7 +44,7 @@ export function BrowseByBrand({ brands }: BrowseByBrandProps) {
                 <InitialAvatar name={brand.name} />
               )}
               <span className="text-center text-[10px] leading-tight font-medium text-neutral-600">{brand.name}</span>
-            </button>
+            </Link>
           ))}
         </div>
       </div>
