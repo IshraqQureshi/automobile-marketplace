@@ -10,16 +10,14 @@ import { initialRegisterShowroomState, registerShowroomFieldSchemas } from "@/fe
 import { stripKenyaPrefix } from "@/lib/validation/kenya-phone";
 
 interface RegisterShowroomFormProps {
-  defaultOwnerName: string;
   defaultEmail: string;
   defaultPhone: string;
 }
 
-export function RegisterShowroomForm({ defaultOwnerName, defaultEmail, defaultPhone }: RegisterShowroomFormProps) {
+export function RegisterShowroomForm({ defaultEmail, defaultPhone }: RegisterShowroomFormProps) {
   const [state, formAction, pending] = useActionState(registerShowroomAction, initialRegisterShowroomState);
   const { validate, errorFor } = useFieldValidation(registerShowroomFieldSchemas);
 
-  const [ownerFullName, setOwnerFullName] = useState(defaultOwnerName);
   const [businessName, setBusinessName] = useState("");
   const [location, setLocation] = useState("");
   const [businessPhone, setBusinessPhone] = useState(stripKenyaPrefix(defaultPhone));
@@ -27,7 +25,6 @@ export function RegisterShowroomForm({ defaultOwnerName, defaultEmail, defaultPh
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
 
-  const ownerFullNameError = errorFor("ownerFullName", state.fieldErrors?.ownerFullName);
   const businessNameError = errorFor("businessName", state.fieldErrors?.businessName);
   const locationError = errorFor("location", state.fieldErrors?.location);
   const businessPhoneError = errorFor("businessPhone", state.fieldErrors?.businessPhone);
@@ -51,23 +48,6 @@ export function RegisterShowroomForm({ defaultOwnerName, defaultEmail, defaultPh
       {state.status === "error" && state.message && (
         <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.message}</p>
       )}
-
-      <div className="mb-4">
-        <label htmlFor="ownerFullName" className="mb-1 block text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-          Owner full name
-        </label>
-        <Input
-          id="ownerFullName"
-          name="ownerFullName"
-          placeholder="e.g. Jane Wanjiru"
-          required
-          error={!!ownerFullNameError}
-          value={ownerFullName}
-          onChange={(e) => setOwnerFullName(e.target.value)}
-          onBlur={(e) => validate("ownerFullName", e.target.value)}
-        />
-        {ownerFullNameError && <p className="mt-1 text-sm text-red-600">{ownerFullNameError}</p>}
-      </div>
 
       <div className="mb-4">
         <label htmlFor="businessName" className="mb-1 block text-xs font-semibold tracking-wide text-neutral-500 uppercase">
