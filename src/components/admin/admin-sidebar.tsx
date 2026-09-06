@@ -16,13 +16,10 @@ interface NavEntry {
 
 const OVERVIEW_ITEMS: NavEntry[] = [{ label: "Dashboard", href: "/admin", icon: DashboardIcon }];
 
-// Vehicle management is Day 4 scope — no page exists yet (href: null). Same
-// "coming soon" treatment as the public header's Brands/Model/Type nav
-// (src/components/layout/header.tsx) rather than linking somewhere that 404s.
 const MARKETPLACE_ITEMS: NavEntry[] = [
   { label: "Catalog", href: "/admin/catalog", icon: () => <TagIcon className="h-4.25 w-4.25" /> },
   { label: "Showrooms", href: "/admin/showrooms", icon: ShowroomIcon },
-  { label: "Vehicles", href: null, icon: VehicleIcon },
+  { label: "Vehicles", href: "/admin/vehicles", icon: VehicleIcon },
 ];
 
 const CONTENT_ITEMS: NavEntry[] = [{ label: "Homepage Highlights", href: "/admin/highlights", icon: VideoIcon }];

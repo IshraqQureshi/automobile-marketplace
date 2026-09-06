@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerShowroom } from "@/features/showroom/my-showroom";
 import { uploadVehicleMedia, validateVehicleImageFile } from "./media-upload";
-import { ownerVehicleStatusSchema, vehicleSchema } from "./schemas";
+import { adminVehicleStatusSchema, ownerVehicleStatusSchema, vehicleSchema } from "./schemas";
 
 export interface VehicleActionResult {
   error?: string;
@@ -146,9 +146,9 @@ export async function updateVehicleAction(id: string, formData: FormData): Promi
 
 /**
  * Owner-facing status changes only (publish/unpublish/mark sold/remove) —
- * PENDING_REVIEW and REJECTED are reserved for the Day 4 admin moderation
- * flow (ADM-004), which doesn't exist yet. Publishing (setting ACTIVE) is
- * additionally gated on the owning showroom being APPROVED: RLS doesn't
+ * PENDING_REVIEW and REJECTED are reserved for the admin moderation flow
+ * (ADM-004 — see updateVehicleStatusAsAdminAction below). Publishing (setting
+ * ACTIVE) is additionally gated on the owning showroom being APPROVED: RLS doesn't
  * enforce this at write time (only at public SELECT time, per
  * vehicles_select_public_or_owner_or_admin), and the /dashboard/vehicles
  * page itself is already gated to APPROVED showrooms — but this action can
@@ -181,6 +181,43 @@ export async function updateVehicleStatusAction(id: string, status: string): Pro
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/dashboard/vehicles");
+  return {};
+}
+
+/**
+ * Admin-facing status changes (ADM-004 — Vehicle Moderation): unlike
+ * updateVehicleStatusAction above, an admin may set ANY of the six statuses
+ * on ANY vehicle, including PENDING_REVIEW/REJECTED and vehicles owned by a
+ * different showroom. Authorization isn't re-checked here — same "don't
+ * duplicate the role check, just fail gracefully if the DB ever rejects it"
+ * reasoning as approveShowroomAction/rejectShowroomAction
+ * (src/features/admin/showroom-actions.ts): vehicles_update_owner_or_admin's
+ * RLS policy (is_admin() OR owns_showroom()) silently filters out the update
+ * for anyone else (0 rows affected, no error), which the NOT_FOUND_ERROR
+ * check below reports as a failure rather than a false "success". Setting a
+ * previously-ACTIVE vehicle to any other status also immediately removes it
+ * from the public marketplace, since every public-facing query filters on
+ * status = 'ACTIVE' — no separate "unpublish" step is needed.
+ */
+export async function updateVehicleStatusAsAdminAction(id: string, status: string): Promise<VehicleActionResult> {
+  const parsedStatus = adminVehicleStatusSchema.safeParse(status);
+  if (!parsedStatus.success) return { error: "Invalid status." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const { data, error } = await supabase.from("vehicles").update({ status: parsedStatus.data }).eq("id", id).select("id");
+  if (error) {
+    logger.error("Failed to update vehicle status (admin)", error, { id, status: parsedStatus.data });
+    return { error: "Failed to update vehicle status." };
+  }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
+
+  revalidatePath("/admin/vehicles");
+  revalidatePath("/admin");
   return {};
 }
 
