@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { renderShowroomRegistrationAdminNotificationEmail, renderShowroomRegistrationReceivedEmail } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
 import { publicEnv } from "@/lib/env";
@@ -34,7 +35,6 @@ export async function registerShowroomAction(
   }
 
   const parsed = registerShowroomSchema.safeParse({
-    ownerFullName: formData.get("ownerFullName"),
     businessName: formData.get("businessName"),
     location: formData.get("location"),
     businessPhone: formData.get("businessPhone"),
@@ -103,16 +103,6 @@ export async function registerShowroomAction(
     };
   }
 
-  // Keep the account's own display name in sync with what the applicant
-  // just confirmed/corrected here — same real-world fact, one source of
-  // truth (profiles.full_name), not a separate showroom-only column.
-  // Best-effort: a failure here shouldn't block an otherwise-successful
-  // registration.
-  const { error: profileUpdateError } = await supabase.from("profiles").update({ full_name: parsed.data.ownerFullName }).eq("id", user.id);
-  if (profileUpdateError) {
-    logger.warn("Failed to update profile full_name during showroom registration", { userId: user.id, error: profileUpdateError.message });
-  }
-
   const { failedUploads } = await uploadShowroomDocuments(supabase, showroom.id, user.id, documents, BUSINESS_REGISTRATION_DOCUMENT_TYPE);
 
   // If every document failed, the applicant would otherwise be left with a
@@ -143,11 +133,27 @@ export async function registerShowroomAction(
   // (including the partial-upload-failure warning, which would otherwise be
   // silently lost). The next real navigation to this page picks up the new
   // showroom naturally, since it's a dynamically-rendered route.
-  await sendRegistrationEmails({
-    showroomId: showroom.id,
-    businessName: parsed.data.businessName,
-    ownerFullName: parsed.data.ownerFullName,
-    ownerEmail: parsed.data.businessEmail,
+  // Deliberately not awaited: a notification email must never block or
+  // delay the real outcome it's reporting on (same principle the
+  // `notifications` table's own migration documents). Confirmed live this
+  // matters here specifically — with dozens of ADMIN-role accounts, even
+  // parallelized sends can hit the (dev-only) Mailtrap sandbox's per-second
+  // rate limit, and awaiting that would otherwise stall this response.
+  //
+  // Uses next/server's after() rather than a bare unawaited call — on
+  // Vercel's serverless runtime, the function can be frozen/terminated
+  // immediately once the response is sent, which would silently kill a
+  // plain fire-and-forget promise before it finishes; after() is the
+  // platform-supported way to keep the function alive until this
+  // background work completes.
+  after(async () => {
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+    await sendRegistrationEmails({
+      showroomId: showroom.id,
+      businessName: parsed.data.businessName,
+      ownerFullName: profile?.full_name || "the applicant",
+      ownerEmail: parsed.data.businessEmail,
+    });
   });
 
   if (failedUploads.length > 0) {

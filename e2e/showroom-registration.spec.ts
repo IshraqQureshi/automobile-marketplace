@@ -93,7 +93,6 @@ test("signed-in customer can submit a showroom registration and sees a pending c
   await page.goto("/register-showroom");
 
   const unique = Date.now();
-  await page.getByLabel("Owner full name").fill(`E2E Owner ${unique}`);
   await page.getByLabel("Business name").fill(`E2E Motors ${unique}`);
   await page.locator("#documents").setInputFiles({
     name: "license.pdf",
@@ -107,11 +106,6 @@ test("signed-in customer can submit a showroom registration and sees a pending c
   await page.getByRole("button", { name: "Submit Application" }).click();
 
   await expect(page.getByRole("heading", { name: "Application submitted" })).toBeVisible();
-
-  // The applicant's account name is kept in sync with what they confirmed
-  // here — same real-world fact, one source of truth (profiles.full_name).
-  const { data: updatedProfile } = await admin().from("profiles").select("full_name").eq("id", customerId).single();
-  expect(updatedProfile?.full_name).toBe(`E2E Owner ${unique}`);
 
   // Confirm the upload actually persisted (not just that the UI said so) —
   // a real showroom_documents row referencing the uploaded file.
@@ -132,7 +126,6 @@ test("submitting without a document shows a clear error, not a crash", async ({ 
   await page.goto("/register-showroom");
 
   const unique = Date.now();
-  await page.getByLabel("Owner full name").fill(`E2E Owner ${unique}`);
   await page.getByLabel("Business name").fill(`E2E Motors ${unique}`);
   await page.getByLabel("Location").fill("Westlands, Nairobi");
   await page.getByLabel("Business phone").fill("712345678");

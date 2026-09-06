@@ -16,11 +16,6 @@ export const BUSINESS_REGISTRATION_DOCUMENT_TYPE = "business_registration";
 // Base object (not yet refined) so `.shape` stays available for per-field
 // client-side validation, same reasoning as auth/schemas.ts.
 const registerShowroomBaseSchema = z.object({
-  // Not in the original design mockup (which has no way to say who's
-  // applying) — added per explicit request. Defaults from the signed-in
-  // user's own `profiles.full_name`, editable here; the action keeps that
-  // profile row in sync with whatever the applicant confirms/corrects.
-  ownerFullName: z.string().trim().min(2, "Owner full name is required").max(150, "Owner full name is too long"),
   businessName: z.string().trim().min(2, "Business name is required").max(150, "Business name is too long"),
   // Design shows a single "Location" field (e.g. "Westlands, Nairobi") —
   // stored as `showrooms.city`; a dedicated street-address field can be

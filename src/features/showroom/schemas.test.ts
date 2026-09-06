@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { registerShowroomSchema } from "./schemas";
 
 const valid = {
-  ownerFullName: "Jane Wanjiru",
   businessName: "AutoElite Motors",
   location: "Westlands, Nairobi",
   businessPhone: "712345678",
@@ -22,16 +21,6 @@ describe("registerShowroomSchema", () => {
 
   it("rejects a business name over 150 characters", () => {
     const result = registerShowroomSchema.safeParse({ ...valid, businessName: "A".repeat(151) });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects a blank owner full name", () => {
-    const result = registerShowroomSchema.safeParse({ ...valid, ownerFullName: "  " });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects an owner full name over 150 characters", () => {
-    const result = registerShowroomSchema.safeParse({ ...valid, ownerFullName: "A".repeat(151) });
     expect(result.success).toBe(false);
   });
 
