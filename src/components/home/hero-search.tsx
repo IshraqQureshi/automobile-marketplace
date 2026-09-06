@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { SearchIcon, ShowroomIcon } from "@/components/admin/admin-ui";
 
 export interface CertifiedShowroomItem {
@@ -61,8 +62,9 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
           </button>
         </div>
 
-        <div className="flex items-center justify-center pb-2" style={{ marginTop: "-4px" }}>
-          <p className="pt-6 text-[11px] font-medium text-white/50">Powered by Arresa</p>
+        <div className="flex items-center justify-center gap-2 pt-6 pb-2">
+          <span className="text-[11px] font-medium text-white/50">Powered by</span>
+          <Image src="/aresa-logo.jpg" alt="Arresa" width={64} height={30} className="h-4.5 w-auto rounded-[3px]" />
         </div>
       </div>
 
