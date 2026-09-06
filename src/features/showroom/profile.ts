@@ -20,6 +20,9 @@ export interface ShowroomProfileFormFields {
   businessEmail: FormDataEntryValue | null;
   address: FormDataEntryValue | null;
   description: FormDataEntryValue | null;
+  openingHours: FormDataEntryValue | null;
+  youtubeChannelUrl: FormDataEntryValue | null;
+  youtubeVideoUrl: FormDataEntryValue | null;
 }
 
 export function readShowroomProfileFormFields(formData: FormData): ShowroomProfileFormFields {
@@ -30,6 +33,9 @@ export function readShowroomProfileFormFields(formData: FormData): ShowroomProfi
     businessEmail: formData.get("businessEmail"),
     address: formData.get("address"),
     description: formData.get("description"),
+    openingHours: formData.get("openingHours"),
+    youtubeChannelUrl: formData.get("youtubeChannelUrl"),
+    youtubeVideoUrl: formData.get("youtubeVideoUrl"),
   };
 }
 
@@ -68,6 +74,9 @@ export async function updateShowroomProfile(
       email: parsed.businessEmail,
       address: parsed.address ?? null,
       description: parsed.description ?? null,
+      opening_hours: parsed.openingHours ?? null,
+      youtube_channel_url: parsed.youtubeChannelUrl ?? null,
+      youtube_video_url: parsed.youtubeVideoUrl ?? null,
       ...(removeLogo && !logoFile ? { logo_storage_path: null } : {}),
     })
     .eq("id", showroomId)

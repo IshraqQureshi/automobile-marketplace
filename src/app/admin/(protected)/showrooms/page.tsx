@@ -17,7 +17,9 @@ export default async function AdminShowroomsPage() {
   const supabase = await createClient();
 
   const [showroomsResult, documentsResult] = await Promise.all([
-    supabase.from("showrooms").select("id, business_name, email, phone, city, address, description, status, created_at, logo_storage_path"),
+    supabase
+      .from("showrooms")
+      .select("id, business_name, email, phone, city, address, description, opening_hours, youtube_channel_url, youtube_video_url, status, created_at, logo_storage_path"),
     supabase.from("showroom_documents").select("id, showroom_id, document_type, storage_path, status, created_at").order("created_at"),
   ]);
 
@@ -46,6 +48,9 @@ export default async function AdminShowroomsPage() {
       city: showroom.city,
       address: showroom.address,
       description: showroom.description,
+      openingHours: typeof showroom.opening_hours === "string" ? showroom.opening_hours : null,
+      youtubeChannelUrl: showroom.youtube_channel_url,
+      youtubeVideoUrl: showroom.youtube_video_url,
       status: showroom.status,
       createdAt: showroom.created_at,
       documents: documentsByShowroom.get(showroom.id) ?? [],
