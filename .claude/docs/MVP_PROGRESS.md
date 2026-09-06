@@ -29,7 +29,7 @@
 | Vehicles           | ⬜           | ⬜  | ⬜  | ⬜          |
 | Marketplace        | 🟡           | ⬜  | 🟢  | ⬜          |
 | Finance Calculator | ⬜           | ⬜  | ⬜  | ⬜          |
-| WhatsApp Inquiry   | ⬜           | ⬜  | ⬜  | ⬜          |
+| WhatsApp Inquiry   | 🟡           | ⬜  | 🟢  | ⬜          |
 | Admin              | 🟡           | ⬜  | 🟢  | ⬜          |
 
 ---
@@ -161,7 +161,7 @@
 * [x] Filters (brand, model, body type, fuel type, price range, year range — filter label renamed "Make" → "Brand" in PR #40 — see PR #39, #40)
 * [x] Sorting (price, year, mileage, newest, relevance — "relevance" aliases to newest, no full-text-search infra exists, documented — see PR #39)
 * [x] Pagination (real `.range()`-based, page number in URL — this project's first real pagination; every other list is client-side/unpaginated at admin/dashboard scale — see PR #39)
-* [x] Vehicle detail page (`/{brand}/{name-slug}-{uid}`, e.g. `/bmw/530i-m-sport-3fa8...` — redesigned in PR #40 to match the user-supplied real rendered HTML: gallery, spec highlights, specifications, description, a real Financing Calculator, a real deduplicated page-view counter (PR #41 — one view per logged-in user ever, one per anonymous IP, never counts the vehicle's own showroom owner or an admin), real showroom card, similar cars; WhatsApp/Send Message/Test Drive/Apply for Financing/favorite/share remain real disabled controls pending Day 4/5 — see PR #39, #40, #41)
+* [x] Vehicle detail page (`/{brand}/{name-slug}-{uid}`, e.g. `/bmw/530i-m-sport-3fa8...` — redesigned in PR #40 to match the user-supplied real rendered HTML: gallery, spec highlights, specifications, description, a real Financing Calculator, a real deduplicated page-view counter (PR #41 — one view per logged-in user ever, one per anonymous IP, never counts the vehicle's own showroom owner or an admin), real showroom card, similar cars; Send Message is now a real, working inquiry form (PR #42); WhatsApp/Test Drive/Apply for Financing/favorite/share remain real disabled controls pending Day 4/5 — see PR #39, #40, #41, #42)
 
 ## Showroom Discovery
 
@@ -215,11 +215,19 @@ Enter Inputs → Calculate → Verify Result`) per CLAUDE.md §11, which
 
 ## WhatsApp Inquiry
 
-* [ ] Inquiry CTA
-* [ ] Vehicle information
-* [ ] Showroom information
-* [ ] WhatsApp redirect
-* [ ] Mobile behavior
+PR #42 delivered the actual user-requested inquiry channel: a "Send Message"
+form-based inquiry (dialog on the vehicle detail page → stored
+`vehicle_inquiries` row → email notification to the showroom owner + all
+admins → thank-you email to the customer → admin/showroom inbox with
+read-state), not a WhatsApp deep-link redirect. WhatsApp itself remains an
+unbuilt, separate CTA (still a real disabled control on the detail page)
+pending an explicit ask — not fabricated or silently dropped.
+
+* [x] Inquiry CTA ("Send Message" — real dialog, no longer disabled)
+* [x] Vehicle information (title, price included in the stored inquiry and both emails)
+* [x] Showroom information (showroom resolved server-side via the vehicle's `showroom_id`, trigger-derived; owner is the email recipient)
+* [ ] WhatsApp redirect (out of scope for this PR — no request for it yet; CTA still absent from the detail page)
+* [x] Mobile behavior (dialog form, verified via existing responsive Tailwind patterns; no dedicated mobile E2E pass beyond the desktop Playwright run)
 
 ## Admin
 
@@ -227,15 +235,15 @@ Enter Inputs → Calculate → Verify Result`) per CLAUDE.md §11, which
 * [ ] User management
 * [ ] Showroom approval/status
 * [ ] Vehicle moderation
-* [ ] Required admin controls
+* [x] Inquiry management (`/admin/inquiries` — search + status filter, mark-read, unread-count sidebar badge)
 
 ## Testing
 
 * [ ] Finance tests
-* [ ] Inquiry tests
+* [x] Inquiry tests (14 unit tests — `src/features/inquiry/schemas.test.ts`)
 * [ ] Admin tests
 * [ ] E2E finance flow
-* [ ] E2E inquiry flow
+* [x] E2E inquiry flow (`e2e/vehicle-inquiry.spec.ts` — 4 tests: anonymous submission, validation, admin mark-read + badge, showroom-scoping)
 * [ ] E2E admin flow
 * [ ] Figma visual QA
 
@@ -668,6 +676,10 @@ Record important scope or architectural decisions here.
 
 | 2026-09-06 | Replaced PR #40's flat per-page-load view counter (PR #41) with real dedup semantics: one view per logged-in user ever, one per anonymous visitor keyed by a SHA-256 hash of their IP, and the vehicle's own showroom owner's or an admin's views never count. New `vehicle_views` dedup ledger table (unique on vehicle_id + viewer_key, RLS enabled with no client-facing policies) and a `record_vehicle_view()` security-definer function replacing `increment_vehicle_view_count()` — it determines admin/owner exclusion and the viewer key entirely server-side from the verified JWT (`auth.uid()`/`is_admin()`/`owns_showroom()`), only trusting the client-supplied IP hash for genuinely anonymous requests | User: "view logic change 1 view per user if logged in and if non-logged in check ip based and if showroom owner view his own car no view count increase and if superadmin logged in view car no view car view count only work when a customer visit the car" |
 | 2026-09-06 | Code review (PR #41) found no issues — independently verified the SQL function's control flow can't skip the admin/owner exclusion, that PL/pgSQL's `FOUND` after `ON CONFLICT DO NOTHING` reliably reflects a genuinely-new insert (confirmed empirically via live testing across all four identities before the E2E test was even written, not just by reading Postgres docs), that the new table's RLS-deny-by-default holds for the same reason the project's existing `is_admin()`/`owns_showroom()` precedent does, that the unique constraint + `ON CONFLICT DO NOTHING` is race-safe under concurrent inserts, and that the rewritten E2E test's use of separate Playwright browser contexts is correctly scoped (IP-dedup tested via the *same* context, user-identity dedup via separate ones for session isolation, never conflating the two) | Independent Code Review Agent finding — a clean pass, recorded to show the specific things that were actually checked rather than "looks fine" |
+
+| 2026-09-06 | Built the real "Send Message" vehicle-inquiry flow (PR #42), replacing the disabled placeholder: a dialog form on the vehicle detail page (pre-filled for a logged-in customer, blank/required for an anonymous visitor), `vehicle_inquiries.customer_id` made nullable with new required `contact_name`/`contact_email`/`contact_phone` snapshot columns captured for every inquiry (not just anonymous ones, so display code never has to branch on login status), email notification to the owning showroom + every real ADMIN-role profile plus a thank-you email to the customer (first app-triggered, non-Supabase-Auth email — new `nodemailer`-based `src/lib/email.ts`, reusing the existing `MAILTRAP_SMTP_USER`/`PASS` sandbox, branding ported from the Supabase Auth email generator into a shared `renderEmailShell()`), and `/admin/inquiries` + `/dashboard/inquiries` inboxes (search + status filter, sidebar unread-count badges, opening a row marks it VIEWED). Deliberately reused the existing `vehicle_inquiries.status` NEW/VIEWED enum as the read-state mechanism rather than wiring up the separate, unused `notifications` table (schema-only, hardcoded to booking/appointment types — extending it for a first-ever use would have been unnecessary scope) | User: "Send Message Buton on detail page opens a popup where non-logged user enters basic details name email phone and logged in user already filled information and a message field and send button send an email to showroom owner and admin an inquiry for car all the details in the email and thankyou email to the customer email, on showroom admin panel and super admin panel both have a notification and entry for the inquiry, form should have proper valdidation, email template follow proper branding like previous, admin panels have proper filters and search, notification count also, on open notiication make it read state" |
+| 2026-09-06 | Two real, self-caught RLS/PostgREST bugs found while building PR #42's anonymous-inquiry insert path, both root-caused via live reproduction (Postgres server logs, raw `curl -v` against the REST API, `docker exec psql` role simulation) rather than assumption. Bug 1: an initial two-policy design (`to authenticated` / `to anon`) failed every anonymous insert with a `42501` RLS violation — this local Supabase instance's PostgREST connects anonymous requests as the Postgres role `authenticator`, never literally switching to a role named `anon`, so the `to anon`-scoped policy silently never applied. Fixed by replacing both with one `to public` policy gated on `auth.uid()` (matching the project's own `vehicles_select_public_or_owner_or_admin` precedent) — which also closes a real gap the naive two-role split would have had (a signed-in caller could otherwise send `customer_id: null` directly against the REST API to bypass their own `customer_id = auth.uid()` check, since Postgres ORs all applicable permissive policies for a role). Bug 2: the same `42501` persisted after fixing Bug 1 — `.select()` chained after `.insert()` triggers PostgREST's `Prefer: return=representation` (`INSERT ... RETURNING`), which re-checks the table's `authenticated`-only SELECT RLS policy on the just-inserted row, rolling back an otherwise-valid anonymous insert; fixed by dropping the unneeded `.select()` from the insert call | Self-caught via live reproduction, not guessed — both documented in `20260906040000_add_vehicle_inquiry_contact_fields.sql` and `src/features/inquiry/actions.ts` as a warning against this project's own future use of role-scoped RLS policies or `.select()` after an `.insert()` on any RLS-anonymous-writable table |
+| 2026-09-06 | A third real bug, caught by the new E2E test rather than by manual inspection: `markInquiryViewedAction`'s `revalidatePath()` calls alone did not update the sidebar's unread-count badge on an already-rendered page — `revalidatePath` only invalidates the Next.js cache, it doesn't refetch an already-rendered Server Component page without an actual navigation. Fixed by adding a client-side `router.refresh()` (from `next/navigation`) after the mark-read action resolves. A full page reload during manual testing would have masked this, since a reload always refetches regardless — the automated E2E badge-count assertion is what actually surfaced it | Caught by `e2e/vehicle-inquiry.spec.ts`'s admin mark-read/badge test, confirmed via a standalone debug script showing the badge text unchanged before the fix, correctly dropping to zero after |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
