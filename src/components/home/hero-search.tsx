@@ -62,11 +62,8 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
           </button>
         </div>
 
-        <div className="flex items-center justify-center gap-2 pt-6 pb-2">
-          <span className="text-[11px] font-medium text-white/50">Powered by</span>
-          {/* width/height match the real file's aspect ratio (877×378 ≈ 2.32:1) so
-              next/image doesn't stretch/squish it when scaled down via h-4.5 w-auto */}
-          <Image src="/aresa-logo.jpg" alt="Arresa" width={88} height={38} className="h-4.5 w-auto rounded-[3px]" />
+        <div className="flex items-center justify-center pt-6 pb-2">
+          <Image src="/aresa-logo.jpg" alt="Powered by Arresa" width={105} height={45} className="rounded-[3px]" />
         </div>
       </div>
 
