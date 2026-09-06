@@ -30,7 +30,7 @@
 | Marketplace        | 🟡           | ⬜  | 🟢  | ⬜          |
 | Finance Calculator | 🟢           | ⬜  | 🟢  | ⬜          |
 | WhatsApp Inquiry   | 🟡           | ⬜  | 🟢  | ⬜          |
-| Admin              | 🟡           | ⬜  | 🟢  | ⬜          |
+| Admin              | 🟢           | ⬜  | 🟢  | ⬜          |
 
 ---
 
@@ -232,7 +232,7 @@ pending an explicit ask — not fabricated or silently dropped.
 ## Admin
 
 * [x] Dashboard metrics (real counts — pending/approved showrooms, active vehicles, users — built ahead of schedule during Day 2's admin foundation, `src/app/admin/(protected)/page.tsx`; the checkbox here was simply never updated at the time)
-* [ ] User management
+* [x] User management (ADM-003, PR #45 — `/admin/users`: platform-wide list with search + role filter + status filter, role changes (CUSTOMER/ADMIN), and suspend/reactivate — the latter backed by `profiles.is_active` and its self-privilege-change trigger, both built Day 1 but never actually used until now)
 * [x] Showroom approval/status (built Day 2 — `/admin/showrooms`; same as above, checkbox lagged the actual codebase state)
 * [x] Vehicle moderation (ADM-004, PR #43 — `/admin/vehicles`: platform-wide view of every showroom's listings, search + status filter, full six-status authority including `PENDING_REVIEW`/`REJECTED`, which an owner can never set)
 * [x] Inquiry management (`/admin/inquiries` — search + status filter, mark-read, unread-count sidebar badge)
@@ -241,18 +241,20 @@ pending an explicit ask — not fabricated or silently dropped.
 
 * [x] Finance tests (9 unit tests — `finance-calculator.test.ts`, pre-existing from PR #40)
 * [x] Inquiry tests (14 unit tests — `src/features/inquiry/schemas.test.ts`)
-* [x] Admin tests (vehicle moderation: 5 unit tests — `src/features/vehicle/schemas.test.ts`)
+* [x] Admin tests (vehicle moderation: 5 unit tests — `src/features/vehicle/schemas.test.ts`; user management: 3 unit tests — `src/features/admin/user-schemas.test.ts`, plus 2 new `rls.integration.test.ts` cases closing a real gap — an admin's own RLS-scoped session, not just the service-role test client, changing another user's role/status, and being blocked from changing its own)
 * [x] E2E finance flow (`e2e/finance-calculator.spec.ts`, PR #44 — 3 tests)
 * [x] E2E inquiry flow (`e2e/vehicle-inquiry.spec.ts` — 4 tests: anonymous submission, validation, admin mark-read + badge, showroom-scoping)
-* [x] E2E admin flow (`e2e/vehicle-moderation.spec.ts` — 3 tests: multi-showroom visibility + search/filter, moderation reflected publicly, unauthorized-owner rejection)
+* [x] E2E admin flow (`e2e/vehicle-moderation.spec.ts` — 3 tests: multi-showroom visibility + search/filter, moderation reflected publicly, unauthorized-owner rejection; `e2e/user-management.spec.ts` — 5 tests: multi-user visibility + filters, suspend/reactivate round-trip against real login, role promotion, self-row controls disabled, non-admin redirected)
 * [ ] Figma visual QA
 
 ### Day 4 Gate
 
-* [ ] All major MVP business functionality exists
-* [ ] Required tests pass
+* [x] All major MVP business functionality exists (Finance Calculator, the "Send Message" inquiry channel, and all five Admin sub-features — dashboard metrics, user management, showroom approval, vehicle moderation, inquiry management — are all built and working)
+* [x] Required tests pass (305/305 unit, all required E2E flows passing)
 
-**Status:** ⬜
+Figma visual QA for this day's screens remains outstanding — tracked separately below, not treated as blocking this functional gate.
+
+**Status:** 🟢
 
 ---
 
@@ -687,6 +689,10 @@ Record important scope or architectural decisions here.
 
 | 2026-09-06 | Closed the last Finance Calculator gap (PR #44, test-only): a dedicated E2E flow matching CLAUDE.md §11's required journey, which `e2e/vehicle-discovery.spec.ts` had never covered in isolation — only its "no financing configured" empty state. New `e2e/finance-calculator.spec.ts` (own dedicated fixture showroom/vehicle) drives a real showroom-configured-financing vehicle through the browser and independently re-verifies the rendered "Est. Monthly Payment"/"Total payable" figures against `calculateFinanceEstimate` (the same pure function already unit-tested), both at initial load and after changing loan term/tracker duration — not just "a number appeared." No application code changed; the calculator itself and its 9 unit tests were already built and correct from PR #40 | User picked this as the next task from a choice between it and Admin User Management, since it required no new design decisions and closed out an already-built feature |
 | 2026-09-06 | Code review (PR #44) found no issues — independently re-ran the full suite rather than trusting the PR description (`tsc --noEmit`, lint, 300/300 unit tests, the new E2E file alongside `vehicle-discovery.spec.ts` running concurrently to confirm no fixture collision between the two files' independent unique-per-run showrooms), and confirmed via `git diff --stat` this was a genuinely pure one-file test-only diff | Independent Code Review Agent finding — a clean pass |
+
+| 2026-09-06 | Built admin user management (ADM-003, PR #45), the last unbuilt Admin sub-feature and the last item on Day 4's checklist. Scoped via an explicit clarifying question (requirements docs only said "manage customers"/"view/manage user accounts") — user picked all three offered options: view/search/filter every user, change roles (CUSTOMER/ADMIN only — "SHOWROOM" is a real enum value but no code path ever assigns it, ownership is via `showrooms.owner_user_id`), and suspend/reactivate accounts. The database side (`profiles.is_active`, `prevent_profile_self_privilege_changes` trigger) had already been built on Day 1 specifically anticipating this feature and was sitting completely unused — confirmed by reading the actual migration files/comments, not assumed | User: chose "View all users", "Suspend/reactivate accounts", and "Change user roles" from a clarifying multi-select question |
+| 2026-09-06 | Real, self-caught gap found while building PR #45: `profiles.is_active` was never checked anywhere in the app (confirmed via grep) — an admin "suspending" a user would have silently done nothing except flip a column no code read, since RLS only blocks the *suspended user's own* attempt to reactivate themselves, not their continued use of literally everything else. Closed by adding an `is_active` check to `src/lib/supabase/middleware.ts` (the one chokepoint that already runs on every request) — a suspended user's live session is now signed out on their very next navigation, not just blocked on a future login attempt — plus explicit rejection with a clear message in both `signInAction` and `adminSignInAction` so a suspended user isn't confusingly let in only to be kicked out one request later | Self-caught by asking "does this actually do anything yet?" before considering the feature done, not by a failing test — a reminder that a schema column built ahead of schedule for a future feature is only as real as the code that actually reads it |
+| 2026-09-06 | Code review (PR #45) found no BLOCKER/HIGH/MEDIUM issues — approved as-is, independently re-verified rather than trusting the PR description: live-confirmed via a standalone script that the pre-existing self-privilege-change trigger's raised error message is byte-for-byte what the new `isSelfPrivilegeTriggerError()` string-match expects (not a fragile guess), confirmed `getAllUsersForAdmin()` can't leak the service-role client to the browser (only ever called from a Server Component, transitively guarded by `createAdminClient`'s `server-only` import), and confirmed via grep that no code path in this app actually assigns `profiles.role = 'SHOWROOM'`, validating that exclusion from the admin-settable role set. One LOW noted and left unfixed: the new `signOut()` call in `middleware.ts` uses the default global scope with no comment explaining why (every other `signOut()` call site in this codebase annotates its scope choice) — the choice itself (kill every session on suspension, not just one device) is correct, just under-documented | Independent Code Review Agent finding — the LOW is recorded as real, minor technical debt rather than silently fixed or silently ignored |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
