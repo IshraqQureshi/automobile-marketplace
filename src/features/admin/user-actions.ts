@@ -121,6 +121,16 @@ export async function createUserAction(formData: FormData): Promise<UserActionRe
  * failure on the second step is reported as a partial success rather than
  * a blanket failure, matching this project's existing tolerance for
  * best-effort two-step actions (e.g. vehicle photo upload).
+ *
+ * The admin-role check runs FIRST, before any write — this action is meant
+ * to be reachable only from the admin-only /admin/users page, but a direct
+ * call bypassing that page would otherwise let a plain user successfully
+ * update their OWN name/phone (profiles_update_own_or_admin's RLS already
+ * permits self-update) before hitting a "not admin" error on the email
+ * step — a real partial-success bug caught live: the name/phone write
+ * silently went through while the caller was told the whole action failed.
+ * Checking admin role up front (matching createUserAction/deleteUserAction's
+ * own ordering) avoids that entirely, rather than only reporting it better.
  */
 export async function updateUserProfileAction(userId: string, formData: FormData): Promise<UserActionResult> {
   const parsed = editUserSchema.safeParse({
@@ -131,6 +141,8 @@ export async function updateUserProfileAction(userId: string, formData: FormData
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid user details." };
 
   const supabase = await createClient();
+  if ((await currentUserRole(supabase)) !== "ADMIN") return { error: NOT_ADMIN_ERROR };
+
   const { data, error } = await supabase
     .from("profiles")
     .update({ full_name: parsed.data.fullName, phone: parsed.data.phone ? `+254${parsed.data.phone}` : null })
@@ -141,8 +153,6 @@ export async function updateUserProfileAction(userId: string, formData: FormData
     return { error: "Failed to update this user." };
   }
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
-
-  if ((await currentUserRole(supabase)) !== "ADMIN") return { error: NOT_ADMIN_ERROR };
 
   const admin = createAdminClient();
   const { error: emailError } = await admin.auth.admin.updateUserById(userId, { email: parsed.data.email });
