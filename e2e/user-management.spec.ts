@@ -12,6 +12,8 @@ const CUSTOMER_EMAIL = `e2e-users-customer-fixture-${unique}@example.com`;
 const CUSTOMER_PASSWORD = "e2e-users-customer-fixture-password-123";
 const OTHER_CUSTOMER_EMAIL = `e2e-users-other-customer-fixture-${unique}@example.com`;
 const OTHER_CUSTOMER_PASSWORD = "e2e-users-other-customer-fixture-password-123";
+const SHOWROOM_OWNER_EMAIL = `e2e-users-showroom-owner-fixture-${unique}@harakagari.local`;
+const SHOWROOM_OWNER_PASSWORD = "e2e-users-showroom-owner-fixture-password-123";
 
 function admin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,6 +26,9 @@ function admin() {
 
 let customerId: string;
 let otherCustomerId: string;
+let showroomOwnerId: string;
+let showroomId: string;
+let createdUserId: string | undefined;
 
 test.beforeAll(async () => {
   const supabase = admin();
@@ -49,6 +54,23 @@ test.beforeAll(async () => {
 
   customerId = await ensureFixtureUser(CUSTOMER_EMAIL, CUSTOMER_PASSWORD, `E2E Users Customer ${unique}`);
   otherCustomerId = await ensureFixtureUser(OTHER_CUSTOMER_EMAIL, OTHER_CUSTOMER_PASSWORD, `E2E Users Other Customer ${unique}`);
+
+  showroomOwnerId = await ensureFixtureUser(SHOWROOM_OWNER_EMAIL, SHOWROOM_OWNER_PASSWORD, `E2E Users Showroom Owner ${unique}`);
+  await supabase.from("showrooms").delete().eq("owner_user_id", showroomOwnerId);
+  const { data: showroom, error: showroomError } = await supabase
+    .from("showrooms")
+    .insert({
+      owner_user_id: showroomOwnerId,
+      business_name: `E2E Users Showroom ${unique}`,
+      phone: "+254712345683",
+      email: `e2e-users-showroom-${unique}@example.com`,
+      status: "APPROVED",
+      verified: true,
+    })
+    .select("id")
+    .single();
+  if (showroomError || !showroom) throw showroomError ?? new Error("showroom not created");
+  showroomId = showroom.id;
 });
 
 test.afterEach(async () => {
@@ -57,6 +79,12 @@ test.afterEach(async () => {
   const supabase = admin();
   await supabase.from("profiles").update({ role: "CUSTOMER", is_active: true }).eq("id", customerId);
   await supabase.from("profiles").update({ role: "CUSTOMER", is_active: true }).eq("id", otherCustomerId);
+});
+
+test.afterAll(async () => {
+  const supabase = admin();
+  await supabase.from("showrooms").delete().eq("id", showroomId);
+  if (createdUserId) await supabase.auth.admin.deleteUser(createdUserId);
 });
 
 async function loginAsAdmin(page: import("@playwright/test").Page) {
@@ -169,4 +197,99 @@ test("a non-admin is redirected away from /admin/users entirely", async ({ page 
 
   await page.goto("/admin/users");
   await expect(page).not.toHaveURL(/\/admin\/users$/);
+});
+
+test("admin can create a new user via invite, and the account exists with the chosen role", async ({ page }) => {
+  await loginAsAdmin(page);
+  await page.goto("/admin/users");
+
+  const newUserEmail = `e2e-users-created-${unique}@example.com`;
+  await page.getByRole("button", { name: "New user" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Full name").fill(`E2E Created User ${unique}`);
+  await dialog.getByLabel("Email").fill(newUserEmail);
+  await dialog.getByLabel(/^Phone/).fill("712345678");
+  await dialog.getByLabel("Role").selectOption("ADMIN");
+  await page.getByRole("button", { name: "Send invite" }).click();
+  await expect(page.getByText("Invite sent")).toBeVisible({ timeout: 10_000 });
+
+  const row = page.getByRole("row", { name: new RegExp(`E2E Created User ${unique}`) });
+  await expect(row).toBeVisible();
+  await expect(row.getByLabel(/Role for/)).toHaveValue("ADMIN");
+
+  // GoTrue's real SMTP delivery can't be independently confirmed from this
+  // suite (see PR description — the same limitation already affects the
+  // pre-existing showroom-owner invite flow in admin-showrooms.spec.ts) —
+  // the reliable, DB-level signal is that handle_new_user really created a
+  // real auth user + profile with the requested role. `profiles` has no
+  // email column, so the new user's id is looked up via the admin API first.
+  const { data: authUsers } = await admin().auth.admin.listUsers({ page: 1, perPage: 200 });
+  const newUserId = authUsers.users.find((u) => u.email === newUserEmail)?.id;
+  expect(newUserId).toBeDefined();
+  createdUserId = newUserId;
+
+  const { data: profile } = await admin().from("profiles").select("role").eq("id", newUserId!).single();
+  expect(profile?.role).toBe("ADMIN");
+});
+
+test("admin can edit a user's name, phone, and email", async ({ page }) => {
+  await loginAsAdmin(page);
+  await page.goto("/admin/users");
+  await page.getByPlaceholder("Search name, email, or showroom…").fill(CUSTOMER_EMAIL);
+
+  const row = page.getByRole("row", { name: new RegExp(`E2E Users Customer ${unique}`) });
+  await row.getByLabel("Edit").click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Full name").fill(`E2E Users Customer Edited ${unique}`);
+  await dialog.getByLabel(/^Phone/).fill("798765432");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("User updated.")).toBeVisible();
+
+  const editedRow = page.getByRole("row", { name: new RegExp(`E2E Users Customer Edited ${unique}`) });
+  await expect(editedRow).toBeVisible();
+
+  const { data } = await admin().from("profiles").select("full_name, phone").eq("id", customerId).single();
+  expect(data?.full_name).toBe(`E2E Users Customer Edited ${unique}`);
+  expect(data?.phone).toBe("+254798765432");
+});
+
+test("admin can delete a user account permanently, but not one who still owns a showroom or their own account", async ({ page }) => {
+  await loginAsAdmin(page);
+  await page.goto("/admin/users");
+
+  // Blocked: still owns a showroom (FK restrict on showrooms.owner_user_id).
+  await page.getByPlaceholder("Search name, email, or showroom…").fill(SHOWROOM_OWNER_EMAIL);
+  const ownerRow = page.getByRole("row", { name: new RegExp(`E2E Users Showroom Owner ${unique}`) });
+  await ownerRow.getByLabel("Delete").click();
+  await page.getByRole("button", { name: "Delete" }).last().click();
+  await expect(page.getByText(/may still own a showroom/)).toBeVisible();
+  await expect(ownerRow).toBeVisible();
+  const { data: ownerStillExists } = await admin().from("profiles").select("id").eq("id", showroomOwnerId).maybeSingle();
+  expect(ownerStillExists).not.toBeNull();
+
+  // Blocked: cannot delete your own account (no confirm dialog even opens —
+  // the Delete button itself is disabled for the signed-in admin's own row).
+  await page.getByPlaceholder("Search name, email, or showroom…").fill(ADMIN_EMAIL);
+  const selfRow = page.getByRole("row", { name: /\(you\)/ });
+  await expect(selfRow.getByLabel("Delete")).toBeDisabled();
+
+  // Allowed: a plain customer with no showroom.
+  await page.getByPlaceholder("Search name, email, or showroom…").fill(OTHER_CUSTOMER_EMAIL);
+  const deletableRow = page.getByRole("row", { name: new RegExp(`E2E Users Other Customer ${unique}`) });
+  await deletableRow.getByLabel("Delete").click();
+  await page.getByRole("button", { name: "Delete" }).last().click();
+  await expect(page.getByText("User deleted.")).toBeVisible();
+  await expect(deletableRow).toHaveCount(0);
+
+  const { data: afterDelete } = await admin().from("profiles").select("id").eq("id", otherCustomerId).maybeSingle();
+  expect(afterDelete).toBeNull();
+
+  // This test permanently deletes otherCustomerId — recreate it so
+  // afterEach's reset (and any test order after this one) still finds a
+  // valid row rather than erroring on a missing profile.
+  const { data: recreated } = await admin().auth.admin.createUser({ email: OTHER_CUSTOMER_EMAIL, password: OTHER_CUSTOMER_PASSWORD, email_confirm: true });
+  if (recreated.user) {
+    otherCustomerId = recreated.user.id;
+    await admin().from("profiles").update({ full_name: `E2E Users Other Customer ${unique}` }).eq("id", otherCustomerId);
+  }
 });
