@@ -27,7 +27,7 @@ const selectClassName =
  */
 export function VehicleFilters({ filters, options }: VehicleFiltersProps) {
   return (
-    <form method="GET" action="/vehicles" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-1 lg:gap-4">
+    <form method="GET" action="/listing" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-1 lg:gap-4">
       <div className="col-span-2 sm:col-span-3 lg:col-span-1">
         <label htmlFor="vehicle-search-q" className="mb-1.5 block text-xs font-semibold text-neutral-600">
           Keyword
@@ -42,7 +42,7 @@ export function VehicleFilters({ filters, options }: VehicleFiltersProps) {
         />
       </div>
 
-      <FilterSelect label="Make" name="make" value={filters.make} options={options.makes} />
+      <FilterSelect label="Brand" name="make" value={filters.make} options={options.makes} />
       <FilterSelect label="Model" name="model" value={filters.model} options={options.models} />
       <FilterSelect label="Body Type" name="bodyType" value={filters.bodyType} options={options.bodyTypes} />
       <FilterSelect label="Fuel Type" name="fuelType" value={filters.fuelType} options={options.fuelTypes} />

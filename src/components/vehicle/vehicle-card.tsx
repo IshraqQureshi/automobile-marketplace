@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CarIcon } from "@/components/admin/admin-ui";
 import { currencyFormatter, type VehicleWithShowroom } from "@/features/vehicle/types";
+import { getVehicleDetailPath } from "@/features/vehicle/slug";
 
 const mileageFormatter = new Intl.NumberFormat("en-KE");
 
@@ -20,7 +21,7 @@ interface VehicleCardProps {
 
 /**
  * Shared vehicle listing card — used by the homepage's "Most Searched"
- * section, the public /vehicles marketplace grid, and a vehicle detail
+ * section, the public /listing marketplace grid, and a vehicle detail
  * page's "Similar Cars" section. Extracted from what was originally an
  * inline .map() in most-searched-vehicles.tsx once a second call site
  * (the marketplace listing page, MKT-002) needed the exact same markup.
@@ -31,7 +32,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
 
   return (
     <Link
-      href={`/vehicles/${vehicle.id}`}
+      href={getVehicleDetailPath(vehicle)}
       className="group flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white no-underline transition-shadow hover:shadow-md"
     >
       <div className="relative h-43.75 overflow-hidden bg-neutral-200">

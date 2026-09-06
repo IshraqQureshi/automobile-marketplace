@@ -23,7 +23,7 @@ export function MostSearchedVehicles({ vehicles, totalVehicleCount }: MostSearch
         <div className="mb-8 flex items-end justify-between">
           <h2 className="font-display text-3xl font-bold text-neutral-900">Most Searched</h2>
           {totalVehicleCount > vehicles.length && (
-            <Link href="/vehicles" className="hidden text-sm font-medium text-brand hover:text-brand-dark md:block">
+            <Link href="/listing" className="hidden text-sm font-medium text-brand hover:text-brand-dark md:block">
               View all {numberFormatter.format(totalVehicleCount)}+ →
             </Link>
           )}

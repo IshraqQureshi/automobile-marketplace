@@ -12,7 +12,7 @@ interface BrowseByBrandProps {
 }
 
 /**
- * Each tile filters the marketplace vehicle listing (MKT-002, /vehicles) by
+ * Each tile filters the marketplace vehicle listing (MKT-002, /listing) by
  * brand name — vehicles.make is a plain text column, not FK'd to the brands
  * catalog table, so this links on the brand's real name rather than its id.
  */
@@ -30,7 +30,7 @@ export function BrowseByBrand({ brands }: BrowseByBrandProps) {
           {brands.map((brand) => (
             <Link
               key={brand.id}
-              href={`/vehicles?make=${encodeURIComponent(brand.name)}`}
+              href={`/listing?make=${encodeURIComponent(brand.name)}`}
               className="flex flex-col items-center gap-1.5 rounded-lg py-2 no-underline hover:bg-neutral-50"
             >
               {brand.logoUrl ? (

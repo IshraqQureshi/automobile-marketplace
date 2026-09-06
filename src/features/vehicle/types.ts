@@ -42,6 +42,7 @@ export interface VehicleListItem {
   status: VehicleStatus;
   photos: VehiclePhoto[];
   createdAt: string;
+  viewCount: number;
 }
 
 // Public-facing pages (homepage highlights, marketplace listing/detail) all
@@ -91,7 +92,7 @@ export interface ModelOption extends CatalogOption {
 // The exact select() column list both vehicle pages (list, edit) query —
 // kept alongside the mapper below so the two can't silently drift apart.
 export const VEHICLE_SELECT_COLUMNS =
-  "id, title, make, model, variant, year, price, mileage, fuel_type, transmission, body_type, color, description, engine, interior, doors, seats, country_of_origin, installment_enabled, bank_finance_enabled, financing_down_payment_type, financing_down_payment_percent, financing_down_payment_amount, financing_interest_rate, financing_insurance_percent, financing_partner, financing_tenure_options_months, financing_tracker_options, status, created_at, vehicle_media(id, storage_path, is_primary, sort_order)";
+  "id, title, make, model, variant, year, price, mileage, fuel_type, transmission, body_type, color, description, engine, interior, doors, seats, country_of_origin, installment_enabled, bank_finance_enabled, financing_down_payment_type, financing_down_payment_percent, financing_down_payment_amount, financing_interest_rate, financing_insurance_percent, financing_partner, financing_tenure_options_months, financing_tracker_options, status, created_at, view_count, vehicle_media(id, storage_path, is_primary, sort_order)";
 
 interface VehicleRow {
   id: string;
@@ -124,6 +125,7 @@ interface VehicleRow {
   financing_tracker_options: unknown;
   status: VehicleStatus;
   created_at: string;
+  view_count: number;
   vehicle_media: { id: string; storage_path: string; is_primary: boolean; sort_order: number }[];
 }
 
@@ -168,5 +170,6 @@ export function vehicleRowToListItem(vehicle: VehicleRow, getPhotoUrl: (storageP
     status: vehicle.status,
     photos: media.map((m) => ({ id: m.id, isPrimary: m.is_primary, url: getPhotoUrl(m.storage_path) })),
     createdAt: vehicle.created_at,
+    viewCount: vehicle.view_count,
   };
 }

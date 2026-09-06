@@ -22,7 +22,7 @@ export function PopularModels({ models }: PopularModelsProps) {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-end justify-between">
           <h2 className="font-display text-3xl font-bold text-neutral-900">Popular Models</h2>
-          <Link href="/vehicles" className="text-sm font-medium text-brand hover:text-brand-dark">
+          <Link href="/listing" className="text-sm font-medium text-brand hover:text-brand-dark">
             All models →
           </Link>
         </div>
@@ -31,7 +31,7 @@ export function PopularModels({ models }: PopularModelsProps) {
           {models.map((model) => (
             <Link
               key={model.key}
-              href={`/vehicles?make=${encodeURIComponent(model.make)}&model=${encodeURIComponent(model.model)}`}
+              href={`/listing?make=${encodeURIComponent(model.make)}&model=${encodeURIComponent(model.model)}`}
               className="overflow-hidden rounded-lg border border-neutral-200 bg-white no-underline"
             >
               <div className="flex h-24 items-center justify-center bg-neutral-100">

@@ -26,7 +26,7 @@ export function VehicleSortSelect({ value }: VehicleSortSelectProps) {
     }
     params.delete("page");
     const query = params.toString();
-    router.push(query ? `/vehicles?${query}` : "/vehicles");
+    router.push(query ? `/listing?${query}` : "/listing");
   }
 
   return (

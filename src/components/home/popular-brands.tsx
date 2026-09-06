@@ -20,7 +20,7 @@ export function PopularBrands({ brands }: PopularBrandsProps) {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-end justify-between">
           <h2 className="font-display text-3xl font-bold text-neutral-900">Popular Brands</h2>
-          <Link href="/vehicles" className="text-sm font-medium text-brand hover:text-brand-dark">
+          <Link href="/listing" className="text-sm font-medium text-brand hover:text-brand-dark">
             All brands →
           </Link>
         </div>
@@ -29,7 +29,7 @@ export function PopularBrands({ brands }: PopularBrandsProps) {
           {brands.map((brand) => (
             <Link
               key={brand.id}
-              href={`/vehicles?make=${encodeURIComponent(brand.name)}`}
+              href={`/listing?make=${encodeURIComponent(brand.name)}`}
               className="flex flex-col items-center gap-2 text-center no-underline"
             >
               {brand.logoUrl ? (

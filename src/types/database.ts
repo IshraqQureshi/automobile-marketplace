@@ -888,6 +888,7 @@ export type Database = {
           transmission: string | null
           updated_at: string
           variant: string | null
+          view_count: number
           year: number
         }
         Insert: {
@@ -922,6 +923,7 @@ export type Database = {
           transmission?: string | null
           updated_at?: string
           variant?: string | null
+          view_count?: number
           year: number
         }
         Update: {
@@ -956,6 +958,7 @@ export type Database = {
           transmission?: string | null
           updated_at?: string
           variant?: string | null
+          view_count?: number
           year?: number
         }
         Relationships: [
@@ -976,6 +979,10 @@ export type Database = {
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      increment_vehicle_view_count: {
+        Args: { target_vehicle_id: string }
+        Returns: undefined
       }
       is_admin: { Args: never; Returns: boolean }
       owns_showroom: { Args: { target_showroom_id: string }; Returns: boolean }
