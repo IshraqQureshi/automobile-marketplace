@@ -8,6 +8,8 @@ test.describe.configure({ mode: "serial" });
 
 const OWNER_EMAIL = "e2e-vehicle-discovery-owner-fixture@harakagari.local";
 const OWNER_PASSWORD = "e2e-vehicle-discovery-owner-fixture-password-123";
+const CUSTOMER_EMAIL = "e2e-vehicle-discovery-customer-fixture@harakagari.local";
+const CUSTOMER_PASSWORD = "e2e-vehicle-discovery-customer-fixture-password-123";
 
 function admin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,22 +30,28 @@ let draftVehicleId: string;
 test.beforeAll(async () => {
   const supabase = admin();
 
-  async function findFixtureUser() {
+  async function findFixtureUser(email: string) {
     const { data } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
-    return data.users.find((u) => u.email === OWNER_EMAIL);
+    return data.users.find((u) => u.email === email);
   }
 
-  let ownerId = (await findFixtureUser())?.id;
-  if (!ownerId) {
-    const { data: created, error } = await supabase.auth.admin.createUser({ email: OWNER_EMAIL, password: OWNER_PASSWORD, email_confirm: true });
-    if (created.user) {
-      ownerId = created.user.id;
-    } else {
-      ownerId = (await findFixtureUser())?.id;
-      if (!ownerId) throw new Error(`Failed to create fixture user: ${error?.message}`);
+  async function ensureFixtureUser(email: string, password: string): Promise<string> {
+    let userId = (await findFixtureUser(email))?.id;
+    if (!userId) {
+      const { data: created, error } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
+      if (created.user) {
+        userId = created.user.id;
+      } else {
+        userId = (await findFixtureUser(email))?.id;
+        if (!userId) throw new Error(`Failed to create fixture user ${email}: ${error?.message}`);
+      }
     }
+    await supabase.auth.admin.updateUserById(userId, { password });
+    return userId;
   }
-  await supabase.auth.admin.updateUserById(ownerId, { password: OWNER_PASSWORD });
+
+  const ownerId = await ensureFixtureUser(OWNER_EMAIL, OWNER_PASSWORD);
+  await ensureFixtureUser(CUSTOMER_EMAIL, CUSTOMER_PASSWORD);
 
   await supabase.from("showrooms").delete().eq("owner_user_id", ownerId);
   const { data: showroom, error: showroomError } = await supabase
@@ -164,17 +172,59 @@ test("clicking a vehicle card opens its /{brand}/{slug} detail page with real sp
   await expect(page.getByText("Financing details not provided for this listing")).toBeVisible();
 });
 
-test("view count increments on each real page load", async ({ page }) => {
+async function readViewCount(page: import("@playwright/test").Page, path: string): Promise<number> {
+  await page.goto(path);
+  const text = await page.getByText(/\d+ views?/).textContent();
+  return Number(text?.match(/\d+/)?.[0]);
+}
+
+test("view count: dedupes anonymous visits by IP, counts a distinct logged-in customer once, and never counts the vehicle's own showroom owner", async ({
+  page,
+  browser,
+}) => {
   const path = detailPath(cheapVehicleId, "Alpha");
-  await page.goto(path);
-  const firstText = await page.getByText(/\d+ views?/).textContent();
-  const firstCount = Number(firstText?.match(/\d+/)?.[0]);
 
-  await page.goto(path);
-  const secondText = await page.getByText(/\d+ views?/).textContent();
-  const secondCount = Number(secondText?.match(/\d+/)?.[0]);
+  // Two anonymous visits from the same client (same IP, no session) — the
+  // second must not increment (deduped), unlike the old flat per-load counter.
+  const anonVisit1 = await readViewCount(page, path);
+  const anonVisit2 = await readViewCount(page, path);
+  expect(anonVisit2).toBe(anonVisit1 + 1);
+  const anonVisit3 = await readViewCount(page, path);
+  expect(anonVisit3).toBe(anonVisit2);
 
-  expect(secondCount).toBe(firstCount + 1);
+  // A distinct logged-in customer is a genuinely new viewer — counts once,
+  // then dedupes on their own repeat visit too.
+  const customerContext = await browser.newContext();
+  const customerPage = await customerContext.newPage();
+  await customerPage.goto("/login");
+  await customerPage.getByLabel("Email address").fill(CUSTOMER_EMAIL);
+  await customerPage.getByLabel("Password", { exact: true }).fill(CUSTOMER_PASSWORD);
+  await customerPage.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await customerPage.waitForURL(/\/account$/);
+  // The displayed count is always the pre-this-visit value (read before the
+  // RPC runs) — a new viewer's own +1 only shows up on their *next* visit.
+  const customerVisit1 = await readViewCount(customerPage, path);
+  expect(customerVisit1).toBe(anonVisit3);
+  const customerVisit2 = await readViewCount(customerPage, path);
+  expect(customerVisit2).toBe(customerVisit1 + 1);
+  const customerVisit3 = await readViewCount(customerPage, path);
+  expect(customerVisit3).toBe(customerVisit2);
+  await customerContext.close();
+
+  // The vehicle's own showroom owner viewing their own listing must never
+  // count, no matter how many times.
+  const ownerContext = await browser.newContext();
+  const ownerPage = await ownerContext.newPage();
+  await ownerPage.goto("/login");
+  await ownerPage.getByLabel("Email address").fill(OWNER_EMAIL);
+  await ownerPage.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
+  await ownerPage.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await ownerPage.waitForURL(/\/dashboard$/);
+  const ownerVisit1 = await readViewCount(ownerPage, path);
+  const ownerVisit2 = await readViewCount(ownerPage, path);
+  expect(ownerVisit1).toBe(customerVisit3);
+  expect(ownerVisit2).toBe(customerVisit3);
+  await ownerContext.close();
 });
 
 test("visiting a draft (non-ACTIVE) vehicle's detail page renders the not-found page rather than exposing it", async ({ page }) => {
