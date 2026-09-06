@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { VehicleCard } from "@/components/vehicle/vehicle-card";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -14,7 +15,11 @@ interface VehicleDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-async function getVehicle(id: string) {
+// generateMetadata and the page component both need this same vehicle —
+// cache() (React's per-request memoization) means the second call within
+// the same request reuses the first's result instead of a duplicate
+// Supabase round-trip.
+const getVehicle = cache(async (id: string) => {
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("vehicles")
@@ -33,7 +38,7 @@ async function getVehicle(id: string) {
   };
 
   return { vehicle, showroom: row.showrooms, supabase };
-}
+});
 
 export async function generateMetadata({ params }: VehicleDetailPageProps): Promise<Metadata> {
   const { id } = await params;
