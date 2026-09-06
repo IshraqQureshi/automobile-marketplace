@@ -37,6 +37,23 @@ export async function currentUserRole(
   return profile?.role ?? null;
 }
 
+/**
+ * ADM-003 (User Management): rejects login outright for a suspended
+ * account, rather than only relying on src/lib/supabase/middleware.ts's
+ * per-request check to catch it on the very next navigation. Shared by
+ * signInAction and adminSignInAction — same reasoning as currentUserRole
+ * above.
+ */
+export async function isCurrentUserActive(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return true;
+
+  const { data: profile } = await supabase.from("profiles").select("is_active").eq("id", user.id).single();
+  return profile?.is_active ?? true;
+}
+
 export async function signUpAction(
   _prevState: AuthActionState,
   formData: FormData,
@@ -144,6 +161,15 @@ export async function signInAction(
     // login form.
     await supabase.auth.signOut({ scope: "local" });
     return { status: "error", message: "Invalid email or password." };
+  }
+
+  // Unlike the ADMIN check above, a suspended account's existence is
+  // already confirmed by a correct password — a specific message here
+  // reveals nothing a wrong-password attempt wouldn't already rule out, and
+  // is far more useful to the real account holder than a generic failure.
+  if (!(await isCurrentUserActive(supabase))) {
+    await supabase.auth.signOut({ scope: "local" });
+    return { status: "error", message: "This account has been suspended. Contact support for help." };
   }
 
   // profiles.role never actually becomes "SHOWROOM" (registering a showroom
