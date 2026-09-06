@@ -47,7 +47,6 @@ export interface ShowroomListItem {
   description: string | null;
   openingHours: string | null;
   youtubeChannelUrl: string | null;
-  youtubeVideoUrl: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
   createdAt: string;
   documents: ShowroomDocumentItem[];
@@ -100,7 +99,6 @@ interface ShowroomFormState {
   description: string;
   openingHours: string;
   youtubeChannelUrl: string;
-  youtubeVideoUrl: string;
 }
 
 const BLANK_FORM: ShowroomFormState = {
@@ -112,7 +110,6 @@ const BLANK_FORM: ShowroomFormState = {
   description: "",
   openingHours: "",
   youtubeChannelUrl: "",
-  youtubeVideoUrl: "",
 };
 
 interface NewOwnerFormState {
@@ -290,7 +287,6 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       description: item.description ?? "",
       openingHours: item.openingHours ?? "",
       youtubeChannelUrl: item.youtubeChannelUrl ?? "",
-      youtubeVideoUrl: item.youtubeVideoUrl ?? "",
     });
     setOwnerMode("existing");
     setSelectedOwner(null);
@@ -352,7 +348,6 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       description: form.description,
       openingHours: form.openingHours,
       youtubeChannelUrl: form.youtubeChannelUrl,
-      youtubeVideoUrl: form.youtubeVideoUrl,
     });
     if (!businessParsed.success) {
       // Only the inline per-field errors below each input — not also the
@@ -399,7 +394,6 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       formData.set("description", form.description);
       formData.set("openingHours", form.openingHours);
       formData.set("youtubeChannelUrl", form.youtubeChannelUrl);
-      formData.set("youtubeVideoUrl", form.youtubeVideoUrl);
       if (logo) formData.set("logo", logo);
       if (editingItem) {
         formData.set("id", editingItem.id);
@@ -987,19 +981,9 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
               error={!!errorForField("youtubeChannelUrl")}
             />
             {errorForField("youtubeChannelUrl") && <p className="mt-1 text-sm text-red-600">{errorForField("youtubeChannelUrl")}</p>}
-          </div>
-
-          <div>
-            <FieldLabel htmlFor="showroom-youtube-video">YouTube featured video URL (optional)</FieldLabel>
-            <Input
-              id="showroom-youtube-video"
-              value={form.youtubeVideoUrl}
-              onChange={(e) => setForm((f) => ({ ...f, youtubeVideoUrl: e.target.value }))}
-              onBlur={(e) => validateField("youtubeVideoUrl", e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-              error={!!errorForField("youtubeVideoUrl")}
-            />
-            {errorForField("youtubeVideoUrl") && <p className="mt-1 text-sm text-red-600">{errorForField("youtubeVideoUrl")}</p>}
+            <p className="mt-1 text-xs text-neutral-400">
+              Individual featured videos are managed by the showroom owner from their own dashboard, not here.
+            </p>
           </div>
 
           <DialogFormActions pending={crudPending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />

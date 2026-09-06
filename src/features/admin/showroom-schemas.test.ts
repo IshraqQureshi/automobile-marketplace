@@ -10,10 +10,9 @@ const valid = {
   description: "",
   openingHours: "",
   youtubeChannelUrl: "",
-  youtubeVideoUrl: "",
 };
 
-describe("adminShowroomSchema — opening hours / YouTube fields", () => {
+describe("adminShowroomSchema — opening hours / YouTube channel field", () => {
   it("accepts every optional field left blank", () => {
     expect(adminShowroomSchema.safeParse(valid).success).toBe(true);
   });
@@ -28,20 +27,12 @@ describe("adminShowroomSchema — opening hours / YouTube fields", () => {
     expect(adminShowroomSchema.safeParse({ ...valid, openingHours: "a".repeat(101) }).success).toBe(false);
   });
 
-  it("accepts valid YouTube channel/video URLs", () => {
-    const result = adminShowroomSchema.safeParse({
-      ...valid,
-      youtubeChannelUrl: "https://www.youtube.com/@channel",
-      youtubeVideoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    });
+  it("accepts a valid YouTube channel URL", () => {
+    const result = adminShowroomSchema.safeParse({ ...valid, youtubeChannelUrl: "https://www.youtube.com/@channel" });
     expect(result.success).toBe(true);
   });
 
   it("rejects a malformed YouTube channel URL", () => {
     expect(adminShowroomSchema.safeParse({ ...valid, youtubeChannelUrl: "not-a-url" }).success).toBe(false);
-  });
-
-  it("rejects a malformed YouTube video URL", () => {
-    expect(adminShowroomSchema.safeParse({ ...valid, youtubeVideoUrl: "not-a-url" }).success).toBe(false);
   });
 });

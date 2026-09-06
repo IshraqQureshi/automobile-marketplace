@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTikTokEmbedUrl, getYouTubeEmbedUrl } from "./video-embed";
+import { getTikTokEmbedUrl, getYouTubeEmbedUrl, getYouTubeThumbnailUrl, getYouTubeVideoId } from "./video-embed";
 
 describe("getYouTubeEmbedUrl", () => {
   it("extracts the ID from a watch URL", () => {
@@ -46,6 +46,34 @@ describe("getYouTubeEmbedUrl", () => {
 
   it("returns null for a malformed URL", () => {
     expect(getYouTubeEmbedUrl("not a url")).toBeNull();
+  });
+});
+
+describe("getYouTubeVideoId", () => {
+  it("extracts the ID from a watch URL", () => {
+    expect(getYouTubeVideoId("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+  });
+
+  it("returns null for a non-YouTube URL", () => {
+    expect(getYouTubeVideoId("https://example.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+  });
+
+  it("returns null for a malformed URL", () => {
+    expect(getYouTubeVideoId("not a url")).toBeNull();
+  });
+});
+
+describe("getYouTubeThumbnailUrl", () => {
+  it("derives YouTube's own static thumbnail URL for a watch URL", () => {
+    expect(getYouTubeThumbnailUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe("https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
+  });
+
+  it("derives it from a youtu.be short URL", () => {
+    expect(getYouTubeThumbnailUrl("https://youtu.be/dQw4w9WgXcQ")).toBe("https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
+  });
+
+  it("returns null for a non-YouTube URL", () => {
+    expect(getYouTubeThumbnailUrl("https://vimeo.com/12345")).toBeNull();
   });
 });
 

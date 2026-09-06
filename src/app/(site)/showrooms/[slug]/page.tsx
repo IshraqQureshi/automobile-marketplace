@@ -3,11 +3,11 @@ import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { ShowroomVehicleBrowser } from "@/components/showroom/showroom-vehicle-browser";
+import { ShowroomVideoSection } from "@/components/showroom/showroom-video-section";
 import { getShowroomDetailPath, parseShowroomIdFromSlug } from "@/features/showroom/slug";
 import { buildWhatsAppLink } from "@/features/showroom/whatsapp";
 import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
 import { getSystemSettingString } from "@/lib/system-settings";
-import { getYouTubeEmbedUrl } from "@/lib/video-embed";
 import { createClient } from "@/lib/supabase/server";
 
 const dateFormatter = new Intl.DateTimeFormat("en-KE", { year: "numeric" });
@@ -30,15 +30,16 @@ const getShowroomData = cache(async (id: string) => {
   // returning no row for an unrelated reason.
   const { data: showroom } = await supabase
     .from("showrooms")
-    .select("id, business_name, city, description, opening_hours, verified, created_at, logo_storage_path, youtube_channel_url, youtube_video_url")
+    .select("id, business_name, city, description, opening_hours, verified, created_at, logo_storage_path, youtube_channel_url")
     .eq("id", id)
     .eq("status", "APPROVED")
     .maybeSingle();
   if (!showroom) return null;
 
-  const [{ data: vehicleRows }, whatsappNumber] = await Promise.all([
+  const [{ data: vehicleRows }, whatsappNumber, { data: videoRows }] = await Promise.all([
     supabase.from("vehicles").select(VEHICLE_SELECT_COLUMNS).eq("showroom_id", id).eq("status", "ACTIVE").order("created_at", { ascending: false }),
     getSystemSettingString(supabase, "whatsapp_contact_number"),
+    supabase.from("showroom_videos").select("id, title, video_url").eq("showroom_id", id).order("sort_order", { ascending: true }),
   ]);
 
   const getPhotoUrl = (storagePath: string) => supabase.storage.from("vehicle-media").getPublicUrl(storagePath).data.publicUrl;
@@ -48,9 +49,11 @@ const getShowroomData = cache(async (id: string) => {
     showroomName: showroom.business_name,
   }));
 
+  const videos = (videoRows ?? []).map((row) => ({ id: row.id, title: row.title, videoUrl: row.video_url }));
+
   const logoUrl = showroom.logo_storage_path ? supabase.storage.from("showroom-logos").getPublicUrl(showroom.logo_storage_path).data.publicUrl : null;
 
-  return { showroom, vehicles, whatsappNumber, logoUrl };
+  return { showroom, vehicles, whatsappNumber, logoUrl, videos };
 });
 
 export async function generateMetadata({ params }: ShowroomDetailPageProps): Promise<Metadata> {
@@ -78,7 +81,7 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
 
   const result = await getShowroomData(id);
   if (!result) notFound();
-  const { showroom, vehicles, whatsappNumber, logoUrl } = result;
+  const { showroom, vehicles, whatsappNumber, logoUrl, videos } = result;
 
   // Canonicalize: a stale/guessed name-slug (e.g. copied before a rename)
   // still resolves by id, but redirects to the real URL rather than serving
@@ -92,8 +95,6 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
 
   const whatsappLink = buildWhatsAppLink(whatsappNumber, `Hi, I'm interested in vehicles from ${showroom.business_name} on HarakaGari.`);
   const openingHours = typeof showroom.opening_hours === "string" ? showroom.opening_hours : null;
-  const videoEmbedUrl = showroom.youtube_video_url ? getYouTubeEmbedUrl(showroom.youtube_video_url, { autoplay: false }) : null;
-  const hasYouTubeSection = Boolean(showroom.youtube_channel_url || videoEmbedUrl);
 
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
@@ -178,40 +179,7 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
         </div>
       </section>
 
-      {hasYouTubeSection && (
-        <section className="bg-neutral-950 px-6 py-10 md:px-12">
-          <div className="mx-auto max-w-7xl">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-semibold tracking-widest text-neutral-500 uppercase">On YouTube</p>
-                <h2 className="font-display text-xl font-bold text-white">{showroom.business_name} Videos</h2>
-              </div>
-              {showroom.youtube_channel_url && (
-                <a
-                  href={showroom.youtube_channel_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-md bg-[#ff0000] px-4 py-2 text-sm font-semibold text-white hover:bg-[#cc0000]"
-                >
-                  <YouTubeIcon />
-                  View Channel
-                </a>
-              )}
-            </div>
-            {videoEmbedUrl && (
-              <div className="aspect-video w-full max-w-3xl overflow-hidden rounded-xl">
-                <iframe
-                  src={videoEmbedUrl}
-                  title={`${showroom.business_name} featured video`}
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
-                  className="h-full w-full"
-                />
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+      <ShowroomVideoSection businessName={showroom.business_name} channelUrl={showroom.youtube_channel_url} videos={videos} />
     </div>
   );
 }
@@ -263,14 +231,6 @@ function MessageIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
-
-function YouTubeIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z" />
     </svg>
   );
 }

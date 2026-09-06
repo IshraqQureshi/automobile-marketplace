@@ -33,17 +33,13 @@ export const showroomFieldSchemas = {
     .max(100, "Opening hours must be under 100 characters")
     .optional()
     .transform((value) => value || undefined),
-  // Each showroom's own YouTube presence, shown on their detail page —
-  // distinct from the homepage's admin-wide TikTok/YouTube highlights
-  // (src/features/admin/homepage-highlights-schemas.ts), which are a
+  // The showroom's own YouTube channel link ("View Channel" button on the
+  // detail page) — distinct from its individual featured videos, which are
+  // a proper one-to-many list (src/features/showroom/video-schemas.ts,
+  // `showroom_videos` table), and distinct from the homepage's admin-wide
+  // TikTok/YouTube highlights (homepage-highlights-schemas.ts), which are a
   // platform-level feature, not per-showroom.
   youtubeChannelUrl: z
-    .string()
-    .trim()
-    .url("Enter a valid URL")
-    .or(z.literal(""))
-    .transform((value) => value || undefined),
-  youtubeVideoUrl: z
     .string()
     .trim()
     .url("Enter a valid URL")

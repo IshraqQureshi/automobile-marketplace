@@ -13,8 +13,14 @@ const YOUTUBE_ID_PATTERN = /^[A-Za-z0-9_-]{6,15}$/;
  * on page load (e.g. a showroom's own featured video), where autoplaying
  * unrequested video/audio the moment a visitor lands would be poor UX.
  */
-export function getYouTubeEmbedUrl(url: string, options: { autoplay?: boolean } = {}): string | null {
-  const { autoplay = true } = options;
+/**
+ * Extracts the raw YouTube video ID from any admin/owner-pasted video URL
+ * (watch/shorts/youtu.be/already-embed forms). Returns null when it can't
+ * be confidently extracted. Shared by getYouTubeEmbedUrl (below) and by
+ * callers that need the ID itself — e.g. deriving a thumbnail image from
+ * YouTube's own static thumbnail CDN without a separate upload/Storage step.
+ */
+export function getYouTubeVideoId(url: string): string | null {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -35,8 +41,26 @@ export function getYouTubeEmbedUrl(url: string, options: { autoplay?: boolean } 
     }
   }
 
-  if (!id || !YOUTUBE_ID_PATTERN.test(id)) return null;
+  return id && YOUTUBE_ID_PATTERN.test(id) ? id : null;
+}
+
+export function getYouTubeEmbedUrl(url: string, options: { autoplay?: boolean } = {}): string | null {
+  const { autoplay = true } = options;
+  const id = getYouTubeVideoId(url);
+  if (!id) return null;
   return `https://www.youtube.com/embed/${id}?autoplay=${autoplay ? 1 : 0}&rel=0`;
+}
+
+/**
+ * A real, freely-hosted YouTube thumbnail image for the given video — no
+ * Storage upload/admin curation step needed (unlike homepage_highlights'
+ * admin-uploaded thumbnails), since YouTube itself serves this for any
+ * public video ID. `hqdefault.jpg` exists for every video (unlike
+ * maxresdefault, which 404s for older/lower-resolution uploads).
+ */
+export function getYouTubeThumbnailUrl(url: string): string | null {
+  const id = getYouTubeVideoId(url);
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
 }
 
 /**
