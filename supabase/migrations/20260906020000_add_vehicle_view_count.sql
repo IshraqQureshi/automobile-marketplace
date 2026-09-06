@@ -11,7 +11,7 @@ alter table public.vehicles
   add column view_count integer not null default 0;
 
 comment on column public.vehicles.view_count is
-  'Real, not-deduplicated count of detail-page loads — incremented via increment_vehicle_view_count(), not written directly.';
+  'Real, not-deduplicated count of detail-page loads — incremented via increment_vehicle_view_count(), not written directly. Callable directly by anon (not just via the page), so a scripted caller could inflate it; acceptable for an informational counter with no fraud/rate-limiting requirement, not acceptable if this ever backs a ranking or payout decision.';
 
 create or replace function public.increment_vehicle_view_count(target_vehicle_id uuid)
 returns void
