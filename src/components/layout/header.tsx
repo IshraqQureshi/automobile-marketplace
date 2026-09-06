@@ -7,11 +7,11 @@ import { cn } from "@/lib/utils";
 
 /**
  * Nav dropdowns (Brands/Model/Type) are visually present per the design but
- * not yet wired to real submenu content — MKT-002 (the /vehicles listing +
+ * not yet wired to real submenu content — MKT-002 (the /listing page +
  * filters) now exists and is the real destination for a category browse, but
  * building a full mega-menu of brand/model/type links is a larger, separate
  * UI piece than the listing page itself; deliberately deferred (see
- * MVP_PROGRESS.md decisions log). The search icon is wired to /vehicles
+ * MVP_PROGRESS.md decisions log). The search icon is wired to /listing
  * (MKT-002) now that a real destination exists.
  */
 const NAV_ITEMS = ["Brands", "Model", "Type"] as const;
@@ -42,7 +42,7 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-4 md:flex">
-          <Link href="/vehicles" aria-label="Search vehicles" className="text-neutral-500 hover:text-neutral-700">
+          <Link href="/listing" aria-label="Search vehicles" className="text-neutral-500 hover:text-neutral-700">
             <SearchIcon />
           </Link>
           <Link href="/ready-to-sell" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">

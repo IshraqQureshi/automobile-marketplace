@@ -102,15 +102,19 @@ test.afterAll(async () => {
   await supabase.from("showrooms").delete().eq("id", showroomId);
 });
 
-test("browsing /vehicles shows only ACTIVE listings for the fixture make, not the draft one", async ({ page }) => {
-  await page.goto(`/vehicles?make=${encodeURIComponent(MAKE)}`);
+function detailPath(id: string, model: string) {
+  return `/${MAKE.toLowerCase()}/${model.toLowerCase()}-${id}`;
+}
+
+test("browsing /listing shows only ACTIVE listings for the fixture make, not the draft one", async ({ page }) => {
+  await page.goto(`/listing?make=${encodeURIComponent(MAKE)}`);
   await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Gamma" })).toHaveCount(0);
 });
 
 test("searching by keyword filters to only matching results", async ({ page }) => {
-  await page.goto("/vehicles");
+  await page.goto("/listing");
   await page.locator("#vehicle-search-q").fill(MAKE);
   await page.getByRole("button", { name: "Apply Filters" }).click();
   await page.waitForURL(/q=/);
@@ -118,39 +122,59 @@ test("searching by keyword filters to only matching results", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
 });
 
-test("filtering by make narrows results to just that make", async ({ page }) => {
-  await page.goto("/vehicles");
+test("filtering by brand narrows results to just that brand", async ({ page }) => {
+  await page.goto("/listing");
+  await expect(page.getByText("Brand", { exact: true })).toBeVisible();
   await page.locator("#vehicle-filter-make").selectOption(MAKE);
   await page.getByRole("button", { name: "Apply Filters" }).click();
   await page.waitForURL(new RegExp(`make=${encodeURIComponent(MAKE)}`));
-  await expect(page.getByText("2 listings found")).toBeVisible();
+  await expect(page.getByText("2 cars found")).toBeVisible();
 });
 
 test("sorting by price low-to-high orders the cheaper fixture vehicle first", async ({ page }) => {
-  await page.goto(`/vehicles?make=${encodeURIComponent(MAKE)}`);
+  await page.goto(`/listing?make=${encodeURIComponent(MAKE)}`);
   await page.getByLabel("Sort vehicles").selectOption("price-asc");
   await page.waitForURL(/sort=price-asc/);
 
-  const cards = page.locator('a[href^="/vehicles/"]');
+  const cards = page.locator('a[href^="/"]:has-text("View")');
   await expect(cards.first()).toContainText("Alpha");
 });
 
 test("an empty search result shows the empty state, not a broken page", async ({ page }) => {
-  await page.goto(`/vehicles?q=${encodeURIComponent(`nonexistent-vehicle-${unique}`)}`);
+  await page.goto(`/listing?q=${encodeURIComponent(`nonexistent-vehicle-${unique}`)}`);
   await expect(page.getByText("No vehicles match your search")).toBeVisible();
 });
 
-test("clicking a vehicle card opens its detail page with real specifications and showroom info", async ({ page }) => {
-  await page.goto(`/vehicles/${expensiveVehicleId}`);
+test("clicking a vehicle card opens its /{brand}/{slug} detail page with real specifications, showroom info, and a view counter", async ({ page }) => {
+  const path = detailPath(expensiveVehicleId, "Beta");
+  await page.goto(path);
   await expect(page.getByRole("heading", { name: `2022 ${MAKE} Beta` })).toBeVisible();
   await expect(page.getByText("Ksh 9,000,000")).toBeVisible();
   await expect(page.getByText("A real description for the expensive fixture vehicle.")).toBeVisible();
   await expect(page.getByText(`E2E Vehicle Discovery Showroom ${unique}`).first()).toBeVisible();
+  await expect(page.getByText(/\d+ views?/)).toBeVisible();
 
   // Day 4/5-dependent actions render as real, visibly-disabled controls —
   // not omitted, and not fabricated as if they worked.
   await expect(page.getByRole("button", { name: "Send Message" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "WhatsApp" })).toBeDisabled();
+
+  // Real, honest empty state — no fabricated financing figures for a
+  // listing that never had financing fields configured.
+  await expect(page.getByText("Financing details not provided for this listing")).toBeVisible();
+});
+
+test("view count increments on each real page load", async ({ page }) => {
+  const path = detailPath(cheapVehicleId, "Alpha");
+  await page.goto(path);
+  const firstText = await page.getByText(/\d+ views?/).textContent();
+  const firstCount = Number(firstText?.match(/\d+/)?.[0]);
+
+  await page.goto(path);
+  const secondText = await page.getByText(/\d+ views?/).textContent();
+  const secondCount = Number(secondText?.match(/\d+/)?.[0]);
+
+  expect(secondCount).toBe(firstCount + 1);
 });
 
 test("visiting a draft (non-ACTIVE) vehicle's detail page renders the not-found page rather than exposing it", async ({ page }) => {
@@ -159,11 +183,12 @@ test("visiting a draft (non-ACTIVE) vehicle's detail page renders the not-found 
   // streaming a 200 before this page's notFound() call resolves — a known
   // Next.js App Router interaction (loading.tsx locks the status to 200
   // once any HTML has flushed), pre-existing and not introduced by this
-  // feature. Confirmed it also affects the app's only other notFound()
-  // caller (dashboard/vehicles/[id]/edit). Flagged in MVP_PROGRESS.md as a
-  // real, separate follow-up rather than fixed here (fixing it means
-  // restructuring the app's global loading-state architecture, out of
-  // scope for vehicle discovery).
-  await page.goto(`/vehicles/${draftVehicleId}`);
+  // feature (see B-009 in MVP_PROGRESS.md).
+  await page.goto(detailPath(draftVehicleId, "Gamma"));
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+});
+
+test("a malformed detail-page slug (no valid uuid) renders not-found rather than erroring", async ({ page }) => {
+  await page.goto(`/${MAKE.toLowerCase()}/not-a-real-slug`);
   await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
 });

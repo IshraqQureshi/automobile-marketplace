@@ -8,9 +8,9 @@ import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom 
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Browse Vehicles — HarakaGari",
-  description: "Search and filter verified vehicle listings from certified showrooms across Kenya, by make, model, price, year, fuel type and more.",
-  alternates: { canonical: "/vehicles" },
+  title: "Browse Listing — HarakaGari",
+  description: "Search and filter verified vehicle listings from certified showrooms across Kenya, by brand, model, price, year, fuel type and more.",
+  alternates: { canonical: "/listing" },
 };
 
 // Filter dropdown options are derived from real currently-ACTIVE listings
@@ -52,9 +52,9 @@ export default async function VehiclesPage({ searchParams }: VehiclesPageProps) 
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10 md:px-12">
-      <h1 className="font-display text-3xl font-bold text-neutral-900">Browse Vehicles</h1>
+      <h1 className="font-display text-3xl font-bold text-neutral-900">Browse Listing</h1>
       <p className="mt-1 text-sm text-neutral-500">
-        {totalCount === 0 ? "No listings match your filters" : `${totalCount.toLocaleString("en-KE")} listing${totalCount === 1 ? "" : "s"} found`}
+        {totalCount === 0 ? "No cars match your filters" : `${totalCount.toLocaleString("en-KE")} car${totalCount === 1 ? "" : "s"} found`}
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[260px_1fr]">
@@ -80,7 +80,7 @@ export default async function VehiclesPage({ searchParams }: VehiclesPageProps) 
             </div>
           )}
 
-          <Pagination filters={filters} totalCount={totalCount} perPage={VEHICLES_PER_PAGE} basePath="/vehicles" />
+          <Pagination filters={filters} totalCount={totalCount} perPage={VEHICLES_PER_PAGE} basePath="/listing" />
         </div>
       </div>
     </div>
