@@ -158,6 +158,62 @@ export function renderInquiryThankYouEmail(data: InquiryEmailData): { subject: s
   return { subject, html };
 }
 
+export interface FinancingApplicationEmailData {
+  vehicleTitle: string;
+  vehicleUrl: string;
+  showroomName: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  employmentStatusLabel: string;
+  monthlyIncome: string;
+  desiredDownPayment: string;
+  desiredTenureMonths: number;
+}
+
+/** Sent to the showroom owner and to every admin — same content either way. */
+export function renderFinancingApplicationNotificationEmail(data: FinancingApplicationEmailData): { subject: string; html: string } {
+  const subject = `New financing application: ${data.vehicleTitle} — HarakaGari`;
+  const html = renderEmailShell({
+    preheader: `${escapeHtml(data.contactName)} applied for financing on ${escapeHtml(data.vehicleTitle)}`,
+    heading: "New Financing Application",
+    bodyHtml: `
+      <p style="margin:0 0 16px 0;">A customer applied for financing on a listing on <strong>${escapeHtml(data.showroomName)}</strong>.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0; border:1px solid ${BORDER}; border-radius:8px;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Vehicle</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.vehicleTitle)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Name</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.contactName)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Email</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.contactEmail)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Phone</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.contactPhone)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Employment</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.employmentStatusLabel)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Monthly income</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.monthlyIncome)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Desired down payment</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.desiredDownPayment)}</td></tr>
+        <tr><td style="padding:12px 16px; font-size:13px; color:${MUTED};">Desired loan term</td><td style="padding:12px 16px; font-size:13px; font-weight:600; text-align:right;">${data.desiredTenureMonths} months</td></tr>
+      </table>
+    `,
+    ctaLabel: "View Listing",
+    ctaUrl: data.vehicleUrl,
+    footnote: "Reply directly to the customer's email or phone above — this inbox does not accept replies.",
+  });
+  return { subject, html };
+}
+
+/** Sent to the customer who submitted the financing application. */
+export function renderFinancingApplicationReceivedEmail(data: FinancingApplicationEmailData): { subject: string; html: string } {
+  const subject = `We've received your financing application — ${data.vehicleTitle}`;
+  const html = renderEmailShell({
+    preheader: `Thanks for applying for financing on ${escapeHtml(data.vehicleTitle)} — ${escapeHtml(data.showroomName)} will be in touch.`,
+    heading: "Financing Application Received",
+    bodyHtml: `
+      <p style="margin:0 0 12px 0;">Hi ${escapeHtml(data.contactName)},</p>
+      <p style="margin:0;">Your financing application for the <strong>${escapeHtml(data.vehicleTitle)}</strong> listed by <strong>${escapeHtml(data.showroomName)}</strong> has been sent. They'll review it and reach out to you directly at ${escapeHtml(data.contactEmail)} or ${escapeHtml(data.contactPhone)} within 24 hours.</p>
+    `,
+    ctaLabel: "View Listing",
+    ctaUrl: data.vehicleUrl,
+    footnote: "If you didn't submit this application, you can safely ignore this email.",
+  });
+  return { subject, html };
+}
+
 export interface ShowroomRegistrationEmailData {
   businessName: string;
   ownerFullName: string;

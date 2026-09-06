@@ -19,13 +19,14 @@ interface DashboardSidebarProps {
   email: string;
   showroom: OwnerShowroom;
   unreadInquiryCount?: number;
+  unreadFinancingCount?: number;
   // Fired on any real nav Link click — DashboardShell uses this to close the
   // mobile off-canvas drawer after navigating, so it isn't left open over
   // the new page. Optional/unused on desktop, where the sidebar is static.
   onNavigate?: () => void;
 }
 
-export function DashboardSidebar({ email, showroom, unreadInquiryCount = 0, onNavigate }: DashboardSidebarProps) {
+export function DashboardSidebar({ email, showroom, unreadInquiryCount = 0, unreadFinancingCount = 0, onNavigate }: DashboardSidebarProps) {
   const pathname = usePathname();
   const approved = showroom.status === "APPROVED";
 
@@ -33,13 +34,14 @@ export function DashboardSidebar({ email, showroom, unreadInquiryCount = 0, onNa
   // "coming soon" treatment as the admin sidebar's own not-yet-built
   // entries, rather than linking somewhere that 404s. Profile editing is
   // allowed regardless of approval status (unlike Vehicles), so it's never
-  // gated behind `approved` here. Inquiries follows the same approval gate
-  // as Vehicles — a listing (and thus a real inquiry) can't exist for an
-  // unapproved showroom anyway.
+  // gated behind `approved` here. Inquiries and Financing follow the same
+  // approval gate as Vehicles — a listing (and thus a real inquiry or
+  // financing application) can't exist for an unapproved showroom anyway.
   const items: NavEntry[] = [
     { label: "Dashboard", href: "/dashboard", icon: DashboardIcon },
     { label: "Vehicles", href: approved ? "/dashboard/vehicles" : null, icon: () => <CarIcon /> },
     { label: "Inquiries", href: approved ? "/dashboard/inquiries" : null, icon: InquiryIcon, count: unreadInquiryCount },
+    { label: "Financing", href: approved ? "/dashboard/financing" : null, icon: FinancingIcon, count: unreadFinancingCount },
     { label: "Profile", href: "/dashboard/profile", icon: ProfileIcon },
     { label: "My Account", href: "/dashboard/account", icon: AccountIcon },
     { label: "Appointments", href: null, icon: CalendarIcon },
@@ -150,6 +152,15 @@ function InquiryIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function FinancingIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
     </svg>
   );
 }

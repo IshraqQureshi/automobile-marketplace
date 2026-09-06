@@ -404,6 +404,53 @@ describe("RLS authorization (integration)", () => {
     });
   });
 
+  describe("financing_applications", () => {
+    let applicationId: string;
+
+    beforeAll(async () => {
+      const { data, error } = await customerA.client
+        .from("financing_applications")
+        .insert({
+          vehicle_id: activeVehicleAId,
+          showroom_id: showroomAId,
+          customer_id: customerA.id,
+          contact_name: "Customer A",
+          contact_email: "customer-a@example.com",
+          contact_phone: "+254712345678",
+          employment_status: "EMPLOYED",
+          monthly_income: 80000,
+          national_id: "12345678",
+          desired_down_payment: 200000,
+          desired_tenure_months: 36,
+        })
+        .select()
+        .single();
+      if (error || !data) throw error ?? new Error("financing application not created");
+      applicationId = data.id;
+    });
+
+    it("a different showroom owner cannot see an application addressed to another showroom", async () => {
+      const { data, error } = await ownerB.client.from("financing_applications").select().eq("id", applicationId);
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+    });
+
+    it("the addressed showroom owner can see and mark the application VIEWED", async () => {
+      const { data: seen, error: seenErr } = await ownerA.client.from("financing_applications").select().eq("id", applicationId);
+      expect(seenErr).toBeNull();
+      expect(seen).toHaveLength(1);
+
+      const { error: updateErr } = await ownerA.client.from("financing_applications").update({ status: "VIEWED" }).eq("id", applicationId);
+      expect(updateErr).toBeNull();
+    });
+
+    it("the submitting customer can still see their own application", async () => {
+      const { data, error } = await customerA.client.from("financing_applications").select().eq("id", applicationId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+  });
+
   describe("showroom_availability", () => {
     let availabilityId: string;
 

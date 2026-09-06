@@ -228,6 +228,82 @@ export type Database = {
           },
         ]
       }
+      financing_applications: {
+        Row: {
+          contact_email: string
+          contact_name: string
+          contact_phone: string
+          created_at: string
+          customer_id: string | null
+          desired_down_payment: number
+          desired_tenure_months: number
+          employment_status: string
+          id: string
+          monthly_income: number
+          national_id: string
+          notes: string | null
+          showroom_id: string
+          status: Database["public"]["Enums"]["financing_application_status"]
+          vehicle_id: string
+        }
+        Insert: {
+          contact_email: string
+          contact_name: string
+          contact_phone: string
+          created_at?: string
+          customer_id?: string | null
+          desired_down_payment: number
+          desired_tenure_months: number
+          employment_status: string
+          id?: string
+          monthly_income: number
+          national_id: string
+          notes?: string | null
+          showroom_id: string
+          status?: Database["public"]["Enums"]["financing_application_status"]
+          vehicle_id: string
+        }
+        Update: {
+          contact_email?: string
+          contact_name?: string
+          contact_phone?: string
+          created_at?: string
+          customer_id?: string | null
+          desired_down_payment?: number
+          desired_tenure_months?: number
+          employment_status?: string
+          id?: string
+          monthly_income?: number
+          national_id?: string
+          notes?: string | null
+          showroom_id?: string
+          status?: Database["public"]["Enums"]["financing_application_status"]
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financing_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financing_applications_showroom_id_fkey"
+            columns: ["showroom_id"]
+            isOneToOne: false
+            referencedRelation: "showrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financing_applications_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       homepage_highlights: {
         Row: {
           created_at: string
@@ -1090,6 +1166,7 @@ export type Database = {
         | "DECLINED"
         | "CANCELLED"
         | "COMPLETED"
+      financing_application_status: "NEW" | "VIEWED"
       homepage_highlight_platform: "TIKTOK" | "YOUTUBE"
       manual_payment_status: "RECORDED" | "VOIDED"
       notification_channel: "EMAIL" | "WHATSAPP"
@@ -1257,6 +1334,7 @@ export const Constants = {
         "CANCELLED",
         "COMPLETED",
       ],
+      financing_application_status: ["NEW", "VIEWED"],
       homepage_highlight_platform: ["TIKTOK", "YOUTUBE"],
       manual_payment_status: ["RECORDED", "VOIDED"],
       notification_channel: ["EMAIL", "WHATSAPP"],

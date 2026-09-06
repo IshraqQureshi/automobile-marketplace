@@ -33,14 +33,16 @@ const ADMIN_ITEMS: NavEntry[] = [
 interface AdminSidebarProps {
   email: string;
   unreadInquiryCount?: number;
+  unreadFinancingCount?: number;
   dueSubscriptionsCount?: number;
 }
 
-export function AdminSidebar({ email, unreadInquiryCount = 0, dueSubscriptionsCount = 0 }: AdminSidebarProps) {
+export function AdminSidebar({ email, unreadInquiryCount = 0, unreadFinancingCount = 0, dueSubscriptionsCount = 0 }: AdminSidebarProps) {
   const pathname = usePathname();
   const marketplaceItems: NavEntry[] = [
     ...MARKETPLACE_ITEMS,
     { label: "Inquiries", href: "/admin/inquiries", icon: InquiryIcon, count: unreadInquiryCount },
+    { label: "Financing", href: "/admin/financing", icon: FinancingIcon, count: unreadFinancingCount },
   ];
   const billingItems: NavEntry[] = [{ label: "Payments", href: "/admin/payments", icon: PaymentIcon, count: dueSubscriptionsCount }];
 
@@ -152,6 +154,15 @@ function InquiryIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function FinancingIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
     </svg>
   );
 }
