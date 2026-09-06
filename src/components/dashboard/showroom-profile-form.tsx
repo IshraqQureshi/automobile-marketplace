@@ -19,6 +19,9 @@ export interface ShowroomProfileInitialValues {
   businessEmail: string;
   address: string;
   description: string;
+  openingHours: string;
+  youtubeChannelUrl: string;
+  youtubeVideoUrl: string;
   logoUrl: string | null;
 }
 
@@ -37,6 +40,9 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     businessEmail: initialValues.businessEmail,
     address: initialValues.address,
     description: initialValues.description,
+    openingHours: initialValues.openingHours,
+    youtubeChannelUrl: initialValues.youtubeChannelUrl,
+    youtubeVideoUrl: initialValues.youtubeVideoUrl,
   });
   const [logo, setLogo] = useState<File | null>(null);
   const [logoInputKey, setLogoInputKey] = useState(0);
@@ -53,7 +59,17 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     setFormError(null);
 
     let hasError = false;
-    for (const field of ["businessName", "location", "businessPhone", "businessEmail", "address", "description"] as const) {
+    for (const field of [
+      "businessName",
+      "location",
+      "businessPhone",
+      "businessEmail",
+      "address",
+      "description",
+      "openingHours",
+      "youtubeChannelUrl",
+      "youtubeVideoUrl",
+    ] as const) {
       if (!showroomFieldSchemas[field].safeParse(form[field]).success) {
         validate(field, form[field]);
         hasError = true;
@@ -68,6 +84,9 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     formData.set("businessEmail", form.businessEmail);
     formData.set("address", form.address);
     formData.set("description", form.description);
+    formData.set("openingHours", form.openingHours);
+    formData.set("youtubeChannelUrl", form.youtubeChannelUrl);
+    formData.set("youtubeVideoUrl", form.youtubeVideoUrl);
     if (logo) formData.set("logo", logo);
     if (removeLogo) formData.set("removeLogo", "true");
 
@@ -231,6 +250,53 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
               className={`w-full rounded-md border px-3 py-2.5 text-sm outline-none placeholder:text-neutral-400 focus:border-brand focus:ring-1 focus:ring-brand ${errorFor("description") ? "border-red-400" : "border-neutral-300"}`}
             />
             {errorFor("description") && <p className="mt-1 text-sm text-red-600">{errorFor("description")}</p>}
+          </div>
+
+          <div className="sm:col-span-2">
+            <FieldLabel htmlFor="showroom-opening-hours">Opening hours (optional)</FieldLabel>
+            <Input
+              id="showroom-opening-hours"
+              value={form.openingHours}
+              onChange={(e) => setField("openingHours", e.target.value)}
+              onBlur={(e) => validate("openingHours", e.target.value)}
+              placeholder="e.g. Mon–Sat, 8am–6pm"
+              error={!!errorFor("openingHours")}
+            />
+            {errorFor("openingHours") && <p className="mt-1 text-sm text-red-600">{errorFor("openingHours")}</p>}
+            <p className="mt-1 text-xs text-neutral-400">Shown as-is on your public showroom page.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="font-display text-lg font-semibold text-neutral-900">YouTube</h2>
+        <p className="mt-0.5 text-sm text-neutral-500">Shown on your public showroom page. Leave blank to hide this section entirely.</p>
+
+        <div className="mt-4 grid grid-cols-1 gap-4">
+          <div>
+            <FieldLabel htmlFor="showroom-youtube-channel">Channel URL (optional)</FieldLabel>
+            <Input
+              id="showroom-youtube-channel"
+              value={form.youtubeChannelUrl}
+              onChange={(e) => setField("youtubeChannelUrl", e.target.value)}
+              onBlur={(e) => validate("youtubeChannelUrl", e.target.value)}
+              placeholder="https://www.youtube.com/@yourchannel"
+              error={!!errorFor("youtubeChannelUrl")}
+            />
+            {errorFor("youtubeChannelUrl") && <p className="mt-1 text-sm text-red-600">{errorFor("youtubeChannelUrl")}</p>}
+          </div>
+
+          <div>
+            <FieldLabel htmlFor="showroom-youtube-video">Featured video URL (optional)</FieldLabel>
+            <Input
+              id="showroom-youtube-video"
+              value={form.youtubeVideoUrl}
+              onChange={(e) => setField("youtubeVideoUrl", e.target.value)}
+              onBlur={(e) => validate("youtubeVideoUrl", e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+              error={!!errorFor("youtubeVideoUrl")}
+            />
+            {errorFor("youtubeVideoUrl") && <p className="mt-1 text-sm text-red-600">{errorFor("youtubeVideoUrl")}</p>}
           </div>
         </div>
       </section>

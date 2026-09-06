@@ -26,7 +26,7 @@ export default async function DashboardProfilePage() {
 
   const { data: full } = await supabase
     .from("showrooms")
-    .select("business_name, city, phone, email, address, description, logo_storage_path")
+    .select("business_name, city, phone, email, address, description, logo_storage_path, opening_hours, youtube_channel_url, youtube_video_url")
     .eq("id", showroom.id)
     .single();
 
@@ -46,6 +46,9 @@ export default async function DashboardProfilePage() {
           businessEmail: full?.email ?? "",
           address: full?.address ?? "",
           description: full?.description ?? "",
+          openingHours: typeof full?.opening_hours === "string" ? full.opening_hours : "",
+          youtubeChannelUrl: full?.youtube_channel_url ?? "",
+          youtubeVideoUrl: full?.youtube_video_url ?? "",
           logoUrl,
         }}
       />

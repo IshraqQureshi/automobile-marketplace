@@ -34,6 +34,12 @@ describe("getYouTubeEmbedUrl", () => {
     expect(getYouTubeEmbedUrl("https://example.com/watch?v=dQw4w9WgXcQ")).toBeNull();
   });
 
+  it("disables autoplay when explicitly requested — for an embed that renders on page load, not behind a click", () => {
+    expect(getYouTubeEmbedUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ", { autoplay: false })).toBe(
+      "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=0&rel=0",
+    );
+  });
+
   it("returns null for a watch URL missing the v param", () => {
     expect(getYouTubeEmbedUrl("https://www.youtube.com/watch")).toBeNull();
   });

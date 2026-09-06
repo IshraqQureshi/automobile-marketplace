@@ -24,6 +24,31 @@ export const showroomFieldSchemas = {
     .max(1000, "Description must be under 1000 characters")
     .optional()
     .transform((value) => value || undefined),
+  // Free-text display string (e.g. "Mon-Sat, 8am-6pm"), shown as-is on the
+  // public showroom detail page — not a structured per-day schedule, since
+  // nothing needs to compute "open now" from it, just display it.
+  openingHours: z
+    .string()
+    .trim()
+    .max(100, "Opening hours must be under 100 characters")
+    .optional()
+    .transform((value) => value || undefined),
+  // Each showroom's own YouTube presence, shown on their detail page —
+  // distinct from the homepage's admin-wide TikTok/YouTube highlights
+  // (src/features/admin/homepage-highlights-schemas.ts), which are a
+  // platform-level feature, not per-showroom.
+  youtubeChannelUrl: z
+    .string()
+    .trim()
+    .url("Enter a valid URL")
+    .or(z.literal(""))
+    .transform((value) => value || undefined),
+  youtubeVideoUrl: z
+    .string()
+    .trim()
+    .url("Enter a valid URL")
+    .or(z.literal(""))
+    .transform((value) => value || undefined),
 };
 
 export const adminShowroomSchema = z.object(showroomFieldSchemas);

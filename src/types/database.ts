@@ -606,6 +606,8 @@ export type Database = {
           status: Database["public"]["Enums"]["showroom_status"]
           updated_at: string
           verified: boolean
+          youtube_channel_url: string | null
+          youtube_video_url: string | null
         }
         Insert: {
           address?: string | null
@@ -624,6 +626,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["showroom_status"]
           updated_at?: string
           verified?: boolean
+          youtube_channel_url?: string | null
+          youtube_video_url?: string | null
         }
         Update: {
           address?: string | null
@@ -642,6 +646,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["showroom_status"]
           updated_at?: string
           verified?: boolean
+          youtube_channel_url?: string | null
+          youtube_video_url?: string | null
         }
         Relationships: [
           {

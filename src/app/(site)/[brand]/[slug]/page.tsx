@@ -9,6 +9,7 @@ import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
 import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-button";
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
 import { getVehicleDetailPath, parseVehicleIdFromSlug } from "@/features/vehicle/slug";
+import { getShowroomDetailPath } from "@/features/showroom/slug";
 import { extractClientIp, hashClientIp } from "@/features/vehicle/view-tracking";
 import { createClient } from "@/lib/supabase/server";
 
@@ -381,14 +382,12 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                     </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  disabled
-                  title="Showroom profile pages — coming soon"
-                  className="shrink-0 rounded-md border border-[#99e6df] bg-[#f0fdf9] px-5 py-2.5 text-sm font-semibold text-brand disabled:cursor-not-allowed"
+                <Link
+                  href={getShowroomDetailPath({ id: vehicle.showroomId, businessName: vehicle.showroomName })}
+                  className="shrink-0 rounded-md border border-[#99e6df] bg-[#f0fdf9] px-5 py-2.5 text-sm font-semibold text-brand no-underline hover:bg-[#e6faf7]"
                 >
                   View Dealer Profile →
-                </button>
+                </Link>
               </div>
             </section>
           )}

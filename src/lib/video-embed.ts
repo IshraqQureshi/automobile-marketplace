@@ -5,8 +5,16 @@ const YOUTUBE_ID_PATTERN = /^[A-Za-z0-9_-]{6,15}$/;
  * (watch/shorts/youtu.be/already-embed forms). Returns null when the ID
  * can't be confidently extracted, so callers can fall back to a plain
  * "watch on YouTube" link rather than rendering a broken iframe.
+ *
+ * `autoplay` defaults to true, matching the only original caller
+ * (src/components/home/highlight-section.tsx's modal — autoplay is
+ * appropriate there since the modal only ever opens after a deliberate
+ * click). Pass `{ autoplay: false }` for an embed that renders directly
+ * on page load (e.g. a showroom's own featured video), where autoplaying
+ * unrequested video/audio the moment a visitor lands would be poor UX.
  */
-export function getYouTubeEmbedUrl(url: string): string | null {
+export function getYouTubeEmbedUrl(url: string, options: { autoplay?: boolean } = {}): string | null {
+  const { autoplay = true } = options;
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -28,7 +36,7 @@ export function getYouTubeEmbedUrl(url: string): string | null {
   }
 
   if (!id || !YOUTUBE_ID_PATTERN.test(id)) return null;
-  return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
+  return `https://www.youtube.com/embed/${id}?autoplay=${autoplay ? 1 : 0}&rel=0`;
 }
 
 /**
