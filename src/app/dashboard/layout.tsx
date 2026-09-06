@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { ToastProvider } from "@/components/ui/toast";
+import { getUnreadInquiryCount } from "@/features/inquiry/queries";
 import { getOwnerShowroom } from "@/features/showroom/my-showroom";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,9 +34,11 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     redirect("/ready-to-sell");
   }
 
+  const unreadInquiryCount = showroom.status === "APPROVED" ? await getUnreadInquiryCount(supabase, showroom.id) : 0;
+
   return (
     <ToastProvider>
-      <DashboardShell email={user.email ?? ""} showroom={showroom}>
+      <DashboardShell email={user.email ?? ""} showroom={showroom} unreadInquiryCount={unreadInquiryCount}>
         {children}
       </DashboardShell>
     </ToastProvider>

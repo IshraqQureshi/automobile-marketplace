@@ -162,9 +162,11 @@ test("clicking a vehicle card opens its /{brand}/{slug} detail page with real sp
   await expect(page.getByText(`E2E Vehicle Discovery Showroom ${unique}`).first()).toBeVisible();
   await expect(page.getByText(/\d+ views?/)).toBeVisible();
 
-  // Day 4/5-dependent actions render as real, visibly-disabled controls —
-  // not omitted, and not fabricated as if they worked.
-  await expect(page.getByRole("button", { name: "Send Message" })).toBeDisabled();
+  // "Send Message" is a real, working inquiry form as of the vehicle-inquiry
+  // feature (see e2e/vehicle-inquiry.spec.ts for its own dedicated coverage)
+  // — only WhatsApp/Test Drive/Financing application remain real, visibly-
+  // disabled controls pending their own Day 4/5 dependencies.
+  await expect(page.getByRole("button", { name: "Send Message" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "WhatsApp" })).toBeDisabled();
 
   // Real, honest empty state — no fabricated financing figures for a

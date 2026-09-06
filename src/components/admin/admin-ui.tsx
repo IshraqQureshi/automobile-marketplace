@@ -132,6 +132,8 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
   APPROVED: "bg-emerald-50 text-emerald-700",
   REJECTED: "bg-red-50 text-red-700",
   SUSPENDED: "bg-neutral-100 text-neutral-500",
+  NEW: "bg-blue-50 text-blue-700",
+  VIEWED: "bg-neutral-100 text-neutral-500",
 };
 
 export function StatusBadge({ status }: { status: string }) {

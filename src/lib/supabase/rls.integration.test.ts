@@ -334,7 +334,15 @@ describe("RLS authorization (integration)", () => {
     beforeAll(async () => {
       const { data, error } = await customerA.client
         .from("vehicle_inquiries")
-        .insert({ vehicle_id: activeVehicleAId, showroom_id: showroomAId, customer_id: customerA.id, message: "Still available?" })
+        .insert({
+          vehicle_id: activeVehicleAId,
+          showroom_id: showroomAId,
+          customer_id: customerA.id,
+          message: "Still available?",
+          contact_name: "Customer A",
+          contact_email: "customer-a@example.com",
+          contact_phone: "+254712345678",
+        })
         .select()
         .single();
       if (error || !data) throw error ?? new Error("inquiry not created");

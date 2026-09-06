@@ -11,6 +11,7 @@ interface NavEntry {
   label: string;
   href: string | null; // null = not built yet, renders inert ("Coming soon")
   icon: () => React.JSX.Element;
+  count?: number;
 }
 
 const OVERVIEW_ITEMS: NavEntry[] = [{ label: "Dashboard", href: "/admin", icon: DashboardIcon }];
@@ -33,10 +34,15 @@ const ADMIN_ITEMS: NavEntry[] = [
 
 interface AdminSidebarProps {
   email: string;
+  unreadInquiryCount?: number;
 }
 
-export function AdminSidebar({ email }: AdminSidebarProps) {
+export function AdminSidebar({ email, unreadInquiryCount = 0 }: AdminSidebarProps) {
   const pathname = usePathname();
+  const marketplaceItems: NavEntry[] = [
+    ...MARKETPLACE_ITEMS,
+    { label: "Inquiries", href: "/admin/inquiries", icon: InquiryIcon, count: unreadInquiryCount },
+  ];
 
   return (
     <aside className="flex flex-col gap-7 border-r border-neutral-200 bg-white px-4 py-5">
@@ -45,7 +51,7 @@ export function AdminSidebar({ email }: AdminSidebarProps) {
       </Link>
 
       <NavGroup label="Overview" items={OVERVIEW_ITEMS} pathname={pathname} />
-      <NavGroup label="Marketplace" items={MARKETPLACE_ITEMS} pathname={pathname} />
+      <NavGroup label="Marketplace" items={marketplaceItems} pathname={pathname} />
       <NavGroup label="Content" items={CONTENT_ITEMS} pathname={pathname} />
       <NavGroup label="Admin" items={ADMIN_ITEMS} pathname={pathname} />
 
@@ -117,7 +123,12 @@ function NavGroup({ label, items, pathname }: NavGroupProps) {
             )}
           >
             <item.icon />
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {!!item.count && (
+              <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-bold", active ? "bg-white/25 text-white" : "bg-brand text-white")}>
+                {item.count}
+              </span>
+            )}
           </Link>
         );
       })}
@@ -132,6 +143,14 @@ function DashboardIcon() {
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
+function InquiryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
 }
