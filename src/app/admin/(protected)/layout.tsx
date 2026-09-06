@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { ToastProvider } from "@/components/ui/toast";
 import { currentUserRole } from "@/features/auth/actions";
+import { getUnreadFinancingCount } from "@/features/financing/queries";
 import { getUnreadInquiryCount } from "@/features/inquiry/queries";
 import { getDueSubscriptionsCount } from "@/features/admin/payment-queries";
 import { createClient } from "@/lib/supabase/server";
@@ -30,12 +31,21 @@ export default async function AdminProtectedLayout({ children }: AdminProtectedL
     redirect("/admin/login");
   }
 
-  const [unreadInquiryCount, dueSubscriptionsCount] = await Promise.all([getUnreadInquiryCount(supabase), getDueSubscriptionsCount(supabase)]);
+  const [unreadInquiryCount, unreadFinancingCount, dueSubscriptionsCount] = await Promise.all([
+    getUnreadInquiryCount(supabase),
+    getUnreadFinancingCount(supabase),
+    getDueSubscriptionsCount(supabase),
+  ]);
 
   return (
     <ToastProvider>
       <div className="grid min-h-screen grid-cols-[248px_1fr] bg-white">
-        <AdminSidebar email={user.email ?? ""} unreadInquiryCount={unreadInquiryCount} dueSubscriptionsCount={dueSubscriptionsCount} />
+        <AdminSidebar
+          email={user.email ?? ""}
+          unreadInquiryCount={unreadInquiryCount}
+          unreadFinancingCount={unreadFinancingCount}
+          dueSubscriptionsCount={dueSubscriptionsCount}
+        />
         <div className="flex min-w-0 flex-col">{children}</div>
       </div>
     </ToastProvider>

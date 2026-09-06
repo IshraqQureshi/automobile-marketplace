@@ -158,7 +158,14 @@ test("admin can see the inquiry, opening it marks it VIEWED and drops the sideba
   await expect(row).toBeVisible();
   await expect(row.getByText("new", { exact: true })).toBeVisible();
 
-  const badgeBefore = await page.locator("aside").getByText(/^\d+$/).first().textContent();
+  // Scoped to the "Inquiries" nav link specifically — the admin sidebar
+  // also shows unread-count badges for Financing applications and due
+  // Payments, so a blanket "any digit in the sidebar" check is ambiguous
+  // once more than one badge can be non-zero at the same time (confirmed
+  // live: this test started failing the moment a second sidebar badge
+  // existed, even though the Inquiries-specific badge dropped correctly).
+  const inquiriesNavLink = page.getByRole("link", { name: "Inquiries" });
+  const badgeBefore = await inquiriesNavLink.getByText(/^\d+$/).textContent();
 
   await row.click();
   await expect(page.getByRole("dialog").getByText("Checking that admins can see this real inquiry.")).toBeVisible();
@@ -171,11 +178,11 @@ test("admin can see the inquiry, opening it marks it VIEWED and drops the sideba
   // what actually re-fetches the sidebar's server-rendered unread count.
   await page.reload();
   await page.waitForTimeout(500);
-  const badgeAfterCount = await page.locator("aside").getByText(/^\d+$/).count();
+  const badgeAfterCount = await page.getByRole("link", { name: "Inquiries" }).getByText(/^\d+$/).count();
   if (Number(badgeBefore) - 1 === 0) {
     expect(badgeAfterCount).toBe(0);
   } else {
-    const badgeAfter = await page.locator("aside").getByText(/^\d+$/).first().textContent();
+    const badgeAfter = await page.getByRole("link", { name: "Inquiries" }).getByText(/^\d+$/).textContent();
     expect(Number(badgeAfter)).toBe(Number(badgeBefore) - 1);
   }
 });

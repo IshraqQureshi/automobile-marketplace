@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { VehicleCard } from "@/components/vehicle/vehicle-card";
+import { FinancingApplicationButton } from "@/components/vehicle/financing-application-button";
 import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
 import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-button";
@@ -150,6 +151,12 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
     vehicle.financingInterestRate != null &&
     vehicle.financingTenureMonths != null &&
     vehicle.financingTenureMonths.length > 0;
+
+  const defaultDesiredDownPayment = hasRealFinancing
+    ? vehicle.financingDownPaymentType === "FIXED"
+      ? (vehicle.financingDownPaymentAmount ?? 0)
+      : vehicle.price * ((vehicle.financingDownPaymentPercent ?? 0) / 100)
+    : 0;
 
   const bodyTypePlural = vehicle.bodyType ? `${vehicle.bodyType}s` : null;
 
@@ -339,14 +346,24 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                   <p className="max-w-120 text-sm leading-relaxed text-white/75">Apply in minutes and get a decision within 24 hours.</p>
                 </div>
               </div>
-              <button
-                type="button"
-                disabled
-                title="Financing applications — coming soon"
-                className="shrink-0 rounded-md bg-white px-6 py-2.5 text-sm font-semibold text-brand disabled:cursor-not-allowed"
-              >
-                Apply for Financing
-              </button>
+              {hasRealFinancing ? (
+                <FinancingApplicationButton
+                  vehicleId={vehicle.id}
+                  vehicleTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                  initialValues={inquiryInitialValues}
+                  defaultDesiredDownPayment={defaultDesiredDownPayment}
+                  tenureOptionsMonths={vehicle.financingTenureMonths!}
+                />
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  title="This showroom hasn't configured financing for this listing"
+                  className="shrink-0 rounded-md bg-white px-6 py-2.5 text-sm font-semibold text-brand disabled:cursor-not-allowed"
+                >
+                  Apply for Financing
+                </button>
+              )}
             </div>
           </section>
 

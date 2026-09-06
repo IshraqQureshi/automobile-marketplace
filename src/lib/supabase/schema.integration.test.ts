@@ -258,6 +258,54 @@ describe("Database schema integrity (integration)", () => {
     expect(error?.code).toBe("23514");
   });
 
+  it("derives financing_applications.showroom_id from the vehicle, ignoring a client-supplied value", async () => {
+    const { data, error } = await supabase
+      .from("financing_applications")
+      .insert({
+        vehicle_id: vehicleId,
+        // Deliberately wrong — the trigger must overwrite this.
+        showroom_id: otherShowroomId,
+        customer_id: customerId,
+        contact_name: "Test Customer",
+        contact_email: "test-customer@example.com",
+        contact_phone: "+254712345678",
+        employment_status: "EMPLOYED",
+        monthly_income: 80000,
+        national_id: "12345678",
+        desired_down_payment: 200000,
+        desired_tenure_months: 36,
+      })
+      .select()
+      .single();
+
+    expect(error).toBeNull();
+    expect(data?.showroom_id).toBe(showroomId);
+
+    if (data) await supabase.from("financing_applications").delete().eq("id", data.id);
+  });
+
+  it("rejects an invalid financing_applications employment_status", async () => {
+    const { error } = await supabase
+      .from("financing_applications")
+      // showroom_id is required by the generated Insert type but always
+      // overwritten by the set_financing_application_showroom trigger.
+      .insert({
+        vehicle_id: vehicleId,
+        showroom_id: showroomId,
+        customer_id: customerId,
+        contact_name: "Test Customer",
+        contact_email: "test-customer@example.com",
+        contact_phone: "+254712345678",
+        employment_status: "RETIRED",
+        monthly_income: 80000,
+        national_id: "12345678",
+        desired_down_payment: 200000,
+        desired_tenure_months: 36,
+      });
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("23514");
+  });
+
   describe("appointments and appointment_vehicles", () => {
     let appointmentId: string;
 
