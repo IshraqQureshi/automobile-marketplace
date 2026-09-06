@@ -855,6 +855,35 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_views: {
+        Row: {
+          created_at: string
+          id: string
+          vehicle_id: string
+          viewer_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          vehicle_id: string
+          viewer_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          vehicle_id?: string
+          viewer_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_views_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicles: {
         Row: {
           bank_finance_enabled: boolean
@@ -980,12 +1009,12 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
-      increment_vehicle_view_count: {
-        Args: { target_vehicle_id: string }
-        Returns: undefined
-      }
       is_admin: { Args: never; Returns: boolean }
       owns_showroom: { Args: { target_showroom_id: string }; Returns: boolean }
+      record_vehicle_view: {
+        Args: { anon_viewer_ip_hash?: string; target_vehicle_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       appointment_status:
