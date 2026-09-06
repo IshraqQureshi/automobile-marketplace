@@ -78,9 +78,11 @@ test("visiting /admin/highlights while signed out redirects to /admin/login", as
   await expect(page).toHaveURL(/\/admin\/login$/);
 });
 
-test("admin can create a highlight and it appears on the homepage, linking to the real video URL", async ({ page }) => {
+test("admin can create a highlight, and clicking its card on the homepage opens the real video in a modal", async ({ page }) => {
   const unique = Date.now();
   const title = `E2E Highlight TikTok ${unique}`;
+  // Numeric path segment so getTikTokEmbedUrl (src/lib/video-embed.ts) can
+  // derive a real embed URL from it, same shape as an actual TikTok video URL.
   const videoUrl = `https://www.tiktok.com/@e2e-test/video/${unique}`;
 
   await loginAsFixtureAdmin(page);
@@ -98,9 +100,13 @@ test("admin can create a highlight and it appears on the homepage, linking to th
   await expect(page.getByRole("row", { name: new RegExp(title) })).toBeAttached();
 
   await page.goto("/");
-  const card = page.getByRole("link", { name: new RegExp(title) });
+  const card = page.getByRole("button", { name: new RegExp(title) });
   await expect(card).toBeVisible();
-  await expect(card).toHaveAttribute("href", videoUrl);
+  await card.click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText(title)).toBeVisible();
+  await expect(dialog.locator("iframe")).toHaveAttribute("src", `https://www.tiktok.com/embed/v2/${unique}`);
 });
 
 test("a highlight marked not visible is hidden from the homepage but still shown in the admin list", async ({ page }) => {

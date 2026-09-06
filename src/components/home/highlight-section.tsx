@@ -1,3 +1,9 @@
+"use client";
+
+import { useState } from "react";
+import { Dialog } from "@/components/ui/dialog";
+import { getTikTokEmbedUrl, getYouTubeEmbedUrl } from "@/lib/video-embed";
+
 export interface HighlightCardItem {
   id: string;
   title: string;
@@ -12,6 +18,7 @@ interface HighlightSectionProps {
   handleLabel: string;
   profileUrl: string;
   items: HighlightCardItem[];
+  platform: "TIKTOK" | "YOUTUBE";
   platformColor: string;
   platformIcon: React.ReactNode;
 }
@@ -25,9 +32,28 @@ interface HighlightSectionProps {
  * TikTok/YouTube API integration. No view-count/handle row (unlike the
  * design mockup) — that data isn't real/available without a live API,
  * which is explicitly out of scope, so it isn't fabricated here.
+ *
+ * Cards open the real admin-pasted video in an in-page modal (embedding the
+ * actual video, not a live API lookup) rather than navigating away — only
+ * the "@Handle" profile link still opens the real external
+ * TikTok/YouTube channel in a new tab.
  */
-export function HighlightSection({ eyebrow, heading, subtitle, handleLabel, profileUrl, items, platformColor, platformIcon }: HighlightSectionProps) {
+export function HighlightSection({
+  eyebrow,
+  heading,
+  subtitle,
+  handleLabel,
+  profileUrl,
+  items,
+  platform,
+  platformColor,
+  platformIcon,
+}: HighlightSectionProps) {
+  const [activeItem, setActiveItem] = useState<HighlightCardItem | null>(null);
+
   if (items.length === 0) return null;
+
+  const embedUrl = activeItem ? (platform === "TIKTOK" ? getTikTokEmbedUrl(activeItem.videoUrl) : getYouTubeEmbedUrl(activeItem.videoUrl)) : null;
 
   return (
     <section className="bg-ink px-6 py-14 md:px-12">
@@ -54,12 +80,11 @@ export function HighlightSection({ eyebrow, heading, subtitle, handleLabel, prof
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {items.map((item) => (
-            <a
+            <button
               key={item.id}
-              href={item.videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group relative block overflow-hidden rounded-xl bg-[#1a1f2e]"
+              type="button"
+              onClick={() => setActiveItem(item)}
+              className="group relative block overflow-hidden rounded-xl bg-[#1a1f2e] text-left"
               style={{ aspectRatio: "9 / 16", maxHeight: "420px" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied Storage thumbnail, no build-time-known dimensions */}
@@ -81,10 +106,43 @@ export function HighlightSection({ eyebrow, heading, subtitle, handleLabel, prof
                   {platformIcon}
                 </span>
               </div>
-            </a>
+            </button>
           ))}
         </div>
       </div>
+
+      <Dialog open={activeItem != null} onClose={() => setActiveItem(null)} title={activeItem?.title ?? ""} size="lg">
+        {embedUrl ? (
+          <div
+            className="mx-auto overflow-hidden rounded-lg bg-black"
+            style={platform === "TIKTOK" ? { aspectRatio: "9 / 16", maxHeight: "70vh", width: "fit-content" } : { aspectRatio: "16 / 9" }}
+          >
+            <iframe
+              src={embedUrl}
+              title={activeItem?.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="h-full w-full"
+              style={platform === "TIKTOK" ? { aspectRatio: "9 / 16", height: "70vh" } : undefined}
+            />
+          </div>
+        ) : (
+          activeItem && (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <p className="text-sm text-neutral-500">This video can&apos;t be embedded directly — watch it on the original platform instead.</p>
+              <a
+                href={activeItem.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md px-5 py-2.5 text-sm font-semibold text-white no-underline"
+                style={{ backgroundColor: platformColor }}
+              >
+                Watch on {platform === "TIKTOK" ? "TikTok" : "YouTube"} →
+              </a>
+            </div>
+          )
+        )}
+      </Dialog>
     </section>
   );
 }

@@ -34,6 +34,9 @@ const MOST_SEARCHED_LIMIT = 8;
 const POPULAR_BRANDS_LIMIT = 10;
 const POPULAR_MODELS_LIMIT = 6;
 const CERTIFIED_SHOWROOMS_LIMIT = 12;
+// Below this, the marquee is more empty space than content — a single
+// showroom repeated to fill the loop looks broken rather than "certified".
+const MIN_SHOWROOMS_FOR_MARQUEE = 10;
 const HIGHLIGHTS_LIMIT = 4;
 
 export default async function Home() {
@@ -87,11 +90,14 @@ export default async function Home() {
   const getShowroomLogoUrl = (path: string) => supabase.storage.from("showroom-logos").getPublicUrl(path).data.publicUrl;
   const getHighlightThumbnailUrl = (path: string) => supabase.storage.from("homepage-highlights").getPublicUrl(path).data.publicUrl;
 
-  const certifiedShowrooms = (showroomRows ?? []).map((row) => ({
-    id: row.id,
-    name: row.business_name,
-    logoUrl: row.logo_storage_path ? getShowroomLogoUrl(row.logo_storage_path) : null,
-  }));
+  const certifiedShowrooms =
+    (showroomCount ?? 0) >= MIN_SHOWROOMS_FOR_MARQUEE
+      ? (showroomRows ?? []).map((row) => ({
+          id: row.id,
+          name: row.business_name,
+          logoUrl: row.logo_storage_path ? getShowroomLogoUrl(row.logo_storage_path) : null,
+        }))
+      : [];
 
   const brandTiles = (brandRows ?? []).map((row) => ({
     id: row.id,
@@ -175,6 +181,7 @@ export default async function Home() {
         handleLabel="@HarakaGari"
         profileUrl={tiktokProfileUrl}
         items={tiktokItems}
+        platform="TIKTOK"
         platformColor="#FF2D55"
         platformIcon={<TikTokIcon />}
       />
@@ -188,6 +195,7 @@ export default async function Home() {
         handleLabel="@HarakaGari"
         profileUrl={youtubeChannelUrl}
         items={youtubeItems}
+        platform="YOUTUBE"
         platformColor="#FF0000"
         platformIcon={<YouTubeIcon />}
       />
