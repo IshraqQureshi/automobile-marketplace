@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { getDueSubscriptions } from "@/features/admin/payment-queries";
+import { currencyFormatter } from "@/features/vehicle/types";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,12 +28,13 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
   // OR'd into each table's SELECT policy, so an authenticated admin gets an
   // unrestricted count here through the regular (RLS-scoped) client —
   // verified against the actual policy SQL, no service-role client needed.
-  const [pendingShowrooms, approvedShowrooms, activeVehicles, users, recentPendingShowrooms] = await Promise.all([
+  const [pendingShowrooms, approvedShowrooms, activeVehicles, users, recentPendingShowrooms, dueSubscriptions] = await Promise.all([
     supabase.from("showrooms").select("*", { count: "exact", head: true }).eq("status", "PENDING"),
     supabase.from("showrooms").select("*", { count: "exact", head: true }).eq("status", "APPROVED"),
     supabase.from("vehicles").select("*", { count: "exact", head: true }).eq("status", "ACTIVE"),
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("showrooms").select("id, business_name, city, created_at").eq("status", "PENDING").order("created_at").limit(5),
+    getDueSubscriptions(supabase),
   ]);
 
   for (const [label, result] of [
@@ -54,6 +57,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
     { label: "Approved showrooms", ...countOrError(approvedShowrooms), hint: "Live on the marketplace" },
     { label: "Vehicles listed", ...countOrError(activeVehicles), hint: "Active listings" },
     { label: "Registered users", ...countOrError(users), hint: "Customers & showrooms" },
+    { label: "Subscriptions due", value: String(dueSubscriptions.length), isError: false, hint: "Expiring soon or overdue" },
   ];
 
   return (
@@ -67,7 +71,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
             </p>
           )}
 
-          <section className="grid grid-cols-4 gap-3.5">
+          <section className="grid grid-cols-5 gap-3.5">
             {stats.map((stat) => (
               <div key={stat.label} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                 <p className="text-xs font-medium text-neutral-500">{stat.label}</p>
@@ -120,13 +124,40 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
             </div>
 
             <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
-              <div className="border-b border-neutral-200 px-5 py-4">
-                <h2 className="font-display text-base font-semibold text-neutral-900">Recent activity</h2>
-                <p className="text-xs text-neutral-500">Last 24 hours</p>
+              <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-4">
+                <div>
+                  <h2 className="font-display text-base font-semibold text-neutral-900">Subscriptions due</h2>
+                  <p className="text-xs text-neutral-500">Expiring soon or overdue</p>
+                </div>
+                {dueSubscriptions.length > 0 && (
+                  <Link href="/admin/payments" className="shrink-0 text-xs font-medium text-brand hover:underline">
+                    View all
+                  </Link>
+                )}
               </div>
-              <div className="flex flex-col items-center justify-center gap-1 px-5 py-14 text-center">
-                <p className="text-sm font-medium text-neutral-500">No activity yet</p>
-              </div>
+              {dueSubscriptions.length > 0 ? (
+                <ul>
+                  {dueSubscriptions.slice(0, 5).map((payment) => {
+                    const overdue = new Date(`${payment.endDate}T00:00:00`) < new Date(new Date().toDateString());
+                    return (
+                      <li key={payment.id} className="flex items-center justify-between gap-3 border-b border-neutral-100 px-5 py-3 last:border-b-0">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-neutral-800">{payment.showroomName}</p>
+                          <p className="text-xs text-neutral-400">{currencyFormatter.format(payment.amount)} · ends {payment.endDate}</p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${overdue ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>
+                          {overdue ? "Overdue" : "Expiring soon"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-1 px-5 py-14 text-center">
+                  <p className="text-sm font-medium text-neutral-500">No subscriptions due</p>
+                  <p className="text-xs text-neutral-400">Every showroom is current on payment.</p>
+                </div>
+              )}
             </div>
           </section>
         </div>

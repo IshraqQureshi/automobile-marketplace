@@ -157,3 +157,37 @@ export function renderInquiryThankYouEmail(data: InquiryEmailData): { subject: s
   });
   return { subject, html };
 }
+
+export interface SubscriptionReminderEmailData {
+  showroomName: string;
+  endDate: string; // "YYYY-MM-DD"
+  urgency: "EXPIRING_SOON" | "OVERDUE";
+}
+
+/** Sent to every admin — once per subscription period, see reminder_sent_at. */
+export function renderSubscriptionReminderEmail(data: SubscriptionReminderEmailData): { subject: string; html: string } {
+  const formattedDate = new Date(`${data.endDate}T00:00:00`).toLocaleDateString("en-KE", { year: "numeric", month: "long", day: "numeric" });
+  const isOverdue = data.urgency === "OVERDUE";
+  const subject = isOverdue
+    ? `Subscription overdue: ${data.showroomName} — HarakaGari Admin`
+    : `Subscription expiring soon: ${data.showroomName} — HarakaGari Admin`;
+  const html = renderEmailShell({
+    preheader: isOverdue
+      ? `${data.showroomName}'s subscription ended on ${formattedDate}.`
+      : `${data.showroomName}'s subscription ends on ${formattedDate}.`,
+    heading: isOverdue ? "Showroom Subscription Overdue" : "Showroom Subscription Expiring Soon",
+    bodyHtml: `
+      <p style="margin:0 0 12px 0;">
+        ${isOverdue ? "This showroom's subscription period has already ended." : "This showroom's subscription period is ending soon."}
+      </p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0; border:1px solid ${BORDER}; border-radius:8px;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Showroom</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.showroomName)}</td></tr>
+        <tr><td style="padding:12px 16px; font-size:13px; color:${MUTED};">${isOverdue ? "Ended on" : "Ends on"}</td><td style="padding:12px 16px; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(formattedDate)}</td></tr>
+      </table>
+    `,
+    ctaLabel: "Review in Admin Panel",
+    ctaUrl: `${publicEnv.NEXT_PUBLIC_SITE_URL}/admin/payments`,
+    footnote: "Record a new payment for this showroom to renew its subscription period.",
+  });
+  return { subject, html };
+}

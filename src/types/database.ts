@@ -287,7 +287,11 @@ export type Database = {
           payment_method: string
           recorded_by: string
           reference: string | null
+          reminder_sent_at: string | null
+          showroom_id: string | null
           status: Database["public"]["Enums"]["manual_payment_status"]
+          subscription_end_date: string | null
+          subscription_start_date: string | null
           updated_at: string
         }
         Insert: {
@@ -301,7 +305,11 @@ export type Database = {
           payment_method: string
           recorded_by: string
           reference?: string | null
+          reminder_sent_at?: string | null
+          showroom_id?: string | null
           status?: Database["public"]["Enums"]["manual_payment_status"]
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -315,7 +323,11 @@ export type Database = {
           payment_method?: string
           recorded_by?: string
           reference?: string | null
+          reminder_sent_at?: string | null
+          showroom_id?: string | null
           status?: Database["public"]["Enums"]["manual_payment_status"]
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -338,6 +350,13 @@ export type Database = {
             columns: ["recorded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_payments_showroom_id_fkey"
+            columns: ["showroom_id"]
+            isOneToOne: false
+            referencedRelation: "showrooms"
             referencedColumns: ["id"]
           },
         ]

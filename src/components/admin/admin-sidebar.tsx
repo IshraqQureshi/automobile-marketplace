@@ -32,14 +32,16 @@ const ADMIN_ITEMS: NavEntry[] = [
 interface AdminSidebarProps {
   email: string;
   unreadInquiryCount?: number;
+  dueSubscriptionsCount?: number;
 }
 
-export function AdminSidebar({ email, unreadInquiryCount = 0 }: AdminSidebarProps) {
+export function AdminSidebar({ email, unreadInquiryCount = 0, dueSubscriptionsCount = 0 }: AdminSidebarProps) {
   const pathname = usePathname();
   const marketplaceItems: NavEntry[] = [
     ...MARKETPLACE_ITEMS,
     { label: "Inquiries", href: "/admin/inquiries", icon: InquiryIcon, count: unreadInquiryCount },
   ];
+  const billingItems: NavEntry[] = [{ label: "Payments", href: "/admin/payments", icon: PaymentIcon, count: dueSubscriptionsCount }];
 
   return (
     <aside className="flex flex-col gap-7 border-r border-neutral-200 bg-white px-4 py-5">
@@ -50,6 +52,7 @@ export function AdminSidebar({ email, unreadInquiryCount = 0 }: AdminSidebarProp
       <NavGroup label="Overview" items={OVERVIEW_ITEMS} pathname={pathname} />
       <NavGroup label="Marketplace" items={marketplaceItems} pathname={pathname} />
       <NavGroup label="Content" items={CONTENT_ITEMS} pathname={pathname} />
+      <NavGroup label="Billing" items={billingItems} pathname={pathname} />
       <NavGroup label="Admin" items={ADMIN_ITEMS} pathname={pathname} />
 
       <div className="flex-1" />
@@ -177,6 +180,15 @@ function UsersIcon() {
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function PaymentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
     </svg>
   );
 }
