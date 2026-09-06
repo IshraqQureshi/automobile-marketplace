@@ -19,7 +19,7 @@ export default async function RegisterShowroomPage() {
   }
 
   const [{ data: profile, error: profileError }, { data: existingShowroom, error: showroomError }] = await Promise.all([
-    supabase.from("profiles").select("phone").eq("id", user.id).single(),
+    supabase.from("profiles").select("full_name, phone").eq("id", user.id).single(),
     supabase.from("showrooms").select("status").eq("owner_user_id", user.id).in("status", ["PENDING", "APPROVED", "SUSPENDED"]).maybeSingle(),
   ]);
 
@@ -41,7 +41,7 @@ export default async function RegisterShowroomPage() {
           {existingShowroom ? (
             <ExistingShowroomStatus status={existingShowroom.status} />
           ) : (
-            <RegisterShowroomForm defaultEmail={user.email ?? ""} defaultPhone={profile?.phone ?? ""} />
+            <RegisterShowroomForm defaultOwnerName={profile?.full_name ?? ""} defaultEmail={user.email ?? ""} defaultPhone={profile?.phone ?? ""} />
           )}
         </div>
 
