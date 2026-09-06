@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { ToastProvider } from "@/components/ui/toast";
 import { currentUserRole } from "@/features/auth/actions";
+import { getUnreadInquiryCount } from "@/features/inquiry/queries";
 import { createClient } from "@/lib/supabase/server";
 
 interface AdminProtectedLayoutProps {
@@ -28,10 +29,12 @@ export default async function AdminProtectedLayout({ children }: AdminProtectedL
     redirect("/admin/login");
   }
 
+  const unreadInquiryCount = await getUnreadInquiryCount(supabase);
+
   return (
     <ToastProvider>
       <div className="grid min-h-screen grid-cols-[248px_1fr] bg-white">
-        <AdminSidebar email={user.email ?? ""} />
+        <AdminSidebar email={user.email ?? ""} unreadInquiryCount={unreadInquiryCount} />
         <div className="flex min-w-0 flex-col">{children}</div>
       </div>
     </ToastProvider>

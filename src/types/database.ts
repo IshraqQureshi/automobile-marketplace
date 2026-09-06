@@ -746,8 +746,11 @@ export type Database = {
       }
       vehicle_inquiries: {
         Row: {
+          contact_email: string
+          contact_name: string
+          contact_phone: string
           created_at: string
-          customer_id: string
+          customer_id: string | null
           id: string
           message: string
           showroom_id: string
@@ -755,8 +758,11 @@ export type Database = {
           vehicle_id: string
         }
         Insert: {
+          contact_email: string
+          contact_name: string
+          contact_phone: string
           created_at?: string
-          customer_id: string
+          customer_id?: string | null
           id?: string
           message: string
           showroom_id: string
@@ -764,8 +770,11 @@ export type Database = {
           vehicle_id: string
         }
         Update: {
+          contact_email?: string
+          contact_name?: string
+          contact_phone?: string
           created_at?: string
-          customer_id?: string
+          customer_id?: string | null
           id?: string
           message?: string
           showroom_id?: string

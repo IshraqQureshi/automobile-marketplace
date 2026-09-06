@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 interface DashboardShellProps {
   email: string;
   showroom: OwnerShowroom;
+  unreadInquiryCount?: number;
   children: React.ReactNode;
 }
 
@@ -60,7 +61,7 @@ function getIsDesktopServerSnapshot() {
  * `inert` to mobile only. Escape closes the drawer and returns focus to the
  * button that opened it, matching standard dialog/drawer behavior.
  */
-export function DashboardShell({ email, showroom, children }: DashboardShellProps) {
+export function DashboardShell({ email, showroom, unreadInquiryCount, children }: DashboardShellProps) {
   const [open, setOpen] = useState(false);
   const isDesktop = useSyncExternalStore(subscribeToDesktopQuery, getIsDesktopSnapshot, getIsDesktopServerSnapshot);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -106,7 +107,7 @@ export function DashboardShell({ email, showroom, children }: DashboardShellProp
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <DashboardSidebar email={email} showroom={showroom} onNavigate={close} />
+        <DashboardSidebar email={email} showroom={showroom} unreadInquiryCount={unreadInquiryCount} onNavigate={close} />
       </div>
 
       <div inert={!isDesktop && open ? true : undefined} className="flex min-w-0 flex-col">

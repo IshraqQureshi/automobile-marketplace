@@ -226,6 +226,9 @@ describe("Database schema integrity (integration)", () => {
         showroom_id: otherShowroomId,
         customer_id: customerId,
         message: "Is this still available?",
+        contact_name: "Test Customer",
+        contact_email: "test-customer@example.com",
+        contact_phone: "+254712345678",
       })
       .select()
       .single();
@@ -242,7 +245,15 @@ describe("Database schema integrity (integration)", () => {
       // showroom_id is required by the generated Insert type but always
       // overwritten by the set_vehicle_inquiry_showroom trigger — any
       // placeholder value is fine here.
-      .insert({ vehicle_id: vehicleId, showroom_id: showroomId, customer_id: customerId, message: "   " });
+      .insert({
+        vehicle_id: vehicleId,
+        showroom_id: showroomId,
+        customer_id: customerId,
+        message: "   ",
+        contact_name: "Test Customer",
+        contact_email: "test-customer@example.com",
+        contact_phone: "+254712345678",
+      });
     expect(error).not.toBeNull();
     expect(error?.code).toBe("23514");
   });

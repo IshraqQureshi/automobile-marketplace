@@ -12,18 +12,20 @@ interface NavEntry {
   label: string;
   href: string | null; // null = not built yet, renders inert ("Coming soon")
   icon: () => React.JSX.Element;
+  count?: number;
 }
 
 interface DashboardSidebarProps {
   email: string;
   showroom: OwnerShowroom;
+  unreadInquiryCount?: number;
   // Fired on any real nav Link click — DashboardShell uses this to close the
   // mobile off-canvas drawer after navigating, so it isn't left open over
   // the new page. Optional/unused on desktop, where the sidebar is static.
   onNavigate?: () => void;
 }
 
-export function DashboardSidebar({ email, showroom, onNavigate }: DashboardSidebarProps) {
+export function DashboardSidebar({ email, showroom, unreadInquiryCount = 0, onNavigate }: DashboardSidebarProps) {
   const pathname = usePathname();
   const approved = showroom.status === "APPROVED";
 
@@ -31,10 +33,13 @@ export function DashboardSidebar({ email, showroom, onNavigate }: DashboardSideb
   // "coming soon" treatment as the admin sidebar's own not-yet-built
   // entries, rather than linking somewhere that 404s. Profile editing is
   // allowed regardless of approval status (unlike Vehicles), so it's never
-  // gated behind `approved` here.
+  // gated behind `approved` here. Inquiries follows the same approval gate
+  // as Vehicles — a listing (and thus a real inquiry) can't exist for an
+  // unapproved showroom anyway.
   const items: NavEntry[] = [
     { label: "Dashboard", href: "/dashboard", icon: DashboardIcon },
     { label: "Vehicles", href: approved ? "/dashboard/vehicles" : null, icon: () => <CarIcon /> },
+    { label: "Inquiries", href: approved ? "/dashboard/inquiries" : null, icon: InquiryIcon, count: unreadInquiryCount },
     { label: "Profile", href: "/dashboard/profile", icon: ProfileIcon },
     { label: "My Account", href: "/dashboard/account", icon: AccountIcon },
     { label: "Appointments", href: null, icon: CalendarIcon },
@@ -76,7 +81,17 @@ export function DashboardSidebar({ email, showroom, onNavigate }: DashboardSideb
               )}
             >
               <item.icon />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {!!item.count && (
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                    active ? "bg-white/25 text-white" : "bg-brand text-white",
+                  )}
+                >
+                  {item.count}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -127,6 +142,14 @@ function AccountIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </svg>
+  );
+}
+
+function InquiryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
 }

@@ -6,6 +6,7 @@ import { cache } from "react";
 import { VehicleCard } from "@/components/vehicle/vehicle-card";
 import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
+import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-button";
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
 import { getVehicleDetailPath, parseVehicleIdFromSlug } from "@/features/vehicle/slug";
 import { extractClientIp, hashClientIp } from "@/features/vehicle/view-tracking";
@@ -99,7 +100,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
   const clientIp = extractClientIp((name) => requestHeaders.get(name));
   const anonViewerIpHash = clientIp ? hashClientIp(clientIp) : undefined;
 
-  const [{ count: activeListingCount }, { data: similarRows }] = await Promise.all([
+  const [{ count: activeListingCount }, { data: similarRows }, { data: userResult }] = await Promise.all([
     supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("showroom_id", vehicle.showroomId).eq("status", "ACTIVE"),
     supabase
       .from("vehicles")
@@ -108,11 +109,22 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
       .eq("make", vehicle.make)
       .neq("id", vehicle.id)
       .limit(SIMILAR_VEHICLES_LIMIT),
+    supabase.auth.getUser(),
     // Fire-and-forget from the page's perspective — renders with the
     // pre-increment count already loaded above; a genuinely new
     // user/IP's +1 shows up on their *next* visit, not this one.
     supabase.rpc("record_vehicle_view", { target_vehicle_id: vehicle.id, anon_viewer_ip_hash: anonViewerIpHash }),
   ]);
+
+  let inquiryInitialValues: { fullName: string; email: string; phone: string } | null = null;
+  if (userResult.user) {
+    const { data: profile } = await supabase.from("profiles").select("full_name, phone").eq("id", userResult.user.id).maybeSingle();
+    inquiryInitialValues = {
+      fullName: profile?.full_name ?? "",
+      email: userResult.user.email ?? "",
+      phone: profile?.phone ?? "",
+    };
+  }
 
   const getPhotoUrl = (storagePath: string) => supabase.storage.from("vehicle-media").getPublicUrl(storagePath).data.publicUrl;
   const similarVehicles: VehicleWithShowroom[] = (similarRows ?? []).map((row) => ({
@@ -231,7 +243,11 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                 </div>
 
                 <div className="mb-4 flex flex-col gap-2.5">
-                  <DisabledCta label="Send Message" title="Inquiries — coming soon" tone="brand" icon={<MessageIcon />} />
+                  <VehicleInquiryButton
+                    vehicleId={vehicle.id}
+                    vehicleTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                    initialValues={inquiryInitialValues}
+                  />
                   <DisabledCta label="WhatsApp" title="WhatsApp inquiry — coming soon" tone="whatsapp" icon={<WhatsAppIcon />} />
                   <DisabledCta label="Schedule Test Drive" title="Appointment booking — coming soon" tone="neutral" icon={<CalendarIcon />} />
                 </div>
@@ -496,13 +512,6 @@ function ShareIcon() {
   );
 }
 
-function MessageIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
 
 function WhatsAppIcon() {
   return (
