@@ -68,10 +68,21 @@ export async function updateSubscriptionPaymentAction(id: string, formData: Form
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid payment details." };
 
   const supabase = await createClient();
-  // The end date changing means a different expiry to track — reset
-  // reminder_sent_at so a new reminder can fire for the new date, rather
-  // than staying permanently silenced by a reminder already sent for the
-  // period's old (now-incorrect) end date.
+
+  // Only reset reminder_sent_at when the end date is actually changing —
+  // a real bug caught in code review: unconditionally nulling it on every
+  // edit meant fixing a typo in the amount/reference/notes on an
+  // already-reminded, still-overdue period would silently make it
+  // eligible for a second reminder, even though nothing about its actual
+  // expiry changed.
+  const { data: existing, error: fetchError } = await supabase.from("manual_payments").select("subscription_end_date").eq("id", id).maybeSingle();
+  if (fetchError) {
+    logger.error("Failed to load existing payment before update", fetchError, { id });
+    return { error: "Failed to update this payment." };
+  }
+  if (!existing) return { error: NOT_FOUND_ERROR };
+  const endDateChanged = existing.subscription_end_date !== parsed.data.endDate;
+
   const { data, error } = await supabase
     .from("manual_payments")
     .update({
@@ -81,7 +92,7 @@ export async function updateSubscriptionPaymentAction(id: string, formData: Form
       notes: parsed.data.notes ?? null,
       subscription_start_date: parsed.data.startDate,
       subscription_end_date: parsed.data.endDate,
-      reminder_sent_at: null,
+      ...(endDateChanged ? { reminder_sent_at: null } : {}),
     })
     .eq("id", id)
     .select("id");

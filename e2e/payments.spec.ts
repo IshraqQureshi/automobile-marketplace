@@ -149,6 +149,41 @@ test("admin can edit a payment, and changing the end date resets any prior remin
   expect(after?.subscription_end_date).toBe(isoDate(90));
 });
 
+test("editing a payment WITHOUT changing its end date preserves an existing reminder — regression for a bug caught in code review", async ({ page }) => {
+  const supabase = admin();
+  const sentAt = new Date().toISOString();
+  const { data: created } = await supabase
+    .from("manual_payments")
+    .insert({
+      showroom_id: showroomAId,
+      amount: 30000,
+      currency: "KES",
+      payment_method: "CASH",
+      subscription_start_date: isoDate(-40),
+      subscription_end_date: isoDate(-10),
+      reminder_sent_at: sentAt,
+      recorded_by: (await supabase.auth.admin.listUsers({ page: 1, perPage: 200 })).data.users.find((u) => u.email === ADMIN_EMAIL)!.id,
+      status: "RECORDED",
+    })
+    .select("id")
+    .single();
+  paymentIds.push(created!.id);
+
+  await loginAsAdmin(page);
+  await page.goto("/admin/payments");
+  const row = page.getByRole("row", { name: new RegExp(`E2E Payments Showroom A ${unique}`) });
+  await row.getByLabel("Edit").click();
+  const dialog = page.getByRole("dialog");
+  // Only the amount changes here — Period end is left exactly as it was.
+  await dialog.getByLabel("Amount (KES)").fill("45000");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Payment updated.")).toBeVisible();
+
+  const { data: after } = await admin().from("manual_payments").select("reminder_sent_at, amount").eq("id", created!.id).single();
+  expect(after?.amount).toBe(45000);
+  expect(after?.reminder_sent_at).not.toBeNull();
+});
+
 test("admin can void a payment — it drops out of the due count but stays visible via the record-status filter", async ({ page }) => {
   const supabase = admin();
   const { data: created } = await supabase
