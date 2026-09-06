@@ -22,7 +22,6 @@ export interface ShowroomProfileFormFields {
   description: FormDataEntryValue | null;
   openingHours: FormDataEntryValue | null;
   youtubeChannelUrl: FormDataEntryValue | null;
-  youtubeVideoUrl: FormDataEntryValue | null;
 }
 
 export function readShowroomProfileFormFields(formData: FormData): ShowroomProfileFormFields {
@@ -35,7 +34,6 @@ export function readShowroomProfileFormFields(formData: FormData): ShowroomProfi
     description: formData.get("description"),
     openingHours: formData.get("openingHours"),
     youtubeChannelUrl: formData.get("youtubeChannelUrl"),
-    youtubeVideoUrl: formData.get("youtubeVideoUrl"),
   };
 }
 
@@ -76,7 +74,6 @@ export async function updateShowroomProfile(
       description: parsed.description ?? null,
       opening_hours: parsed.openingHours ?? null,
       youtube_channel_url: parsed.youtubeChannelUrl ?? null,
-      youtube_video_url: parsed.youtubeVideoUrl ?? null,
       ...(removeLogo && !logoFile ? { logo_storage_path: null } : {}),
     })
     .eq("id", showroomId)

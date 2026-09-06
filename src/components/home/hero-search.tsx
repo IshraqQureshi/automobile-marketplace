@@ -1,5 +1,7 @@
 import Image from "next/image";
+import Link from "next/link";
 import { SearchIcon, ShowroomIcon } from "@/components/admin/admin-ui";
+import { getShowroomDetailPath } from "@/features/showroom/slug";
 
 export interface CertifiedShowroomItem {
   id: string;
@@ -79,29 +81,48 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
               className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16"
               style={{ background: "linear-gradient(to left, rgba(0,79,75,0.95), transparent)" }}
             />
-            {/* Names are decorative here (not yet linkable — showroom detail pages don't
-                exist), and the track duplicates every item to loop seamlessly, so the
-                whole scroller is hidden from assistive tech to avoid announcing each
-                name twice; the showroom/vehicle counts above already convey the same
-                information in text. */}
-            <div className="flex w-max animate-marquee items-center" aria-hidden="true">
-              {[...showrooms, ...showrooms].map((showroom, index) => (
-                <div key={`${showroom.id}-${index}`} className="mx-7 flex shrink-0 items-center gap-2.5">
-                  {showroom.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- tiny decorative marquee badge, no build-time-known dimensions
-                    <img src={showroom.logoUrl} alt="" className="h-9 w-9 shrink-0 rounded-[5px] object-cover shadow-md" />
-                  ) : (
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[5px] bg-white text-brand shadow-md">
-                      <ShowroomIcon className="h-4 w-4" />
-                    </span>
-                  )}
-                  <span className="text-[13px] font-medium whitespace-nowrap text-white/80">{showroom.name}</span>
-                </div>
+            {/* Each real card links to that showroom's own detail page. The track
+                duplicates the list once more purely to loop seamlessly — that
+                duplicate set is hidden from assistive tech (and stays non-interactive,
+                never a link) so it's never announced/tabbed to as a second copy of
+                the same showroom. */}
+            <div className="flex w-max animate-marquee items-center">
+              {showrooms.map((showroom) => (
+                <Link
+                  key={showroom.id}
+                  href={getShowroomDetailPath({ id: showroom.id, businessName: showroom.name })}
+                  className="mx-7 flex shrink-0 items-center gap-2.5 transition-opacity hover:opacity-80"
+                >
+                  <ShowroomBadge showroom={showroom} />
+                </Link>
               ))}
+              <div className="flex shrink-0 items-center" aria-hidden="true">
+                {showrooms.map((showroom) => (
+                  <div key={`${showroom.id}-duplicate`} className="mx-7 flex shrink-0 items-center gap-2.5">
+                    <ShowroomBadge showroom={showroom} />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+function ShowroomBadge({ showroom }: { showroom: CertifiedShowroomItem }) {
+  return (
+    <>
+      {showroom.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- tiny decorative marquee badge, no build-time-known dimensions
+        <img src={showroom.logoUrl} alt="" className="h-9 w-9 shrink-0 rounded-[5px] object-cover shadow-md" />
+      ) : (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[5px] bg-white text-brand shadow-md">
+          <ShowroomIcon className="h-4 w-4" />
+        </span>
+      )}
+      <span className="text-[13px] font-medium whitespace-nowrap text-white/80">{showroom.name}</span>
+    </>
   );
 }

@@ -3,7 +3,16 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { DialogFormActions, FieldLabel, InitialAvatar, UploadIcon } from "@/components/admin/admin-ui";
+import {
+  DialogFormActions,
+  FieldLabel,
+  InitialAvatar,
+  UploadIcon,
+} from "@/components/admin/admin-ui";
+import {
+  ShowroomVideosManager,
+  type ShowroomVideoItem,
+} from "@/components/dashboard/showroom-videos-manager";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
@@ -21,15 +30,20 @@ export interface ShowroomProfileInitialValues {
   description: string;
   openingHours: string;
   youtubeChannelUrl: string;
-  youtubeVideoUrl: string;
   logoUrl: string | null;
 }
 
 interface ShowroomProfileFormProps {
+  showroomId: string;
   initialValues: ShowroomProfileInitialValues;
+  videos: ShowroomVideoItem[];
 }
 
-export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps) {
+export function ShowroomProfileForm({
+  showroomId,
+  initialValues,
+  videos,
+}: ShowroomProfileFormProps) {
   const router = useRouter();
   const toast = useToast();
   const { validate, errorFor } = useFieldValidation(showroomFieldSchemas);
@@ -42,7 +56,6 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     description: initialValues.description,
     openingHours: initialValues.openingHours,
     youtubeChannelUrl: initialValues.youtubeChannelUrl,
-    youtubeVideoUrl: initialValues.youtubeVideoUrl,
   });
   const [logo, setLogo] = useState<File | null>(null);
   const [logoInputKey, setLogoInputKey] = useState(0);
@@ -68,7 +81,6 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
       "description",
       "openingHours",
       "youtubeChannelUrl",
-      "youtubeVideoUrl",
     ] as const) {
       if (!showroomFieldSchemas[field].safeParse(form[field]).success) {
         validate(field, form[field]);
@@ -86,7 +98,6 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     formData.set("description", form.description);
     formData.set("openingHours", form.openingHours);
     formData.set("youtubeChannelUrl", form.youtubeChannelUrl);
-    formData.set("youtubeVideoUrl", form.youtubeVideoUrl);
     if (logo) formData.set("logo", logo);
     if (removeLogo) formData.set("removeLogo", "true");
 
@@ -115,166 +126,226 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
   const currentLogoUrl = logo ? null : initialValues.logoUrl;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
-      {formError && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
+    <div className="flex flex-col gap-6">
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+        {formError && (
+          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {formError}
+          </p>
+        )}
 
-      <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h2 className="font-display text-lg font-semibold text-neutral-900">Showroom profile</h2>
-        <p className="mt-0.5 text-sm text-neutral-500">
-          This is what customers and admins see for your business. Approval status can only be changed by an admin.
-        </p>
+        <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+          <h2 className="font-display text-lg font-semibold text-neutral-900">
+            Showroom profile
+          </h2>
+          <p className="mt-0.5 text-sm text-neutral-500">
+            This is what customers and admins see for your business. Approval
+            status can only be changed by an admin.
+          </p>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="showroom-business-name">Business name</FieldLabel>
-            <Input
-              id="showroom-business-name"
-              value={form.businessName}
-              onChange={(e) => setField("businessName", e.target.value)}
-              onBlur={(e) => validate("businessName", e.target.value)}
-              autoFocus
-              required
-              error={!!errorFor("businessName")}
-            />
-            {errorFor("businessName") && <p className="mt-1 text-sm text-red-600">{errorFor("businessName")}</p>}
-          </div>
-
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="showroom-logo">Logo (optional)</FieldLabel>
-            <div className="flex items-center gap-3">
-              {currentLogoUrl ? (
-                <Image
-                  src={currentLogoUrl}
-                  alt="Current logo"
-                  width={40}
-                  height={40}
-                  unoptimized
-                  className="shrink-0 rounded-lg border border-neutral-200 object-contain p-0.5"
-                />
-              ) : (
-                <InitialAvatar name={form.businessName || "?"} />
-              )}
-              <label
-                htmlFor="showroom-logo"
-                className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:border-brand hover:text-brand"
-              >
-                <UploadIcon />
-                <span className="truncate">{logo ? logo.name : "Upload logo"}</span>
-              </label>
-              <input
-                key={logoInputKey}
-                id="showroom-logo"
-                type="file"
-                accept={LOGO_ACCEPT}
-                onChange={(e) => {
-                  setLogo(e.target.files?.[0] ?? null);
-                  setRemoveLogo(false);
-                }}
-                className="sr-only"
-              />
-            </div>
-            {initialValues.logoUrl && !logo && (
-              <label className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
-                <input type="checkbox" checked={removeLogo} onChange={(e) => setRemoveLogo(e.target.checked)} />
-                Remove current logo
-              </label>
-            )}
-          </div>
-
-          <div>
-            <FieldLabel htmlFor="showroom-location">Location</FieldLabel>
-            <Input
-              id="showroom-location"
-              value={form.location}
-              onChange={(e) => setField("location", e.target.value)}
-              onBlur={(e) => validate("location", e.target.value)}
-              placeholder="e.g. Westlands, Nairobi"
-              required
-              error={!!errorFor("location")}
-            />
-            {errorFor("location") && <p className="mt-1 text-sm text-red-600">{errorFor("location")}</p>}
-          </div>
-
-          <div>
-            <FieldLabel htmlFor="showroom-phone">Business phone</FieldLabel>
-            <div className="flex items-center gap-2">
-              <span className="flex items-center rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-500">+254</span>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="showroom-business-name">
+                Business name
+              </FieldLabel>
               <Input
-                id="showroom-phone"
-                value={form.businessPhone}
-                onChange={(e) => setField("businessPhone", e.target.value)}
-                onBlur={(e) => validate("businessPhone", e.target.value)}
-                placeholder="712345678"
+                id="showroom-business-name"
+                value={form.businessName}
+                onChange={(e) => setField("businessName", e.target.value)}
+                onBlur={(e) => validate("businessName", e.target.value)}
+                autoFocus
                 required
-                error={!!errorFor("businessPhone")}
+                error={!!errorFor("businessName")}
               />
+              {errorFor("businessName") && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errorFor("businessName")}
+                </p>
+              )}
             </div>
-            {errorFor("businessPhone") && <p className="mt-1 text-sm text-red-600">{errorFor("businessPhone")}</p>}
+
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="showroom-logo">Logo (optional)</FieldLabel>
+              <div className="flex items-center gap-3">
+                {currentLogoUrl ? (
+                  <Image
+                    src={currentLogoUrl}
+                    alt="Current logo"
+                    width={40}
+                    height={40}
+                    unoptimized
+                    className="shrink-0 rounded-lg border border-neutral-200 object-contain p-0.5"
+                  />
+                ) : (
+                  <InitialAvatar name={form.businessName || "?"} />
+                )}
+                <label
+                  htmlFor="showroom-logo"
+                  className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:border-brand hover:text-brand"
+                >
+                  <UploadIcon />
+                  <span className="truncate">
+                    {logo ? logo.name : "Upload logo"}
+                  </span>
+                </label>
+                <input
+                  key={logoInputKey}
+                  id="showroom-logo"
+                  type="file"
+                  accept={LOGO_ACCEPT}
+                  onChange={(e) => {
+                    setLogo(e.target.files?.[0] ?? null);
+                    setRemoveLogo(false);
+                  }}
+                  className="sr-only"
+                />
+              </div>
+              {initialValues.logoUrl && !logo && (
+                <label className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
+                  <input
+                    type="checkbox"
+                    checked={removeLogo}
+                    onChange={(e) => setRemoveLogo(e.target.checked)}
+                  />
+                  Remove current logo
+                </label>
+              )}
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="showroom-location">Location</FieldLabel>
+              <Input
+                id="showroom-location"
+                value={form.location}
+                onChange={(e) => setField("location", e.target.value)}
+                onBlur={(e) => validate("location", e.target.value)}
+                placeholder="e.g. Westlands, Nairobi"
+                required
+                error={!!errorFor("location")}
+              />
+              {errorFor("location") && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errorFor("location")}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="showroom-phone">Business phone</FieldLabel>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-500">
+                  +254
+                </span>
+                <Input
+                  id="showroom-phone"
+                  value={form.businessPhone}
+                  onChange={(e) => setField("businessPhone", e.target.value)}
+                  onBlur={(e) => validate("businessPhone", e.target.value)}
+                  placeholder="712345678"
+                  required
+                  error={!!errorFor("businessPhone")}
+                />
+              </div>
+              {errorFor("businessPhone") && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errorFor("businessPhone")}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="showroom-email">Business email</FieldLabel>
+              <Input
+                id="showroom-email"
+                type="email"
+                value={form.businessEmail}
+                onChange={(e) => setField("businessEmail", e.target.value)}
+                onBlur={(e) => validate("businessEmail", e.target.value)}
+                required
+                error={!!errorFor("businessEmail")}
+              />
+              {errorFor("businessEmail") && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errorFor("businessEmail")}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="showroom-address">
+                Address (optional)
+              </FieldLabel>
+              <Input
+                id="showroom-address"
+                value={form.address}
+                onChange={(e) => setField("address", e.target.value)}
+                onBlur={(e) => validate("address", e.target.value)}
+                error={!!errorFor("address")}
+              />
+              {errorFor("address") && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errorFor("address")}
+                </p>
+              )}
+            </div>
+
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="showroom-description">
+                Description (optional)
+              </FieldLabel>
+              <textarea
+                id="showroom-description"
+                value={form.description}
+                onChange={(e) => setField("description", e.target.value)}
+                onBlur={(e) => validate("description", e.target.value)}
+                rows={4}
+                placeholder="Tell customers what makes your showroom worth visiting…"
+                className={`w-full rounded-md border px-3 py-2.5 text-sm outline-none placeholder:text-neutral-400 focus:border-brand focus:ring-1 focus:ring-brand ${errorFor("description") ? "border-red-400" : "border-neutral-300"}`}
+              />
+              {errorFor("description") && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errorFor("description")}
+                </p>
+              )}
+            </div>
+
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="showroom-opening-hours">
+                Opening hours (optional)
+              </FieldLabel>
+              <Input
+                id="showroom-opening-hours"
+                value={form.openingHours}
+                onChange={(e) => setField("openingHours", e.target.value)}
+                onBlur={(e) => validate("openingHours", e.target.value)}
+                placeholder="e.g. Mon–Sat, 8am–6pm"
+                error={!!errorFor("openingHours")}
+              />
+              {errorFor("openingHours") && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errorFor("openingHours")}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-neutral-400">
+                Shown as-is on your public showroom page.
+              </p>
+            </div>
           </div>
+        </section>
 
-          <div>
-            <FieldLabel htmlFor="showroom-email">Business email</FieldLabel>
-            <Input
-              id="showroom-email"
-              type="email"
-              value={form.businessEmail}
-              onChange={(e) => setField("businessEmail", e.target.value)}
-              onBlur={(e) => validate("businessEmail", e.target.value)}
-              required
-              error={!!errorFor("businessEmail")}
-            />
-            {errorFor("businessEmail") && <p className="mt-1 text-sm text-red-600">{errorFor("businessEmail")}</p>}
-          </div>
+        <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+          <h2 className="font-display text-lg font-semibold text-neutral-900">
+            YouTube
+          </h2>
+          <p className="mt-0.5 text-sm text-neutral-500">
+            Shown on your public showroom page. Leave the channel URL blank to
+            hide the &quot;View Channel&quot; button.
+          </p>
 
-          <div>
-            <FieldLabel htmlFor="showroom-address">Address (optional)</FieldLabel>
-            <Input
-              id="showroom-address"
-              value={form.address}
-              onChange={(e) => setField("address", e.target.value)}
-              onBlur={(e) => validate("address", e.target.value)}
-              error={!!errorFor("address")}
-            />
-            {errorFor("address") && <p className="mt-1 text-sm text-red-600">{errorFor("address")}</p>}
-          </div>
-
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="showroom-description">Description (optional)</FieldLabel>
-            <textarea
-              id="showroom-description"
-              value={form.description}
-              onChange={(e) => setField("description", e.target.value)}
-              onBlur={(e) => validate("description", e.target.value)}
-              rows={4}
-              placeholder="Tell customers what makes your showroom worth visiting…"
-              className={`w-full rounded-md border px-3 py-2.5 text-sm outline-none placeholder:text-neutral-400 focus:border-brand focus:ring-1 focus:ring-brand ${errorFor("description") ? "border-red-400" : "border-neutral-300"}`}
-            />
-            {errorFor("description") && <p className="mt-1 text-sm text-red-600">{errorFor("description")}</p>}
-          </div>
-
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="showroom-opening-hours">Opening hours (optional)</FieldLabel>
-            <Input
-              id="showroom-opening-hours"
-              value={form.openingHours}
-              onChange={(e) => setField("openingHours", e.target.value)}
-              onBlur={(e) => validate("openingHours", e.target.value)}
-              placeholder="e.g. Mon–Sat, 8am–6pm"
-              error={!!errorFor("openingHours")}
-            />
-            {errorFor("openingHours") && <p className="mt-1 text-sm text-red-600">{errorFor("openingHours")}</p>}
-            <p className="mt-1 text-xs text-neutral-400">Shown as-is on your public showroom page.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h2 className="font-display text-lg font-semibold text-neutral-900">YouTube</h2>
-        <p className="mt-0.5 text-sm text-neutral-500">Shown on your public showroom page. Leave blank to hide this section entirely.</p>
-
-        <div className="mt-4 grid grid-cols-1 gap-4">
-          <div>
-            <FieldLabel htmlFor="showroom-youtube-channel">Channel URL (optional)</FieldLabel>
+          <div className="mt-4">
+            <FieldLabel htmlFor="showroom-youtube-channel">
+              Channel URL (optional)
+            </FieldLabel>
             <Input
               id="showroom-youtube-channel"
               value={form.youtubeChannelUrl}
@@ -283,27 +354,39 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
               placeholder="https://www.youtube.com/@yourchannel"
               error={!!errorFor("youtubeChannelUrl")}
             />
-            {errorFor("youtubeChannelUrl") && <p className="mt-1 text-sm text-red-600">{errorFor("youtubeChannelUrl")}</p>}
+            {errorFor("youtubeChannelUrl") && (
+              <p className="mt-1 text-sm text-red-600">
+                {errorFor("youtubeChannelUrl")}
+              </p>
+            )}
           </div>
+        </section>
 
-          <div>
-            <FieldLabel htmlFor="showroom-youtube-video">Featured video URL (optional)</FieldLabel>
-            <Input
-              id="showroom-youtube-video"
-              value={form.youtubeVideoUrl}
-              onChange={(e) => setField("youtubeVideoUrl", e.target.value)}
-              onBlur={(e) => validate("youtubeVideoUrl", e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-              error={!!errorFor("youtubeVideoUrl")}
-            />
-            {errorFor("youtubeVideoUrl") && <p className="mt-1 text-sm text-red-600">{errorFor("youtubeVideoUrl")}</p>}
-          </div>
+        <div className="border-t border-neutral-200 pt-4">
+          <DialogFormActions
+            pending={pending}
+            submitLabel="Save changes"
+            onCancel={() => router.push("/dashboard")}
+          />
         </div>
-      </section>
+      </form>
 
-      <div className="border-t border-neutral-200 pt-4">
-        <DialogFormActions pending={pending} submitLabel="Save changes" onCancel={() => router.push("/dashboard")} />
-      </div>
-    </form>
+      {/* Outside the profile form on purpose — this section renders its own
+          <form> (ShowroomVideosManager's add-video form), and nesting a
+          <form> inside another <form> is invalid HTML that breaks
+          hydration (confirmed live: it hung the page instead of just
+          warning). Each video also saves immediately via its own action,
+          independent of the profile form's own single submit above. */}
+      <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="font-display text-lg font-semibold text-neutral-900">
+          Featured videos
+        </h2>
+        <p className="mt-0.5 mb-3 text-sm text-neutral-500">
+          Add any number of videos — each is shown as its own card on your
+          public page. Adding or removing a video saves immediately.
+        </p>
+        <ShowroomVideosManager showroomId={showroomId} videos={videos} />
+      </section>
+    </div>
   );
 }

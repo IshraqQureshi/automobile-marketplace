@@ -64,13 +64,18 @@ test.beforeAll(async () => {
       verified: true,
       opening_hours: "Mon–Sat, 8am–6pm",
       youtube_channel_url: "https://www.youtube.com/@e2eshowroom",
-      youtube_video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     })
     .select("id")
     .single();
   if (showroomError || !showroom) throw showroomError ?? new Error("showroom not created");
   showroomId = showroom.id;
   showroomPath = `/showrooms/e2e-showroom-detail-${unique}-${showroomId}`;
+
+  const { error: videosError } = await supabase.from("showroom_videos").insert([
+    { showroom_id: showroomId, title: "Showroom Tour", video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", sort_order: 0 },
+    { showroom_id: showroomId, title: "Customer Reviews", video_url: "https://www.youtube.com/watch?v=oHg5SJYRHA0", sort_order: 1 },
+  ]);
+  if (videosError) throw videosError;
 
   const { data: pendingShowroom, error: pendingError } = await supabase
     .from("showrooms")
@@ -182,12 +187,57 @@ test("type-filter pills and sort narrow/reorder the real vehicle list", async ({
   await expect(firstCardPrice).toHaveText("Ksh 1,000,000");
 });
 
-test("the YouTube section shows the real channel link and embedded video when configured", async ({ page }) => {
+test("the YouTube section shows the real channel link and every real video, each opening its own modal", async ({ page }) => {
   await page.goto(showroomPath);
 
   await expect(page.getByText("ON YOUTUBE")).toBeVisible();
   await expect(page.getByRole("link", { name: "View Channel" })).toHaveAttribute("href", "https://www.youtube.com/@e2eshowroom");
-  await expect(page.locator("iframe")).toHaveAttribute("src", /autoplay=0/);
+
+  // Both seeded videos render as their own grid card (a showroom can have
+  // multiple, unlike the single-video field this replaced).
+  const firstCard = page.getByRole("button", { name: "Showroom Tour" });
+  const secondCard = page.getByRole("button", { name: "Customer Reviews" });
+  await expect(firstCard).toBeVisible();
+  await expect(secondCard).toBeVisible();
+
+  await firstCard.click();
+  await expect(page.locator("iframe")).toHaveAttribute("src", /embed\/dQw4w9WgXcQ/);
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await secondCard.click();
+  await expect(page.locator("iframe")).toHaveAttribute("src", /embed\/oHg5SJYRHA0/);
+});
+
+test("the showroom owner can add and remove a video from their dashboard, reflected on the public page", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(OWNER_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await page.waitForURL("**/dashboard");
+
+  // domcontentloaded, not the default "load": this dev-server environment's
+  // authenticated dashboard pages have been observed to never fire a "load"
+  // event at all (confirmed against /dashboard/vehicles too, unrelated to
+  // this feature) — same precedent as this file's own stale-slug test below.
+  await page.goto("/dashboard/profile", { waitUntil: "domcontentloaded" });
+  const newTitle = `E2E Added Video ${unique}`;
+  await page.getByLabel("Title").fill(newTitle);
+  await page.getByLabel("Video URL").fill("https://www.youtube.com/watch?v=9bZkp7q19f0");
+  await page.getByRole("button", { name: "Add video" }).click();
+  await expect(page.getByText("Video added.")).toBeVisible();
+  await expect(page.getByText(newTitle)).toBeVisible();
+
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: newTitle })).toBeVisible();
+
+  await page.goto("/dashboard/profile", { waitUntil: "domcontentloaded" });
+  const row = page.locator("li", { hasText: newTitle });
+  await row.getByTitle("Remove video").click();
+  await expect(page.getByText("Video removed.")).toBeVisible();
+  await expect(page.getByText(newTitle)).toHaveCount(0);
+
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: newTitle })).toHaveCount(0);
 });
 
 test("the Message button opens WhatsApp to the admin-configured global number, and is disabled when unset", async ({ page }) => {

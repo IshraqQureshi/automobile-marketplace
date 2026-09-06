@@ -214,7 +214,6 @@ export async function createShowroomAction(formData: FormData): Promise<Showroom
       description: parsed.data.description ?? null,
       opening_hours: parsed.data.openingHours ?? null,
       youtube_channel_url: parsed.data.youtubeChannelUrl ?? null,
-      youtube_video_url: parsed.data.youtubeVideoUrl ?? null,
     })
     .select("id")
     .single();
