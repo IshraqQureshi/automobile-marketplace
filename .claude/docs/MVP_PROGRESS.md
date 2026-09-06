@@ -156,12 +156,12 @@
 
 ## Vehicle Discovery
 
-* [ ] Vehicle listing
-* [ ] Search
-* [ ] Filters
-* [ ] Sorting
-* [ ] Pagination
-* [ ] Vehicle detail page
+* [x] Vehicle listing (`/vehicles` — real Supabase-backed, ACTIVE-only, see PR #39)
+* [x] Search (keyword, matched against title/make/model — see PR #39)
+* [x] Filters (make, model, body type, fuel type, price range, year range — see PR #39)
+* [x] Sorting (price, year, mileage, newest, relevance — "relevance" aliases to newest, no full-text-search infra exists, documented — see PR #39)
+* [x] Pagination (real `.range()`-based, page number in URL — this project's first real pagination; every other list is client-side/unpaginated at admin/dashboard scale — see PR #39)
+* [x] Vehicle detail page (`/vehicles/[id]` — gallery, specs, price, description, real showroom card, similar cars; WhatsApp/finance-calculator/test-drive/favorite actions render as real disabled controls pending Day 4/5 — see PR #39)
 
 ## Showroom Discovery
 
@@ -173,22 +173,22 @@
 ## Testing
 
 * [x] Homepage tests (`e2e/homepage-highlights.spec.ts` — admin CRUD, the `is_active` visibility toggle, social links, deletion, all verified against the real homepage; `e2e/smoke.spec.ts` updated for the real homepage's content)
-* [ ] Search tests
-* [ ] Filter tests
-* [ ] Marketplace tests
-* [ ] E2E marketplace flow
-* [ ] Figma visual QA (homepage visually verified live via Playwright screenshots at 1440px/390px against `design/homepage.png` — see decisions log; formal Figma sign-off process not otherwise applicable, no Figma Dev Mode access this project — see B-002)
+* [x] Search tests (`src/features/vehicle/search.test.ts` — 14 unit tests: sanitization, filter parsing, sort/page validation and clamping)
+* [x] Filter tests (same file — make/model/bodyType/fuelType/price/year parsing and edge cases)
+* [x] Marketplace tests (`src/features/vehicle/pagination-utils.test.ts` — 6 unit tests for page-number windowing/ellipsis logic)
+* [x] E2E marketplace flow (`e2e/vehicle-discovery.spec.ts` — 7 tests: browse/ACTIVE-only, keyword search, make filter, price sort, empty state, detail-page real data, draft-vehicle non-exposure — see PR #39)
+* [ ] Figma visual QA (no Figma mockup exists for the vehicle listing page — `design/car-detail.png` exists for the detail page and was used as a layout reference for its real-data sections only; the design's Financing Calculator/reviews/ratings sections were deliberately not built — see decisions log)
 
 ### Day 3 Gate
 
-* [ ] Customer can browse vehicles
-* [ ] Customer can search vehicles
-* [ ] Customer can filter vehicles
-* [ ] Customer can view vehicle details
-* [ ] Customer can view showroom details
-* [ ] Required tests pass
+* [x] Customer can browse vehicles
+* [x] Customer can search vehicles
+* [x] Customer can filter vehicles
+* [x] Customer can view vehicle details
+* [ ] Customer can view showroom details (Showroom Discovery not yet started — separate from Vehicle Discovery)
+* [x] Required tests pass
 
-**Status:** ⬜
+**Status:** 🟨 (Vehicle Discovery complete; Showroom Discovery remains)
 
 ---
 
@@ -508,6 +508,7 @@ Regression Test
 | B-006 | No real legal content (Terms of Service, Privacy Policy, Cookie Policy) supplied yet | The signup form requires agreeing to Terms/Privacy before account creation (matches `design/signup-page.png`), and the footer links to all three — real pages exist at `/terms`, `/privacy`, `/cookie-policy` but show an honest "placeholder, not final" notice rather than fabricated legal text. Was already flagged generically in the original Proposal's "Client Requirements / Access Needed" list; this is the concrete point it starts blocking real functionality. | Client / legal counsel | ⬜ Not started |
 | B-007 | No production SMTP credentials yet — local/staging dev uses a Mailtrap sandbox inbox (`supabase/config.toml` `[auth.email.smtp]`, credentials in gitignored `.env.local`), which only ever delivers to Mailtrap's own inbox, never real recipients | Confirmation and password-reset emails work end-to-end in dev via Mailtrap, but production needs real SMTP or no user will ever receive an actual email. Client has said they'll supply Google Workspace SMTP details when ready — swap `supabase/config.toml`'s `host`/`port`/`user`/`pass` (env-var-backed) to those values then. | Client (provide Google SMTP credentials) | ⬜ Not started |
 | B-008 | PR #29 raised every Server Action's request body cap app-wide from Next.js's 1MB default to 20MB (`next.config.ts`'s `experimental.serverActions.bodySizeLimit`) to fix real photo-upload failures — the only mechanism Next.js exposes for this is global, not per-action. Code Review Agent flagged (non-blocking) that this modestly widens the request-size/resource-exhaustion surface with no rate limiting anywhere in the app to compensate | Not a functional bug — a deliberate, necessary trade-off for file uploads to work at all — but worth a real look before production: either app-level rate limiting, or push large uploads to signed direct-to-Storage URLs instead of routing file bytes through a Server Action at all | Security Agent / Full-Stack Agent (Day 5 hardening pass) | ⬜ Not started |
+| B-009 | The app-wide root `src/app/loading.tsx` causes any `notFound()` call anywhere in the app to return HTTP 200 instead of a real 404 — a documented Next.js App Router interaction (a route-level `loading.tsx` starts streaming a 200 shell before a deeper `notFound()` call can flip the status once any HTML has flushed). Discovered via PR #39's `/vehicles/[id]` E2E test, confirmed via a production build (not just dev), and confirmed pre-existing for the app's only other `notFound()` caller (`dashboard/vehicles/[id]/edit`) | Real content is still correct (the not-found page renders), only the HTTP status is wrong — a real SEO/correctness gap (crawlers/monitoring that check status codes would treat a nonexistent vehicle/edit page as a valid 200 page) that will recur for every future `notFound()` call (e.g. an eventual showroom detail page) until fixed | Frontend Agent (restructure global loading-state architecture — e.g. remove the root `loading.tsx` in favor of per-route ones, or move data-fetch-then-notFound() checks ahead of any Suspense boundary) | ⬜ Not started |
 
 ---
 
@@ -650,6 +651,8 @@ Record important scope or architectural decisions here.
 | 2026-09-06 | Code review (PR #36) found 1 MEDIUM + 1 LOW, both fixed and re-verified before merge. MEDIUM: the certified-showrooms marquee duplicates its item array (`[...showrooms, ...showrooms]`) so the CSS loop is seamless, but the duplicate copy wasn't hidden from assistive tech — screen readers would announce every real showroom name twice back-to-back; fixed with `aria-hidden="true"` on the track (the showroom/vehicle counts already stated in the hero text above convey the same information). LOW: `BrowseByBrand`'s brand-name label was set to `text-[9px]`, smaller than every other label size (10px) introduced elsewhere in the same PR; bumped to `text-[10px]` for consistency | Independent Code Review Agent finding — the MEDIUM in particular is a reminder that any marketing/decorative content duplicated purely for a CSS looping trick needs an explicit accessibility exemption, not just a visual check |
 | 2026-09-06 | Homepage refinements from live review (PR #37): (1) real Arresa logo — `real-assets/aresa-logo.jpg` copied to `public/`, replacing the "Powered by Arresa" text-only caption in `HeroSearch`. (2) Certified-showrooms marquee now gated behind a new `MIN_SHOWROOMS_FOR_MARQUEE = 10` constant, checked against the real total `showroomCount` rather than the 12-item preview array's length — with only 1 real showroom in the dev database, the marquee looked broken/empty rather than "certified"; verified live that it correctly hides at count 1 and reappears at count 10 (9 temporary showrooms, each under a distinct owner per the one-active-showroom-per-owner constraint, torn down after). (3) TikTok/YouTube highlight cards now open the real admin-pasted video in an in-page modal (reusing the existing `Dialog` component, not a new one) instead of `<a target="_blank">` navigating away; a new `src/lib/video-embed.ts` (12 unit tests) derives a playable YouTube/TikTok embed URL from the stored video URL, falling back to a plain "watch on `<platform>`" link (never a broken iframe) when an ID can't be confidently extracted, e.g. a TikTok short link | User: "Place the read Aresa Logo under search... Certified Showroom slider should show when we have atleast 10 showroom... Can we open tiktok and youtube video in a modal redirecting to their link not good" |
 | 2026-09-06 | Code review (PR #37) found 1 MEDIUM, fixed and re-verified before merge. MEDIUM: the Arresa logo's declared `next/image` `width`/`height` (64×30, ratio 2.13:1) didn't match the real file's actual pixel dimensions (877×378, ratio 2.32:1) — `next/image` computes its rendered box from the declared props, not the file's actual content, so this produced a subtle horizontal squish; corrected to 88×38 to match the real ratio | Independent Code Review Agent finding, self-caught by actually checking the asset's real pixel dimensions rather than trusting the declared props — a reminder that `next/image` width/height must reflect the source file, not just "close enough" values |
+| 2026-09-06 | Started Day 3's Vehicle Discovery (MVP_REQUIREMENTS.md §5) and the real-data core of Vehicle Detail (§6) — PR #39. New `/vehicles` listing (server-side Supabase filters on make/model/bodyType/fuelType/price/year, keyword search, sort, and this project's first real pagination — every other list in the codebase is client-side/unpaginated at admin/dashboard scale) and `/vehicles/[id]` detail page (gallery, specs, price, description, real showroom card, similar cars). Extracted a shared `VehicleCard` (`src/components/vehicle/`) from what was an inline duplicate in `most-searched-vehicles.tsx`. Wired up every homepage control that was waiting on this (Browse by Brand, Popular Brands/Models, "View all N+", header search icon) from disabled "coming soon" placeholders to real links. "Relevance" sort (required by §5) has no ranking infrastructure (no full-text search) and aliases to "Newest" — documented, not a fabricated scoring algorithm. Financing calculator, WhatsApp inquiry, test-drive booking, and favorites on the detail page render as real disabled controls (Day 4/5 dependencies not built yet), not faked or omitted | User: "start Vehicle discovery" |
+| 2026-09-06 | Code review (PR #39) found 1 MEDIUM + 1 LOW, both fixed and re-verified before merge. MEDIUM: `generateMetadata` and the page component each independently called `getVehicle(id)` — two full Supabase round-trips per detail-page view; fixed by wrapping it in React's `cache()` (the standard Next.js App Router pattern for exactly this dedup case). LOW: a `git add -A` accidentally swept an unrelated untracked `brands-logo/` asset folder into a commit; untracked it and added it to `.gitignore` (files kept on disk). Also surfaced, documented, and deliberately left unfixed (real, pre-existing, not introduced by this PR): the app-wide root `src/app/loading.tsx` causes any `notFound()` call to return HTTP 200 instead of 404 — a known Next.js App Router interaction (a route-level `loading.tsx` starts streaming a 200 shell before a deeper `notFound()` call can flip the status). Confirmed via a production build (`next build && next start`, not just dev) that this already affected the app's only other `notFound()` caller (`dashboard/vehicles/[id]/edit`) before this PR. Fixing it means restructuring the app's global loading-state architecture (e.g. removing the root `loading.tsx` in favor of per-route ones, or moving data-fetch-then-notFound() checks ahead of any Suspense boundary) — a real follow-up, out of scope for vehicle discovery | Independent Code Review Agent finding — the `notFound()`/`loading.tsx` interaction in particular is worth remembering before adding any other `notFound()` call anywhere else in the app (e.g. a future showroom detail page) |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
