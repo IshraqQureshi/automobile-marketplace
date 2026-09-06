@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { BrowseByBrand } from "@/components/home/browse-by-brand";
 import { HeroSearch } from "@/components/home/hero-search";
 import { HighlightSection } from "@/components/home/highlight-section";
-import { MostSearchedVehicles, type HomeVehicleItem } from "@/components/home/most-searched-vehicles";
+import { MostSearchedVehicles } from "@/components/home/most-searched-vehicles";
 import { PopularBrands } from "@/components/home/popular-brands";
 import { PopularModels, type PopularModelItem } from "@/components/home/popular-models";
 import { getSystemSettingString } from "@/lib/system-settings";
 import { createClient } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
-import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem } from "@/features/vehicle/types";
+import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
 
 export const metadata: Metadata = {
   title: "HarakaGari — Kenya's Premium Car Marketplace",
@@ -64,7 +64,7 @@ export default async function Home() {
     supabase.from("brands").select("id, name, logo_storage_path").order("name"),
     supabase
       .from("vehicles")
-      .select(`${VEHICLE_SELECT_COLUMNS}, showrooms(business_name)`)
+      .select(`${VEHICLE_SELECT_COLUMNS}, showroom_id, showrooms(business_name)`)
       .eq("status", "ACTIVE")
       .order("created_at", { ascending: false })
       .limit(MAX_VEHICLES_FOR_AGGREGATION),
@@ -106,8 +106,9 @@ export default async function Home() {
   }));
   const brandLogoByName = new Map(brandTiles.map((b) => [b.name.toLowerCase(), b]));
 
-  const vehicles: HomeVehicleItem[] = (vehicleRows ?? []).map((row) => ({
+  const vehicles: VehicleWithShowroom[] = (vehicleRows ?? []).map((row) => ({
     ...vehicleRowToListItem(row, (storagePath) => supabase.storage.from("vehicle-media").getPublicUrl(storagePath).data.publicUrl),
+    showroomId: row.showroom_id,
     showroomName: row.showrooms?.business_name ?? "Unknown showroom",
   }));
 
