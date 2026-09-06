@@ -1,5 +1,8 @@
 "use server";
 
+import { renderShowroomRegistrationAdminNotificationEmail, renderShowroomRegistrationReceivedEmail } from "@/lib/email-templates";
+import { sendEmail } from "@/lib/email";
+import { publicEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { fieldErrorsFrom } from "@/lib/validation/field-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -31,6 +34,7 @@ export async function registerShowroomAction(
   }
 
   const parsed = registerShowroomSchema.safeParse({
+    ownerFullName: formData.get("ownerFullName"),
     businessName: formData.get("businessName"),
     location: formData.get("location"),
     businessPhone: formData.get("businessPhone"),
@@ -99,6 +103,16 @@ export async function registerShowroomAction(
     };
   }
 
+  // Keep the account's own display name in sync with what the applicant
+  // just confirmed/corrected here — same real-world fact, one source of
+  // truth (profiles.full_name), not a separate showroom-only column.
+  // Best-effort: a failure here shouldn't block an otherwise-successful
+  // registration.
+  const { error: profileUpdateError } = await supabase.from("profiles").update({ full_name: parsed.data.ownerFullName }).eq("id", user.id);
+  if (profileUpdateError) {
+    logger.warn("Failed to update profile full_name during showroom registration", { userId: user.id, error: profileUpdateError.message });
+  }
+
   const { failedUploads } = await uploadShowroomDocuments(supabase, showroom.id, user.id, documents, BUSINESS_REGISTRATION_DOCUMENT_TYPE);
 
   // If every document failed, the applicant would otherwise be left with a
@@ -129,6 +143,13 @@ export async function registerShowroomAction(
   // (including the partial-upload-failure warning, which would otherwise be
   // silently lost). The next real navigation to this page picks up the new
   // showroom naturally, since it's a dynamically-rendered route.
+  await sendRegistrationEmails({
+    showroomId: showroom.id,
+    businessName: parsed.data.businessName,
+    ownerFullName: parsed.data.ownerFullName,
+    ownerEmail: parsed.data.businessEmail,
+  });
+
   if (failedUploads.length > 0) {
     logger.warn("Showroom registration submitted with partial document upload failure", {
       showroomId: showroom.id,
@@ -141,4 +162,31 @@ export async function registerShowroomAction(
   }
 
   return { status: "success", message: "Application submitted. We'll review your business information and documents within 1–2 business days." };
+}
+
+/** Sent once a showroom application row genuinely exists — never on the total-upload-failure rollback path above, since that showroom no longer exists. */
+async function sendRegistrationEmails(data: { showroomId: string; businessName: string; ownerFullName: string; ownerEmail: string }) {
+  const admin = createAdminClient();
+  const { data: adminProfiles } = await admin.from("profiles").select("id").eq("role", "ADMIN");
+
+  // Resolved in parallel, not a sequential loop — this dev environment alone
+  // has accumulated 50+ ADMIN-role fixture profiles across its E2E history,
+  // and a sequential per-admin getUserById round-trip made registration
+  // submission visibly slow (confirmed live: a real multi-second delay
+  // before the "Application submitted" state appeared).
+  const userResults = await Promise.all((adminProfiles ?? []).map((profile) => admin.auth.admin.getUserById(profile.id)));
+  const recipientEmails = userResults.map((result) => result.data?.user?.email).filter((email): email is string => Boolean(email));
+
+  const reviewUrl = `${publicEnv.NEXT_PUBLIC_SITE_URL}/admin/showrooms`;
+  const notification = renderShowroomRegistrationAdminNotificationEmail({ businessName: data.businessName, ownerFullName: data.ownerFullName, reviewUrl });
+  const received = renderShowroomRegistrationReceivedEmail({ businessName: data.businessName, ownerFullName: data.ownerFullName });
+
+  const results = await Promise.all([
+    ...recipientEmails.map((to) => sendEmail({ to, subject: notification.subject, html: notification.html })),
+    sendEmail({ to: data.ownerEmail, subject: received.subject, html: received.html }),
+  ]);
+
+  if (results.some((sent) => !sent)) {
+    logger.warn("One or more showroom registration notification emails failed to send", { showroomId: data.showroomId, recipientCount: recipientEmails.length });
+  }
 }

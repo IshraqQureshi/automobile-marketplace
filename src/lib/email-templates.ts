@@ -158,6 +158,48 @@ export function renderInquiryThankYouEmail(data: InquiryEmailData): { subject: s
   return { subject, html };
 }
 
+export interface ShowroomRegistrationEmailData {
+  businessName: string;
+  ownerFullName: string;
+}
+
+/** Sent to every admin when a new showroom application is submitted. */
+export function renderShowroomRegistrationAdminNotificationEmail(
+  data: ShowroomRegistrationEmailData & { reviewUrl: string },
+): { subject: string; html: string } {
+  const subject = `New showroom application: ${data.businessName} — HarakaGari Admin`;
+  const html = renderEmailShell({
+    preheader: `${data.ownerFullName} applied to list ${data.businessName} on HarakaGari.`,
+    heading: "New Showroom Application",
+    bodyHtml: `
+      <p style="margin:0 0 16px 0;">A new showroom application is awaiting review.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0; border:1px solid ${BORDER}; border-radius:8px;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Business</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.businessName)}</td></tr>
+        <tr><td style="padding:12px 16px; font-size:13px; color:${MUTED};">Owner</td><td style="padding:12px 16px; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.ownerFullName)}</td></tr>
+      </table>
+    `,
+    ctaLabel: "Review in Admin Panel",
+    ctaUrl: data.reviewUrl,
+    footnote: "Review the submitted documents and approve or reject the application from the admin panel.",
+  });
+  return { subject, html };
+}
+
+/** Sent to the applicant confirming their submission was received. */
+export function renderShowroomRegistrationReceivedEmail(data: ShowroomRegistrationEmailData): { subject: string; html: string } {
+  const subject = `We've received your showroom application — HarakaGari`;
+  const html = renderEmailShell({
+    preheader: `Your application for ${data.businessName} is being reviewed.`,
+    heading: "Application Received",
+    bodyHtml: `
+      <p style="margin:0 0 12px 0;">Hi ${escapeHtml(data.ownerFullName)},</p>
+      <p style="margin:0;">Thanks for applying to list <strong>${escapeHtml(data.businessName)}</strong> on HarakaGari. We're reviewing your business information and documents, and will be in touch within 1–2 business days.</p>
+    `,
+    footnote: "If you didn't submit this application, please contact support.",
+  });
+  return { subject, html };
+}
+
 export interface SubscriptionReminderEmailData {
   showroomName: string;
   endDate: string; // "YYYY-MM-DD"
