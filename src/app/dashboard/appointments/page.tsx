@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppointmentList } from "@/components/appointment/appointment-list";
-import { AvailabilitySettings } from "@/components/dashboard/availability-settings";
-import { getShowroomAppointments, getShowroomAvailability, getShowroomSlotConfig } from "@/features/appointment/queries";
+import { getShowroomAppointments } from "@/features/appointment/queries";
 import { requireApprovedOwnerShowroom } from "@/features/showroom/my-showroom";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,20 +18,19 @@ export default async function DashboardAppointmentsPage() {
   if (!user) redirect("/login");
 
   const showroom = await requireApprovedOwnerShowroom(user.id);
-  const [items, availability, slotConfig] = await Promise.all([
-    getShowroomAppointments(supabase, showroom.id),
-    getShowroomAvailability(supabase, showroom.id),
-    getShowroomSlotConfig(supabase, showroom.id),
-  ]);
+  const items = await getShowroomAppointments(supabase, showroom.id);
 
   return (
-    <div className="flex flex-col gap-6 p-7">
-      <AvailabilitySettings
-        showroomId={showroom.id}
-        initialSlotDurationMinutes={slotConfig?.slotDurationMinutes ?? 30}
-        initialBufferMinutes={slotConfig?.bufferMinutes ?? 0}
-        initialDays={availability.filter((a) => a.isAvailable).map((a) => ({ dayOfWeek: a.dayOfWeek, isAvailable: true, startTime: a.startTime.slice(0, 5), endTime: a.endTime.slice(0, 5) }))}
-      />
+    <div className="flex flex-col gap-4 p-7">
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-lg font-semibold text-neutral-900">Appointments</h1>
+        <Link
+          href="/dashboard/appointments/availability"
+          className="rounded-md border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+        >
+          Manage test drive availability
+        </Link>
+      </div>
       <AppointmentList items={items} />
     </div>
   );
