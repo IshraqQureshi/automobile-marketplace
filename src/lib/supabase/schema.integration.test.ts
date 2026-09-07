@@ -382,7 +382,7 @@ describe("Database schema integrity (integration)", () => {
       expect(error?.message).toMatch(/does not belong to the appointment's showroom/);
     });
 
-    it("rejects a second PENDING/CONFIRMED appointment for the same showroom/date/start_time (double-booking prevention, APT-004)", async () => {
+    it("rejects a second PENDING/CONFIRMED appointment for the exact same showroom/date/time range (double-booking prevention, APT-004)", async () => {
       const { error } = await supabase.from("appointments").insert({
         booking_reference: `BK-TEST-${testId}-conflict`,
         customer_id: customerId,
@@ -395,10 +395,53 @@ describe("Database schema integrity (integration)", () => {
         contact_phone: "+254712345678",
       });
       expect(error).not.toBeNull();
-      expect(error?.code).toBe("23505");
+      expect(error?.code).toBe("23P01"); // exclusion_violation
     });
 
-    it("allows a new appointment for the same slot once the conflicting one is DECLINED (the unique index is partial)", async () => {
+    it("rejects a PARTIALLY overlapping range too, not just an exact start_time match (APT-003 — a multi-vehicle appointment spans multiple slots)", async () => {
+      // Fixture appointment occupies 10:00-10:30. A 10:15-10:45 request has
+      // a different start_time but genuinely overlaps — the old exact-match
+      // unique index couldn't have caught this; the range-overlap exclusion
+      // constraint must.
+      const { error } = await supabase.from("appointments").insert({
+        booking_reference: `BK-TEST-${testId}-partial-overlap`,
+        customer_id: customerId,
+        showroom_id: showroomId,
+        appointment_date: "2026-12-01",
+        start_time: "10:15",
+        end_time: "10:45",
+        contact_name: "Test Customer",
+        contact_email: "test-customer@example.com",
+        contact_phone: "+254712345678",
+      });
+      expect(error).not.toBeNull();
+      expect(error?.code).toBe("23P01");
+    });
+
+    it("allows a back-to-back, non-overlapping range immediately after an existing appointment", async () => {
+      // Fixture appointment ends at 10:30 — a request starting exactly at
+      // 10:30 doesn't overlap it (end-exclusive range), same as two
+      // adjacent single-vehicle slots being independently bookable today.
+      const { data, error } = await supabase
+        .from("appointments")
+        .insert({
+          booking_reference: `BK-TEST-${testId}-back-to-back`,
+          customer_id: customerId,
+          showroom_id: showroomId,
+          appointment_date: "2026-12-01",
+          start_time: "10:30",
+          end_time: "11:00",
+          contact_name: "Test Customer",
+          contact_email: "test-customer@example.com",
+          contact_phone: "+254712345678",
+        })
+        .select()
+        .single();
+      expect(error).toBeNull();
+      if (data) await supabase.from("appointments").delete().eq("id", data.id);
+    });
+
+    it("allows a new appointment for the same slot once the conflicting one is DECLINED (the exclusion constraint is partial)", async () => {
       const { error: declineError } = await supabase.from("appointments").update({ status: "DECLINED" }).eq("id", appointmentId);
       expect(declineError).toBeNull();
 

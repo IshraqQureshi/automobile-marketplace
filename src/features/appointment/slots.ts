@@ -5,9 +5,19 @@
 // already-booked start times for that specific date, computes the list of
 // bookable time slots — each already marked booked/available so the UI
 // never needs to duplicate this logic. The real double-booking guard is
-// the DB's own partial unique index (appointments_no_double_booking); this
-// is what decides what to SHOW as open, not the source of truth for what's
-// actually still free at submit time.
+// the DB's own range-overlap exclusion constraint (appointments_no_double_booking,
+// a `gist` exclusion constraint over each row's own generated timestamp
+// range — see the 20260908010000 migration); this is what decides what to
+// SHOW as open, not the source of truth for what's actually still free at
+// submit time.
+//
+// One appointment can span MULTIPLE consecutive slots — one per attached
+// vehicle (APT-003's "book 5 cars, consume 5 slots" requirement) — so a
+// showroom's slot cadence (slotDurationMinutes + bufferMinutes, the "step")
+// is also needed to (a) figure out which already-booked appointments
+// occupy which individual slot start times (expandBookedRanges), and (b)
+// determine which candidate start times have enough free CONSECUTIVE slots
+// to actually host N vehicles (markSlotsForVehicleCount).
 
 export interface TimeSlot {
   startTime: string; // "HH:MM", 24-hour
@@ -64,4 +74,57 @@ export function generateTimeSlots(input: GenerateSlotsInput): TimeSlot[] {
     });
   }
   return slots;
+}
+
+export interface BookedRange {
+  startTime: string;
+  endTime: string;
+}
+
+/**
+ * Reconstructs every individual slot start time an existing appointment
+ * occupies, from just its stored (possibly multi-slot) start_time/end_time
+ * range — an appointment for N vehicles was originally booked as N
+ * back-to-back slots at this same slot_duration+buffer cadence, so walking
+ * the range in `step` increments recovers exactly those N start times
+ * without needing to store them separately anywhere.
+ */
+export function expandBookedRanges(ranges: BookedRange[], slotDurationMinutes: number, bufferMinutes: number): string[] {
+  if (slotDurationMinutes <= 0) return [];
+  const step = slotDurationMinutes + Math.max(0, bufferMinutes);
+  const result: string[] = [];
+  for (const range of ranges) {
+    const rangeStart = toMinutes(range.startTime);
+    const rangeEnd = toMinutes(range.endTime);
+    for (let t = rangeStart; t + slotDurationMinutes <= rangeEnd; t += step) {
+      result.push(toTimeString(t));
+    }
+  }
+  return result;
+}
+
+/**
+ * Marks a slot as unavailable (booked) unless it can be the START of
+ * `vehicleCount` consecutive, still-open slots — i.e. booking N vehicles
+ * from this slot never needs more than what's actually free, and never
+ * silently crosses into a different availability window (a gap between
+ * two windows, e.g. a lunch break, breaks the `step`-spaced chain and
+ * correctly stops the run there). `slots` must already be sorted ascending
+ * by startTime. A no-op for the single-vehicle case.
+ */
+export function markSlotsForVehicleCount(slots: TimeSlot[], slotDurationMinutes: number, bufferMinutes: number, vehicleCount: number): TimeSlot[] {
+  if (vehicleCount <= 1) return slots;
+  const step = slotDurationMinutes + Math.max(0, bufferMinutes);
+
+  return slots.map((slot, i) => {
+    if (slot.booked) return slot;
+    const baseStart = toMinutes(slot.startTime);
+    for (let k = 1; k < vehicleCount; k++) {
+      const next = slots[i + k];
+      if (!next || next.booked || toMinutes(next.startTime) !== baseStart + k * step) {
+        return { ...slot, booked: true };
+      }
+    }
+    return slot;
+  });
 }
