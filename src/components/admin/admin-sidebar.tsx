@@ -16,6 +16,8 @@ interface NavEntry {
 
 const OVERVIEW_ITEMS: NavEntry[] = [{ label: "Dashboard", href: "/admin", icon: DashboardIcon }];
 
+const ANALYTICS_ITEMS: NavEntry[] = [{ label: "Reports", href: "/admin/reports", icon: ReportsIcon }];
+
 const MARKETPLACE_ITEMS: NavEntry[] = [
   { label: "Catalog", href: "/admin/catalog", icon: () => <TagIcon className="h-4.25 w-4.25" /> },
   { label: "Showrooms", href: "/admin/showrooms", icon: ShowroomIcon },
@@ -61,6 +63,7 @@ export function AdminSidebar({
       </Link>
 
       <NavGroup label="Overview" items={OVERVIEW_ITEMS} pathname={pathname} />
+      <NavGroup label="Analytics" items={ANALYTICS_ITEMS} pathname={pathname} />
       <NavGroup label="Marketplace" items={marketplaceItems} pathname={pathname} />
       <NavGroup label="Content" items={CONTENT_ITEMS} pathname={pathname} />
       <NavGroup label="Billing" items={billingItems} pathname={pathname} />
@@ -154,6 +157,15 @@ function DashboardIcon() {
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
+function ReportsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <path d="M3 3v18h18" />
+      <path d="M7 15l4-5 3 3 5-7" />
     </svg>
   );
 }
