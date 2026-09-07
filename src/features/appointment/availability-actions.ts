@@ -78,6 +78,6 @@ export async function updateShowroomAvailabilityAction(showroomId: string, formD
     return { error: "Failed to save availability." };
   }
 
-  revalidatePath("/dashboard/appointments");
+  revalidatePath("/dashboard/appointments/availability");
   return {};
 }

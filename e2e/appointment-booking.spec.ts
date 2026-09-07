@@ -285,7 +285,7 @@ test("owner can edit and save availability from the dashboard, and it persists (
   await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
   await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
   await page.waitForURL(/\/dashboard$/);
-  await page.goto("/dashboard/appointments", { waitUntil: "domcontentloaded" });
+  await page.goto("/dashboard/appointments/availability", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByLabel("Monday", { exact: true })).toBeChecked();
   await page.getByLabel("Sunday", { exact: true }).check();
