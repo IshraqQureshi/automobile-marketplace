@@ -144,22 +144,41 @@ async function main() {
         color: "Pearl White",
         description: "Seed fixture for local testing of vehicle discovery, the finance calculator, financing applications, inquiries, and appointment booking.",
         status: "ACTIVE",
+        installment_enabled: true,
+        bank_finance_enabled: true,
         financing_down_payment_percent: 20,
         financing_interest_rate: 14,
         financing_tenure_options_months: [12, 24, 36],
         financing_partner: "HarakaGari Finance Partners",
         financing_insurance_percent: 3,
       })
-      .select("id, make, model")
+      .select("id, make, model, variant")
       .single();
     if (error || !data) throw error ?? new Error("vehicle not created");
     vehicle = data;
   } else {
-    await supabase.from("vehicles").update({ status: "ACTIVE" }).eq("id", vehicle.id);
+    // Re-select variant too — the existing-vehicle lookup above only fetched
+    // id/make/model, and it's needed below for the same slug scheme the app
+    // itself uses.
+    const { data: refetched } = await supabase.from("vehicles").select("id, make, model, variant").eq("id", vehicle.id).single();
+    vehicle = refetched ?? vehicle;
+    await supabase.from("vehicles").update({ status: "ACTIVE", installment_enabled: true, bank_finance_enabled: true }).eq("id", vehicle.id);
   }
 
-  const brandSlug = vehicle.make.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  const nameSlug = `${vehicle.model.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}-${vehicle.id}`;
+  // Mirrors src/features/vehicle/slug.ts's slugify()/getVehicleDetailPath()
+  // exactly (including the model+variant name-slug rule) — duplicated
+  // rather than imported because this is a plain Node ESM script with no
+  // TypeScript loader configured, so it can't import a .ts module directly.
+  const slugify = (value) =>
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  const brandSlug = slugify(vehicle.make);
+  const name = vehicle.variant ? `${vehicle.model} ${vehicle.variant}` : vehicle.model;
+  const nameSlugPrefix = slugify(name);
+  const nameSlug = `${nameSlugPrefix ? `${nameSlugPrefix}-` : ""}${vehicle.id}`;
   const vehicleUrl = `http://localhost:3000/${brandSlug}/${nameSlug}`;
 
   console.log("\n✅ Test data ready.\n");
