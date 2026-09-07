@@ -1,23 +1,30 @@
 // Pure slot-generation math for the "Schedule Test Drive" booking flow.
 // Given a showroom's configured working-hours window for one day
 // (showroom_availability), its flat slot-duration/buffer-time settings
-// (showrooms.slot_duration_minutes/buffer_minutes), and the set of
-// already-booked start times for that specific date, computes the list of
-// bookable time slots — each already marked booked/available so the UI
-// never needs to duplicate this logic. The real double-booking guard is
-// the DB's own range-overlap exclusion constraint (appointments_no_double_booking,
-// a `gist` exclusion constraint over each row's own generated timestamp
-// range — see the 20260908010000 migration); this is what decides what to
-// SHOW as open, not the source of truth for what's actually still free at
-// submit time.
+// (showrooms.slot_duration_minutes/buffer_minutes), and the raw
+// start_time/end_time ranges of already-booked appointments for that
+// specific date, computes the list of bookable time slots — each already
+// marked booked/available so the UI never needs to duplicate this logic.
+// The real double-booking guard is the DB's own range-overlap exclusion
+// constraint (appointments_no_double_booking, a `gist` exclusion
+// constraint over each row's own generated timestamp range — see the
+// 20260908010000 migration); this is what decides what to SHOW as open,
+// not the source of truth for what's actually still free at submit time.
 //
 // One appointment can span MULTIPLE consecutive slots — one per attached
-// vehicle (APT-003's "book 5 cars, consume 5 slots" requirement) — so a
-// showroom's slot cadence (slotDurationMinutes + bufferMinutes, the "step")
-// is also needed to (a) figure out which already-booked appointments
-// occupy which individual slot start times (expandBookedRanges), and (b)
-// determine which candidate start times have enough free CONSECUTIVE slots
-// to actually host N vehicles (markSlotsForVehicleCount).
+// vehicle (APT-003's "book 5 cars, consume 5 slots" requirement). A candidate
+// slot is marked booked whenever it OVERLAPS any existing appointment's raw
+// range (isSlotBooked) — never by comparing exact slot start times against
+// each other. That distinction matters: a showroom can change its slot
+// length/buffer at any time, and an appointment booked under the OLD
+// cadence has no reason to land on any of the NEW cadence's exact slot
+// boundaries. Exact-string matching would then silently miss the overlap
+// entirely; checking real time overlap doesn't care what grid either side
+// was computed against, so it stays correct across a cadence change with no
+// need to record what cadence a past appointment was booked under.
+//
+// markSlotsForVehicleCount then determines which candidate start times have
+// enough free CONSECUTIVE slots to actually host N vehicles.
 
 export interface TimeSlot {
   startTime: string; // "HH:MM", 24-hour
@@ -38,12 +45,25 @@ function toTimeString(totalMinutes: number): string {
   return `${hours}:${minutes}`;
 }
 
+export interface BookedRange {
+  startTime: string;
+  endTime: string;
+}
+
+function isSlotBooked(slotStart: number, slotEnd: number, bookedRanges: { start: number; end: number }[]): boolean {
+  // Standard end-exclusive interval overlap: two ranges overlap iff each
+  // starts before the other ends. Back-to-back ranges (one's end exactly
+  // equals the other's start) do NOT overlap — same semantics as the DB's
+  // own `tsrange(..., '[)')` exclusion constraint.
+  return bookedRanges.some((r) => slotStart < r.end && slotEnd > r.start);
+}
+
 export interface GenerateSlotsInput {
   windowStartTime: string; // "HH:MM" — showroom_availability.start_time for that day
   windowEndTime: string; // "HH:MM" — showroom_availability.end_time for that day
   slotDurationMinutes: number;
   bufferMinutes: number;
-  bookedStartTimes: string[]; // already-PENDING/CONFIRMED appointments' start_time for this date
+  bookedRanges: BookedRange[]; // already-PENDING/CONFIRMED appointments' raw start_time/end_time for this date
   // When generating slots for today, minutes-since-midnight right now —
   // any slot starting at or before this is filtered out entirely (not
   // shown as booked, just not offered). Omit for a future date.
@@ -51,56 +71,25 @@ export interface GenerateSlotsInput {
 }
 
 export function generateTimeSlots(input: GenerateSlotsInput): TimeSlot[] {
-  const { windowStartTime, windowEndTime, slotDurationMinutes, bufferMinutes, bookedStartTimes, nowMinutes } = input;
+  const { windowStartTime, windowEndTime, slotDurationMinutes, bufferMinutes, bookedRanges, nowMinutes } = input;
   if (slotDurationMinutes <= 0) return [];
 
   const windowStart = toMinutes(windowStartTime);
   const windowEnd = toMinutes(windowEndTime);
-  // Postgres `time` columns come back from Supabase as "HH:MM:SS" — booked
-  // times are normalized to this function's own "HH:MM" output format so
-  // Set membership actually matches, regardless of what precision the
-  // caller passed in.
-  const booked = new Set(bookedStartTimes.map((t) => toTimeString(toMinutes(t))));
+  const ranges = bookedRanges.map((r) => ({ start: toMinutes(r.startTime), end: toMinutes(r.endTime) }));
   const step = slotDurationMinutes + Math.max(0, bufferMinutes);
 
   const slots: TimeSlot[] = [];
   for (let start = windowStart; start + slotDurationMinutes <= windowEnd; start += step) {
     if (nowMinutes != null && start <= nowMinutes) continue;
-    const startTime = toTimeString(start);
+    const end = start + slotDurationMinutes;
     slots.push({
-      startTime,
-      endTime: toTimeString(start + slotDurationMinutes),
-      booked: booked.has(startTime),
+      startTime: toTimeString(start),
+      endTime: toTimeString(end),
+      booked: isSlotBooked(start, end, ranges),
     });
   }
   return slots;
-}
-
-export interface BookedRange {
-  startTime: string;
-  endTime: string;
-}
-
-/**
- * Reconstructs every individual slot start time an existing appointment
- * occupies, from just its stored (possibly multi-slot) start_time/end_time
- * range — an appointment for N vehicles was originally booked as N
- * back-to-back slots at this same slot_duration+buffer cadence, so walking
- * the range in `step` increments recovers exactly those N start times
- * without needing to store them separately anywhere.
- */
-export function expandBookedRanges(ranges: BookedRange[], slotDurationMinutes: number, bufferMinutes: number): string[] {
-  if (slotDurationMinutes <= 0) return [];
-  const step = slotDurationMinutes + Math.max(0, bufferMinutes);
-  const result: string[] = [];
-  for (const range of ranges) {
-    const rangeStart = toMinutes(range.startTime);
-    const rangeEnd = toMinutes(range.endTime);
-    for (let t = rangeStart; t + slotDurationMinutes <= rangeEnd; t += step) {
-      result.push(toTimeString(t));
-    }
-  }
-  return result;
 }
 
 /**

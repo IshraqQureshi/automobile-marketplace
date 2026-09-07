@@ -11,7 +11,7 @@ import { sendEmail } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { expandBookedRanges, generateTimeSlots, markSlotsForVehicleCount, type TimeSlot } from "./slots";
+import { generateTimeSlots, markSlotsForVehicleCount, type TimeSlot } from "./slots";
 import { appointmentFieldSchemas, appointmentVehicleIdsSchema } from "./schemas";
 
 const dateFormatter = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "long", year: "numeric" });
@@ -81,11 +81,12 @@ export async function getAvailableSlotsAction(showroomId: string, date: string, 
   const isToday = date === today.toISOString().slice(0, 10);
   const nowMinutes = isToday ? today.getHours() * 60 + today.getMinutes() : undefined;
   // Each existing appointment may itself span multiple consecutive slots
-  // (one per vehicle it was booked with) — reconstruct every individual
-  // slot start time it occupies from its own stored start_time/end_time,
-  // since that's the only place that range is recorded.
+  // (one per vehicle it was booked with) — a candidate slot is marked
+  // booked whenever it overlaps an existing appointment's raw range
+  // (generateTimeSlots), which stays correct even if the showroom's slot
+  // cadence has changed since that appointment was booked (no need to
+  // reconstruct exact historical slot boundaries at all).
   const bookedRanges = (booked ?? []).map((row) => ({ startTime: row.start_time, endTime: row.end_time }));
-  const bookedStartTimes = expandBookedRanges(bookedRanges, showroom.slot_duration_minutes, showroom.buffer_minutes);
 
   const slots = windows.flatMap((window) =>
     generateTimeSlots({
@@ -93,7 +94,7 @@ export async function getAvailableSlotsAction(showroomId: string, date: string, 
       windowEndTime: window.end_time,
       slotDurationMinutes: showroom.slot_duration_minutes,
       bufferMinutes: showroom.buffer_minutes,
-      bookedStartTimes,
+      bookedRanges,
       nowMinutes,
     }),
   );
@@ -178,10 +179,36 @@ export async function submitAppointmentAction(formData: FormData): Promise<Appoi
   // so this recomputes the same range the customer already saw, rather
   // than trusting a client-sent end time.
   const [hours, minutes] = startTimeResult.data.split(":").map(Number);
-  const endTotalMinutes = (hours ?? 0) * 60 + (minutes ?? 0) + (vehicleCount - 1) * step + slotDurationMinutes;
+  const startTotalMinutes = (hours ?? 0) * 60 + (minutes ?? 0);
+  const endTotalMinutes = startTotalMinutes + (vehicleCount - 1) * step + slotDurationMinutes;
   const endTime = `${Math.floor(endTotalMinutes / 60)
     .toString()
     .padStart(2, "0")}:${(endTotalMinutes % 60).toString().padStart(2, "0")}`;
+
+  // The picker only ever offers a start time backed by markSlotsForVehicleCount's
+  // own within-one-window check, but that's client-supplied — re-validate
+  // server-side that the full widened range still fits inside one of the
+  // showroom's real availability windows for this exact date, rather than
+  // trusting the client's start_time/vehicle count blindly. Also catches a
+  // range that would run past midnight, which a `time` column can't
+  // represent and would otherwise surface as a confusing raw insert error.
+  const dayOfWeek = new Date(`${dateResult.data}T00:00:00`).getDay();
+  const { data: windowsForDay } = await supabase
+    .from("showroom_availability")
+    .select("start_time, end_time")
+    .eq("showroom_id", showroomId)
+    .eq("day_of_week", dayOfWeek)
+    .eq("is_available", true);
+  const fitsAWindow = (windowsForDay ?? []).some((w) => {
+    const [wStartH, wStartM] = w.start_time.split(":").map(Number);
+    const [wEndH, wEndM] = w.end_time.split(":").map(Number);
+    const windowStart = (wStartH ?? 0) * 60 + (wStartM ?? 0);
+    const windowEnd = (wEndH ?? 0) * 60 + (wEndM ?? 0);
+    return startTotalMinutes >= windowStart && endTotalMinutes <= windowEnd;
+  });
+  if (!fitsAWindow) {
+    return { error: "That time no longer fits within the showroom's availability. Please choose another slot." };
+  }
 
   const appointmentId = crypto.randomUUID();
   const bookingReference = generateBookingReference();
