@@ -3,6 +3,19 @@
 // dates, picking a sensible chart granularity for that span, and bucketing
 // arbitrary dated records into it (zero-filling buckets with no data, so a
 // chart's x-axis is continuous rather than skipping gaps).
+//
+// Every date this module touches is handled in UTC, consistently, end to
+// end — not because UTC is inherently "more correct," but because the
+// records being bucketed (appointments.created_at etc., timestamptz
+// columns) come back from Supabase as UTC ISO strings, and every report
+// query slices their calendar date via `.slice(0, 10)` on that UTC string
+// (see showroom-report-queries.ts/admin-report-queries.ts). Resolving
+// "today"/parsing "YYYY-MM-DD" via LOCAL time here, while the actual data
+// being bucketed is keyed by its UTC calendar date, would silently
+// misattribute records near a day boundary whenever the runtime's local
+// timezone isn't UTC — code review caught exactly this inconsistency
+// before merge (the module was internally local-time-consistent, but that
+// consistency didn't survive contact with the UTC-keyed query layer).
 
 export type DateRangePreset = "7d" | "30d" | "90d" | "custom";
 
@@ -11,17 +24,32 @@ export interface DateRange {
   end: string; // "YYYY-MM-DD", inclusive
 }
 
-// Local-time date components, not `.toISOString().slice(0, 10)` — every
-// Date this module constructs (`new Date(\`${dateString}T00:00:00\`)`,
-// `new Date(year, month, day)`) is already local-time, and mixing that
-// with a UTC-based formatter here would shift the date by a day whenever
-// the runtime's local timezone isn't UTC (the same day-boundary bug class
-// already hit this codebase's E2E date-picker helpers).
 function toDateOnly(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+// Parses a "YYYY-MM-DD" string as UTC midnight — never bare
+// `new Date(dateString + "T00:00:00")`, which parses as LOCAL midnight.
+function parseDateOnly(dateString: string): Date {
+  return new Date(`${dateString}T00:00:00Z`);
+}
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A defense-in-depth guard for a custom range's `start`/`end` query params
+ * before they ever reach resolveDateRange — a cleared date input submits
+ * as `""` rather than being omitted (see DateRangeForm's own client-side
+ * guard for the same issue), and an empty/malformed string isn't
+ * distinguishable from "no override" by a bare `??`. Format-only (doesn't
+ * check the date is a real calendar date) — resolveDateRange's own
+ * start<=end clamping handles the rest.
+ */
+export function isValidDateOnly(value: string | undefined): value is string {
+  return !!value && DATE_ONLY_PATTERN.test(value);
 }
 
 const PRESET_DAYS: Record<Exclude<DateRangePreset, "custom">, number> = {
@@ -41,16 +69,16 @@ export function resolveDateRange(preset: DateRangePreset, custom?: { start?: str
     return { start: start <= end ? start : end, end };
   }
   const days = PRESET_DAYS[preset];
-  const startDate = new Date(`${end}T00:00:00`);
-  startDate.setDate(startDate.getDate() - (days - 1));
+  const startDate = parseDateOnly(end);
+  startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
   return { start: toDateOnly(startDate), end };
 }
 
 export type BucketGranularity = "day" | "week" | "month";
 
 function daysBetween(range: DateRange): number {
-  const start = new Date(`${range.start}T00:00:00`);
-  const end = new Date(`${range.end}T00:00:00`);
+  const start = parseDateOnly(range.start);
+  const end = parseDateOnly(range.end);
   return Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
 }
 
@@ -64,17 +92,17 @@ export function pickGranularity(range: DateRange): BucketGranularity {
 
 function startOfWeek(date: Date): Date {
   const d = new Date(date);
-  d.setDate(d.getDate() - d.getDay()); // Sunday-start, matching showroom_availability's own day_of_week convention
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay()); // Sunday-start, matching showroom_availability's own day_of_week convention
   return d;
 }
 
 function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
 /** Maps an arbitrary "YYYY-MM-DD" date to the key of the bucket it falls into. */
 export function bucketKeyFor(dateString: string, granularity: BucketGranularity): string {
-  const date = new Date(`${dateString}T00:00:00`);
+  const date = parseDateOnly(dateString);
   if (granularity === "day") return dateString;
   if (granularity === "week") return toDateOnly(startOfWeek(date));
   return toDateOnly(startOfMonth(date));
@@ -84,15 +112,15 @@ export function bucketKeyFor(dateString: string, granularity: BucketGranularity)
 export function bucketKeysInRange(range: DateRange, granularity: BucketGranularity): string[] {
   const keys: string[] = [];
   const seen = new Set<string>();
-  const end = new Date(`${range.end}T00:00:00`);
-  const cursor = new Date(`${range.start}T00:00:00`);
+  const end = parseDateOnly(range.end);
+  const cursor = parseDateOnly(range.start);
   while (cursor <= end) {
     const key = bucketKeyFor(toDateOnly(cursor), granularity);
     if (!seen.has(key)) {
       seen.add(key);
       keys.push(key);
     }
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return keys;
 }

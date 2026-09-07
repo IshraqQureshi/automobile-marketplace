@@ -6,7 +6,7 @@ import { ExportCsvButton } from "@/components/analytics/export-csv-button";
 import { ReportEmptyState, ReportSection } from "@/components/analytics/report-section";
 import { StatCard } from "@/components/analytics/stat-card";
 import { APPOINTMENT_STATUS_LABELS } from "@/features/appointment/schemas";
-import { pickGranularity, resolveDateRange, type DateRangePreset } from "@/features/analytics/date-range";
+import { isValidDateOnly, pickGranularity, resolveDateRange, type DateRangePreset } from "@/features/analytics/date-range";
 import { getShowroomReportData } from "@/features/analytics/showroom-report-queries";
 import { requireApprovedOwnerShowroom } from "@/features/showroom/my-showroom";
 import { createClient } from "@/lib/supabase/server";
@@ -36,7 +36,10 @@ export default async function DashboardReportsPage({ searchParams }: DashboardRe
   const showroom = await requireApprovedOwnerShowroom(user.id);
 
   const preset: DateRangePreset = isPreset(params.range) ? params.range : "30d";
-  const range = resolveDateRange(preset, { start: params.start, end: params.end });
+  const range = resolveDateRange(preset, {
+    start: isValidDateOnly(params.start) ? params.start : undefined,
+    end: isValidDateOnly(params.end) ? params.end : undefined,
+  });
   const granularity = pickGranularity(range);
 
   const data = await getShowroomReportData(supabase, showroom.id, range, granularity);

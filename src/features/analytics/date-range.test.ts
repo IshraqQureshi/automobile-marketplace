@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { bucketKeyFor, bucketKeysInRange, pickGranularity, resolveDateRange } from "./date-range";
+import { bucketKeyFor, bucketKeysInRange, isValidDateOnly, pickGranularity, resolveDateRange } from "./date-range";
 
 const FIXED_TODAY = new Date("2026-03-15T12:00:00Z");
 
 describe("resolveDateRange", () => {
   it("resolves the 7d preset to a 7-day inclusive range ending today", () => {
     expect(resolveDateRange("7d", undefined, FIXED_TODAY)).toEqual({ start: "2026-03-09", end: "2026-03-15" });
+  });
+
+  it("resolves 'today' by its UTC calendar date, not the process's local timezone — code review finding", () => {
+    // 23:30 UTC on 2026-03-15 is already 2026-03-16 in timezones ahead of
+    // UTC by 1+ hour, and still 2026-03-15 in timezones behind UTC. If this
+    // function used local-time getters (as it originally did), the result
+    // here would depend on whatever timezone the test happened to run in —
+    // it must not, since every report record it's compared against
+    // (`created_at.slice(0, 10)`) is keyed by its UTC calendar date.
+    const lateUtcInstant = new Date("2026-03-15T23:30:00Z");
+    expect(resolveDateRange("7d", undefined, lateUtcInstant).end).toBe("2026-03-15");
   });
 
   it("resolves the 30d preset", () => {
@@ -70,5 +81,25 @@ describe("bucketKeysInRange", () => {
 
   it("produces one key per distinct month for month granularity", () => {
     expect(bucketKeysInRange({ start: "2026-01-15", end: "2026-03-05" }, "month")).toEqual(["2026-01-01", "2026-02-01", "2026-03-01"]);
+  });
+});
+
+describe("isValidDateOnly", () => {
+  it("accepts a well-formed YYYY-MM-DD string", () => {
+    expect(isValidDateOnly("2026-03-15")).toBe(true);
+  });
+
+  it("rejects an empty string — a cleared date input submits this, not undefined", () => {
+    expect(isValidDateOnly("")).toBe(false);
+  });
+
+  it("rejects undefined", () => {
+    expect(isValidDateOnly(undefined)).toBe(false);
+  });
+
+  it("rejects a malformed date string", () => {
+    expect(isValidDateOnly("not-a-date")).toBe(false);
+    expect(isValidDateOnly("2026/03/15")).toBe(false);
+    expect(isValidDateOnly("2026-3-15")).toBe(false);
   });
 });

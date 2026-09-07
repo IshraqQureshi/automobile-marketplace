@@ -45,6 +45,13 @@ export function DateRangeForm({ action, preset, start, end }: DateRangeFormProps
     const form = e.currentTarget;
     const nextStart = (form.elements.namedItem("start") as HTMLInputElement).value;
     const nextEnd = (form.elements.namedItem("end") as HTMLInputElement).value;
+    // A cleared date input submits as "" (not omitted), which the page's
+    // resolveDateRange call can't tell apart from "no override" via `??` —
+    // code review caught this producing a silently empty/malformed range
+    // rather than a validation error. Keep the field's own existing value
+    // (still visible in the input, just not yet actually applied) instead
+    // of navigating with a blank date.
+    if (!nextStart || !nextEnd) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("range", "custom");
     params.set("start", nextStart);
