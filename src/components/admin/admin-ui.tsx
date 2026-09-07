@@ -134,6 +134,11 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
   SUSPENDED: "bg-neutral-100 text-neutral-500",
   NEW: "bg-blue-50 text-blue-700",
   VIEWED: "bg-neutral-100 text-neutral-500",
+  CONFIRMED: "bg-emerald-50 text-emerald-700",
+  DECLINED: "bg-red-50 text-red-700",
+  CANCELLED: "bg-neutral-100 text-neutral-500",
+  COMPLETED: "bg-indigo-50 text-indigo-700",
+  RESCHEDULED: "bg-amber-50 text-amber-700",
 };
 
 export function StatusBadge({ status }: { status: string }) {

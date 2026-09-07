@@ -112,8 +112,11 @@ export type Database = {
         Row: {
           appointment_date: string
           booking_reference: string
+          contact_email: string
+          contact_name: string
+          contact_phone: string
           created_at: string
-          customer_id: string
+          customer_id: string | null
           customer_notes: string | null
           end_time: string
           id: string
@@ -126,8 +129,11 @@ export type Database = {
         Insert: {
           appointment_date: string
           booking_reference: string
+          contact_email: string
+          contact_name: string
+          contact_phone: string
           created_at?: string
-          customer_id: string
+          customer_id?: string | null
           customer_notes?: string | null
           end_time: string
           id?: string
@@ -140,8 +146,11 @@ export type Database = {
         Update: {
           appointment_date?: string
           booking_reference?: string
+          contact_email?: string
+          contact_name?: string
+          contact_phone?: string
           created_at?: string
-          customer_id?: string
+          customer_id?: string | null
           customer_notes?: string | null
           end_time?: string
           id?: string
@@ -702,6 +711,7 @@ export type Database = {
       showrooms: {
         Row: {
           address: string | null
+          buffer_minutes: number
           business_name: string
           city: string | null
           created_at: string
@@ -714,6 +724,7 @@ export type Database = {
           opening_hours: Json | null
           owner_user_id: string
           phone: string
+          slot_duration_minutes: number
           status: Database["public"]["Enums"]["showroom_status"]
           updated_at: string
           verified: boolean
@@ -721,6 +732,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          buffer_minutes?: number
           business_name: string
           city?: string | null
           created_at?: string
@@ -733,6 +745,7 @@ export type Database = {
           opening_hours?: Json | null
           owner_user_id: string
           phone: string
+          slot_duration_minutes?: number
           status?: Database["public"]["Enums"]["showroom_status"]
           updated_at?: string
           verified?: boolean
@@ -740,6 +753,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          buffer_minutes?: number
           business_name?: string
           city?: string | null
           created_at?: string
@@ -752,6 +766,7 @@ export type Database = {
           opening_hours?: Json | null
           owner_user_id?: string
           phone?: string
+          slot_duration_minutes?: number
           status?: Database["public"]["Enums"]["showroom_status"]
           updated_at?: string
           verified?: boolean
@@ -1147,6 +1162,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      appointment_allows_public_vehicle_insert: {
+        Args: { target_appointment_id: string }
+        Returns: boolean
+      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -1155,6 +1174,10 @@ export type Database = {
       owns_showroom: { Args: { target_showroom_id: string }; Returns: boolean }
       record_vehicle_view: {
         Args: { anon_viewer_ip_hash?: string; target_vehicle_id: string }
+        Returns: undefined
+      }
+      replace_showroom_availability: {
+        Args: { p_days: Json; p_showroom_id: string }
         Returns: undefined
       }
     }

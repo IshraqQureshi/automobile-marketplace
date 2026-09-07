@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { ToastProvider } from "@/components/ui/toast";
+import { getPendingAppointmentCount } from "@/features/appointment/queries";
 import { getUnreadFinancingCount } from "@/features/financing/queries";
 import { getUnreadInquiryCount } from "@/features/inquiry/queries";
 import { getOwnerShowroom } from "@/features/showroom/my-showroom";
@@ -35,14 +36,24 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     redirect("/ready-to-sell");
   }
 
-  const [unreadInquiryCount, unreadFinancingCount] =
+  const [unreadInquiryCount, unreadFinancingCount, pendingAppointmentCount] =
     showroom.status === "APPROVED"
-      ? await Promise.all([getUnreadInquiryCount(supabase, showroom.id), getUnreadFinancingCount(supabase, showroom.id)])
-      : [0, 0];
+      ? await Promise.all([
+          getUnreadInquiryCount(supabase, showroom.id),
+          getUnreadFinancingCount(supabase, showroom.id),
+          getPendingAppointmentCount(supabase, showroom.id),
+        ])
+      : [0, 0, 0];
 
   return (
     <ToastProvider>
-      <DashboardShell email={user.email ?? ""} showroom={showroom} unreadInquiryCount={unreadInquiryCount} unreadFinancingCount={unreadFinancingCount}>
+      <DashboardShell
+        email={user.email ?? ""}
+        showroom={showroom}
+        unreadInquiryCount={unreadInquiryCount}
+        unreadFinancingCount={unreadFinancingCount}
+        pendingAppointmentCount={pendingAppointmentCount}
+      >
         {children}
       </DashboardShell>
     </ToastProvider>

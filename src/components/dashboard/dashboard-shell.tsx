@@ -11,6 +11,7 @@ interface DashboardShellProps {
   showroom: OwnerShowroom;
   unreadInquiryCount?: number;
   unreadFinancingCount?: number;
+  pendingAppointmentCount?: number;
   children: React.ReactNode;
 }
 
@@ -62,7 +63,7 @@ function getIsDesktopServerSnapshot() {
  * `inert` to mobile only. Escape closes the drawer and returns focus to the
  * button that opened it, matching standard dialog/drawer behavior.
  */
-export function DashboardShell({ email, showroom, unreadInquiryCount, unreadFinancingCount, children }: DashboardShellProps) {
+export function DashboardShell({ email, showroom, unreadInquiryCount, unreadFinancingCount, pendingAppointmentCount, children }: DashboardShellProps) {
   const [open, setOpen] = useState(false);
   const isDesktop = useSyncExternalStore(subscribeToDesktopQuery, getIsDesktopSnapshot, getIsDesktopServerSnapshot);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -113,6 +114,7 @@ export function DashboardShell({ email, showroom, unreadInquiryCount, unreadFina
           showroom={showroom}
           unreadInquiryCount={unreadInquiryCount}
           unreadFinancingCount={unreadFinancingCount}
+          pendingAppointmentCount={pendingAppointmentCount}
           onNavigate={close}
         />
       </div>

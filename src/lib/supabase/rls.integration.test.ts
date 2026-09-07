@@ -494,6 +494,9 @@ describe("RLS authorization (integration)", () => {
           appointment_date: "2026-12-15",
           start_time: "10:00",
           end_time: "10:30",
+          contact_name: "Customer A",
+          contact_email: "customer-a@example.com",
+          contact_phone: "+254712345678",
         })
         .select()
         .single();
@@ -512,10 +515,46 @@ describe("RLS authorization (integration)", () => {
           start_time: "11:00",
           end_time: "11:30",
           status: "CONFIRMED",
+          contact_name: "Customer A",
+          contact_email: "customer-a@example.com",
+          contact_phone: "+254712345678",
         })
         .select();
       expect(error).not.toBeNull();
       expect(data).toBeNull();
+    });
+
+    it("a customer cannot self-confirm their own PENDING booking via a direct update (PR #53 code review finding)", async () => {
+      // appointments_update_customer_or_showroom_or_admin is deliberately
+      // broad (a customer can update their own row at all, e.g. notes), so
+      // without the appointments_prevent_customer_status_change trigger a
+      // customer's own authenticated client could call
+      // .update({ status: "CONFIRMED" }) directly and bypass the showroom's
+      // confirm/decline workflow entirely — confirmAppointmentAction's
+      // .eq("status","PENDING") guard only protects the server action path,
+      // not a direct RLS-scoped call.
+      const { data, error } = await customerA.client
+        .from("appointments")
+        .update({ status: "CONFIRMED" })
+        .eq("id", appointmentId)
+        .select();
+      expect(error).not.toBeNull();
+      expect(data).toBeNull();
+
+      const { data: unchanged } = await ownerA.client.from("appointments").select("status").eq("id", appointmentId).single();
+      expect(unchanged?.status).toBe("PENDING");
+    });
+
+    it("the addressed showroom CAN confirm the booking via a direct update", async () => {
+      const { data, error } = await ownerA.client
+        .from("appointments")
+        .update({ status: "CONFIRMED" })
+        .eq("id", appointmentId)
+        .select();
+      expect(error).toBeNull();
+      expect(data?.[0]?.status).toBe("CONFIRMED");
+
+      await ownerA.client.from("appointments").update({ status: "PENDING" }).eq("id", appointmentId);
     });
 
     it("a different customer cannot see another customer's appointment", async () => {
@@ -547,6 +586,38 @@ describe("RLS authorization (integration)", () => {
       const { data, error } = await customerB.client.from("appointment_vehicles").select().eq("appointment_id", appointmentId);
       expect(error).toBeNull();
       expect(data).toEqual([]);
+    });
+
+    it("an anonymous visitor can book an appointment and attach a vehicle to it", async () => {
+      // The action layer generates the id itself (never .select()s an
+      // anonymous insert — same RLS-with-RETURNING gotcha as
+      // vehicle_inquiries/financing_applications), so this test does the
+      // same to exercise the real path, including the security-definer
+      // appointment_allows_public_vehicle_insert() function the
+      // appointment_vehicles insert policy relies on for an anonymous
+      // caller (a plain EXISTS subquery would silently see nothing here,
+      // since anon has no SELECT visibility into appointments at all).
+      const anonAppointmentId = crypto.randomUUID();
+      const { error: insertError } = await anon.from("appointments").insert({
+        id: anonAppointmentId,
+        booking_reference: `BK-RLS-ANON-${testId}`,
+        customer_id: null,
+        showroom_id: showroomAId,
+        appointment_date: "2026-12-17",
+        start_time: "09:00",
+        end_time: "09:30",
+        contact_name: "Anonymous Visitor",
+        contact_email: "anon-visitor@example.com",
+        contact_phone: "+254712345680",
+      });
+      expect(insertError).toBeNull();
+
+      const { error: attachError } = await anon
+        .from("appointment_vehicles")
+        .insert({ appointment_id: anonAppointmentId, vehicle_id: activeVehicleAId });
+      expect(attachError).toBeNull();
+
+      await admin.from("appointments").delete().eq("id", anonAppointmentId);
     });
   });
 

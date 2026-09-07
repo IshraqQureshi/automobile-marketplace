@@ -6,6 +6,7 @@ import { cache } from "react";
 import { VehicleCard } from "@/components/vehicle/vehicle-card";
 import { FinancingApplicationButton } from "@/components/vehicle/financing-application-button";
 import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
+import { ScheduleTestDriveButton } from "@/components/vehicle/schedule-test-drive-button";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
 import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-button";
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -102,21 +103,40 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
   const clientIp = extractClientIp((name) => requestHeaders.get(name));
   const anonViewerIpHash = clientIp ? hashClientIp(clientIp) : undefined;
 
-  const [{ count: activeListingCount }, { data: similarRows }, { data: userResult }] = await Promise.all([
-    supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("showroom_id", vehicle.showroomId).eq("status", "ACTIVE"),
-    supabase
-      .from("vehicles")
-      .select(`${VEHICLE_SELECT_COLUMNS}, showroom_id, showrooms(business_name)`)
-      .eq("status", "ACTIVE")
-      .eq("make", vehicle.make)
-      .neq("id", vehicle.id)
-      .limit(SIMILAR_VEHICLES_LIMIT),
-    supabase.auth.getUser(),
-    // Fire-and-forget from the page's perspective — renders with the
-    // pre-increment count already loaded above; a genuinely new
-    // user/IP's +1 shows up on their *next* visit, not this one.
-    supabase.rpc("record_vehicle_view", { target_vehicle_id: vehicle.id, anon_viewer_ip_hash: anonViewerIpHash }),
-  ]);
+  const [{ count: activeListingCount }, { data: similarRows }, { data: userResult }, { data: availabilityRows }, { data: otherShowroomVehicleRows }] =
+    await Promise.all([
+      supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("showroom_id", vehicle.showroomId).eq("status", "ACTIVE"),
+      supabase
+        .from("vehicles")
+        .select(`${VEHICLE_SELECT_COLUMNS}, showroom_id, showrooms(business_name)`)
+        .eq("status", "ACTIVE")
+        .eq("make", vehicle.make)
+        .neq("id", vehicle.id)
+        .limit(SIMILAR_VEHICLES_LIMIT),
+      supabase.auth.getUser(),
+      // Same public data every visitor needs to build the "Schedule Test
+      // Drive" date picker (showroom_availability's own SELECT RLS policy
+      // is public read) — fetched here rather than in the dialog itself so
+      // the calendar can gray out days with no configured hours at all,
+      // without a round trip before the dialog even opens.
+      supabase.from("showroom_availability").select("day_of_week").eq("showroom_id", vehicle.showroomId).eq("is_available", true),
+      // For "add multiple cars to this appointment" — other real, currently
+      // ACTIVE listings from the same showroom only (matches the
+      // cross-showroom trigger's own constraint on appointment_vehicles).
+      supabase
+        .from("vehicles")
+        .select("id, make, model")
+        .eq("showroom_id", vehicle.showroomId)
+        .eq("status", "ACTIVE")
+        .neq("id", vehicle.id),
+      // Fire-and-forget from the page's perspective — renders with the
+      // pre-increment count already loaded above; a genuinely new
+      // user/IP's +1 shows up on their *next* visit, not this one.
+      supabase.rpc("record_vehicle_view", { target_vehicle_id: vehicle.id, anon_viewer_ip_hash: anonViewerIpHash }),
+    ]);
+
+  const availableDaysOfWeek = [...new Set((availabilityRows ?? []).map((row) => row.day_of_week))];
+  const otherShowroomVehicles = (otherShowroomVehicleRows ?? []).map((row) => ({ id: row.id, title: `${row.make} ${row.model}` }));
 
   let inquiryInitialValues: { fullName: string; email: string; phone: string } | null = null;
   if (userResult.user) {
@@ -257,7 +277,19 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                     initialValues={inquiryInitialValues}
                   />
                   <DisabledCta label="WhatsApp" title="WhatsApp inquiry — coming soon" tone="whatsapp" icon={<WhatsAppIcon />} />
-                  <DisabledCta label="Schedule Test Drive" title="Appointment booking — coming soon" tone="neutral" icon={<CalendarIcon />} />
+                  {availableDaysOfWeek.length > 0 ? (
+                    <ScheduleTestDriveButton
+                      vehicleId={vehicle.id}
+                      vehicleTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                      showroomId={vehicle.showroomId}
+                      showroomName={vehicle.showroomName}
+                      availableDaysOfWeek={availableDaysOfWeek}
+                      otherVehicles={otherShowroomVehicles}
+                      initialValues={inquiryInitialValues}
+                    />
+                  ) : (
+                    <DisabledCta label="Schedule Test Drive" title="This showroom hasn't set their availability yet" tone="neutral" icon={<CalendarIcon />} />
+                  )}
                 </div>
 
                 {(vehicle.installmentEnabled || vehicle.bankFinanceEnabled) && (

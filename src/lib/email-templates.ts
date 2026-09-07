@@ -214,6 +214,80 @@ export function renderFinancingApplicationReceivedEmail(data: FinancingApplicati
   return { subject, html };
 }
 
+export interface AppointmentEmailData {
+  bookingReference: string;
+  showroomName: string;
+  appointmentDate: string; // formatted, e.g. "7 September 2026"
+  timeRange: string; // formatted, e.g. "10:00 AM – 10:30 AM"
+  vehicleTitles: string[];
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+}
+
+function vehicleListHtml(vehicleTitles: string[]): string {
+  return vehicleTitles.map((title) => escapeHtml(title)).join(", ");
+}
+
+/** Sent to the showroom owner and to every admin when a new appointment is requested. */
+export function renderAppointmentNotificationEmail(data: AppointmentEmailData): { subject: string; html: string } {
+  const subject = `New test drive request: ${data.bookingReference} — HarakaGari`;
+  const html = renderEmailShell({
+    preheader: `${escapeHtml(data.contactName)} requested a test drive on ${escapeHtml(data.appointmentDate)}`,
+    heading: "New Test Drive Request",
+    bodyHtml: `
+      <p style="margin:0 0 16px 0;">A customer requested a test drive appointment with <strong>${escapeHtml(data.showroomName)}</strong>.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0; border:1px solid ${BORDER}; border-radius:8px;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Booking reference</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.bookingReference)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Date</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.appointmentDate)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Time</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.timeRange)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Vehicles</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${vehicleListHtml(data.vehicleTitles)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Name</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.contactName)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Email</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.contactEmail)}</td></tr>
+        <tr><td style="padding:12px 16px; font-size:13px; color:${MUTED};">Phone</td><td style="padding:12px 16px; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.contactPhone)}</td></tr>
+      </table>
+    `,
+    footnote: "Confirm or decline this request from the admin panel — the customer is notified automatically once you do.",
+  });
+  return { subject, html };
+}
+
+/** Sent to the customer once the showroom/admin confirms their appointment. */
+export function renderAppointmentConfirmedEmail(data: AppointmentEmailData): { subject: string; html: string } {
+  const subject = `Your test drive is confirmed — ${data.bookingReference}`;
+  const html = renderEmailShell({
+    preheader: `${escapeHtml(data.showroomName)} confirmed your test drive on ${escapeHtml(data.appointmentDate)}.`,
+    heading: "Test Drive Confirmed",
+    bodyHtml: `
+      <p style="margin:0 0 12px 0;">Hi ${escapeHtml(data.contactName)},</p>
+      <p style="margin:0 0 16px 0;"><strong>${escapeHtml(data.showroomName)}</strong> has confirmed your test drive appointment.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0; border:1px solid ${BORDER}; border-radius:8px;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Booking reference</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.bookingReference)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Date</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.appointmentDate)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Time</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.timeRange)}</td></tr>
+        <tr><td style="padding:12px 16px; font-size:13px; color:${MUTED};">Vehicles</td><td style="padding:12px 16px; font-size:13px; font-weight:600; text-align:right;">${vehicleListHtml(data.vehicleTitles)}</td></tr>
+      </table>
+    `,
+    footnote: "If you need to change this booking, contact the showroom directly using the details on their page.",
+  });
+  return { subject, html };
+}
+
+/** Sent to the customer if the showroom/admin declines their appointment request. */
+export function renderAppointmentDeclinedEmail(data: AppointmentEmailData): { subject: string; html: string } {
+  const subject = `Update on your test drive request — ${data.bookingReference}`;
+  const html = renderEmailShell({
+    preheader: `${escapeHtml(data.showroomName)} couldn't accommodate your requested test drive time.`,
+    heading: "Test Drive Request Declined",
+    bodyHtml: `
+      <p style="margin:0 0 12px 0;">Hi ${escapeHtml(data.contactName)},</p>
+      <p style="margin:0;"><strong>${escapeHtml(data.showroomName)}</strong> wasn't able to accommodate your requested test drive on ${escapeHtml(data.appointmentDate)} at ${escapeHtml(data.timeRange)} (booking reference ${escapeHtml(data.bookingReference)}). Contact them directly to arrange another time.</p>
+    `,
+    footnote: "If you didn't request this appointment, you can safely ignore this email.",
+  });
+  return { subject, html };
+}
+
 export interface ShowroomRegistrationEmailData {
   businessName: string;
   ownerFullName: string;
