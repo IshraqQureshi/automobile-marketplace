@@ -24,6 +24,8 @@ function admin() {
 let vehicleId: string;
 let vehiclePath: string;
 let showroomId: string;
+let secondVehicleId: string;
+let secondVehicleTitle: string;
 
 // A fixed weekday/time far enough in the future that "today" never
 // collides with it during a test run, and whose day-of-week is always
@@ -115,6 +117,30 @@ test.beforeAll(async () => {
   if (vehicleError || !vehicle) throw vehicleError ?? new Error("vehicle not created");
   vehicleId = vehicle.id;
   vehiclePath = `/e2eappointment${unique}/alpha-${vehicleId}`;
+
+  // A second ACTIVE vehicle in the same showroom, for the multi-vehicle
+  // ("add another car to this appointment") test below — the popup's
+  // vehicle-picker section only renders once there's at least one other
+  // active listing to offer.
+  const { data: secondVehicle, error: secondVehicleError } = await supabase
+    .from("vehicles")
+    .insert({
+      showroom_id: showroomId,
+      title: `E2E Appointment Vehicle Beta ${unique}`,
+      make: `E2eappointment${unique}`,
+      model: "Beta",
+      year: 2023,
+      price: 2_500_000,
+      status: "ACTIVE",
+    })
+    .select("id, make, model")
+    .single();
+  if (secondVehicleError || !secondVehicle) throw secondVehicleError ?? new Error("second vehicle not created");
+  secondVehicleId = secondVehicle.id;
+  // The "add another car" picker's label is built from make+model (see
+  // otherShowroomVehicleRows in [brand]/[slug]/page.tsx), not the vehicle's
+  // own `title` column.
+  secondVehicleTitle = `${secondVehicle.make} ${secondVehicle.model}`;
 });
 
 test.afterEach(async () => {
@@ -124,6 +150,7 @@ test.afterEach(async () => {
 test.afterAll(async () => {
   const supabase = admin();
   await supabase.from("vehicles").delete().eq("id", vehicleId);
+  await supabase.from("vehicles").delete().eq("id", secondVehicleId);
   await supabase.from("showrooms").delete().eq("id", showroomId);
 });
 
@@ -172,6 +199,34 @@ test("an anonymous visitor can book a test drive, stored with no customer_id", a
   expect(data?.appointment_date).toBe(BOOKING_DATE);
   expect(data?.start_time).toBe("09:00:00");
   expect(data?.booking_reference).toMatch(/^BK-/);
+});
+
+test("a customer can add a second vehicle from the same showroom to one appointment (APT-003)", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await page.getByRole("button", { name: "Schedule Test Drive" }).click();
+  await navigateToBookingDate(page);
+  await expect(page.getByRole("button", { name: "2:00 pm", exact: true })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: "2:00 pm", exact: true }).click();
+
+  // The current vehicle is pre-checked and locked (disabled); the second,
+  // other-showroom-vehicle checkbox is what this test actually exercises.
+  await expect(page.getByLabel("Alpha", { exact: false })).toBeChecked();
+  await page.getByLabel(secondVehicleTitle).check();
+
+  await page.getByLabel("Full Name").fill("Multi Vehicle Tester");
+  await page.getByLabel("Email").fill(`multi-vehicle-${unique}@example.com`);
+  await page.getByLabel("Phone").fill("712345690");
+  await page.getByRole("button", { name: "Request Appointment" }).click();
+
+  await expect(page.getByText("Request sent!")).toBeVisible({ timeout: 10000 });
+
+  const { data } = await admin()
+    .from("appointments")
+    .select("id, appointment_vehicles(vehicle_id)")
+    .eq("contact_email", `multi-vehicle-${unique}@example.com`)
+    .single();
+  const attachedVehicleIds = (data?.appointment_vehicles ?? []).map((row) => row.vehicle_id).sort();
+  expect(attachedVehicleIds).toEqual([vehicleId, secondVehicleId].sort());
 });
 
 test("booking an already-taken slot shows a clear conflict error, not a duplicate row", async ({ page, context }) => {
