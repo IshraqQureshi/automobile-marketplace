@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { ToastProvider } from "@/components/ui/toast";
+import { getPendingAppointmentCount } from "@/features/appointment/queries";
 import { currentUserRole } from "@/features/auth/actions";
 import { getUnreadFinancingCount } from "@/features/financing/queries";
 import { getUnreadInquiryCount } from "@/features/inquiry/queries";
@@ -31,9 +32,10 @@ export default async function AdminProtectedLayout({ children }: AdminProtectedL
     redirect("/admin/login");
   }
 
-  const [unreadInquiryCount, unreadFinancingCount, dueSubscriptionsCount] = await Promise.all([
+  const [unreadInquiryCount, unreadFinancingCount, pendingAppointmentCount, dueSubscriptionsCount] = await Promise.all([
     getUnreadInquiryCount(supabase),
     getUnreadFinancingCount(supabase),
+    getPendingAppointmentCount(supabase),
     getDueSubscriptionsCount(supabase),
   ]);
 
@@ -44,6 +46,7 @@ export default async function AdminProtectedLayout({ children }: AdminProtectedL
           email={user.email ?? ""}
           unreadInquiryCount={unreadInquiryCount}
           unreadFinancingCount={unreadFinancingCount}
+          pendingAppointmentCount={pendingAppointmentCount}
           dueSubscriptionsCount={dueSubscriptionsCount}
         />
         <div className="flex min-w-0 flex-col">{children}</div>

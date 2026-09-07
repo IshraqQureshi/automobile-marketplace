@@ -319,6 +319,9 @@ describe("Database schema integrity (integration)", () => {
           appointment_date: "2026-12-01",
           start_time: "10:00",
           end_time: "10:30",
+          contact_name: "Test Customer",
+          contact_email: "test-customer@example.com",
+          contact_phone: "+254712345678",
         })
         .select()
         .single();
@@ -338,6 +341,9 @@ describe("Database schema integrity (integration)", () => {
         appointment_date: "2026-12-02",
         start_time: "11:00",
         end_time: "11:30",
+        contact_name: "Test Customer",
+        contact_email: "test-customer@example.com",
+        contact_phone: "+254712345678",
       });
       expect(error).not.toBeNull();
       expect(error?.code).toBe("23505");
@@ -351,6 +357,9 @@ describe("Database schema integrity (integration)", () => {
         appointment_date: "2026-12-03",
         start_time: "12:00",
         end_time: "12:00",
+        contact_name: "Test Customer",
+        contact_email: "test-customer@example.com",
+        contact_phone: "+254712345678",
       });
       expect(error).not.toBeNull();
       expect(error?.code).toBe("23514");
@@ -371,6 +380,49 @@ describe("Database schema integrity (integration)", () => {
         .insert({ appointment_id: appointmentId, vehicle_id: otherVehicleId });
       expect(error).not.toBeNull();
       expect(error?.message).toMatch(/does not belong to the appointment's showroom/);
+    });
+
+    it("rejects a second PENDING/CONFIRMED appointment for the same showroom/date/start_time (double-booking prevention, APT-004)", async () => {
+      const { error } = await supabase.from("appointments").insert({
+        booking_reference: `BK-TEST-${testId}-conflict`,
+        customer_id: customerId,
+        showroom_id: showroomId,
+        appointment_date: "2026-12-01",
+        start_time: "10:00",
+        end_time: "10:30",
+        contact_name: "Test Customer",
+        contact_email: "test-customer@example.com",
+        contact_phone: "+254712345678",
+      });
+      expect(error).not.toBeNull();
+      expect(error?.code).toBe("23505");
+    });
+
+    it("allows a new appointment for the same slot once the conflicting one is DECLINED (the unique index is partial)", async () => {
+      const { error: declineError } = await supabase.from("appointments").update({ status: "DECLINED" }).eq("id", appointmentId);
+      expect(declineError).toBeNull();
+
+      const { data, error } = await supabase
+        .from("appointments")
+        .insert({
+          booking_reference: `BK-TEST-${testId}-after-decline`,
+          customer_id: customerId,
+          showroom_id: showroomId,
+          appointment_date: "2026-12-01",
+          start_time: "10:00",
+          end_time: "10:30",
+          contact_name: "Test Customer",
+          contact_email: "test-customer@example.com",
+          contact_phone: "+254712345678",
+        })
+        .select()
+        .single();
+      expect(error).toBeNull();
+
+      // Restore for the outer afterAll's cleanup and put the original
+      // fixture back to PENDING in case other tests in this block run after.
+      if (data) await supabase.from("appointments").delete().eq("id", data.id);
+      await supabase.from("appointments").update({ status: "PENDING" }).eq("id", appointmentId);
     });
   });
 

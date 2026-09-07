@@ -494,6 +494,9 @@ describe("RLS authorization (integration)", () => {
           appointment_date: "2026-12-15",
           start_time: "10:00",
           end_time: "10:30",
+          contact_name: "Customer A",
+          contact_email: "customer-a@example.com",
+          contact_phone: "+254712345678",
         })
         .select()
         .single();
@@ -512,6 +515,9 @@ describe("RLS authorization (integration)", () => {
           start_time: "11:00",
           end_time: "11:30",
           status: "CONFIRMED",
+          contact_name: "Customer A",
+          contact_email: "customer-a@example.com",
+          contact_phone: "+254712345678",
         })
         .select();
       expect(error).not.toBeNull();
@@ -547,6 +553,38 @@ describe("RLS authorization (integration)", () => {
       const { data, error } = await customerB.client.from("appointment_vehicles").select().eq("appointment_id", appointmentId);
       expect(error).toBeNull();
       expect(data).toEqual([]);
+    });
+
+    it("an anonymous visitor can book an appointment and attach a vehicle to it", async () => {
+      // The action layer generates the id itself (never .select()s an
+      // anonymous insert — same RLS-with-RETURNING gotcha as
+      // vehicle_inquiries/financing_applications), so this test does the
+      // same to exercise the real path, including the security-definer
+      // appointment_allows_public_vehicle_insert() function the
+      // appointment_vehicles insert policy relies on for an anonymous
+      // caller (a plain EXISTS subquery would silently see nothing here,
+      // since anon has no SELECT visibility into appointments at all).
+      const anonAppointmentId = crypto.randomUUID();
+      const { error: insertError } = await anon.from("appointments").insert({
+        id: anonAppointmentId,
+        booking_reference: `BK-RLS-ANON-${testId}`,
+        customer_id: null,
+        showroom_id: showroomAId,
+        appointment_date: "2026-12-17",
+        start_time: "09:00",
+        end_time: "09:30",
+        contact_name: "Anonymous Visitor",
+        contact_email: "anon-visitor@example.com",
+        contact_phone: "+254712345680",
+      });
+      expect(insertError).toBeNull();
+
+      const { error: attachError } = await anon
+        .from("appointment_vehicles")
+        .insert({ appointment_id: anonAppointmentId, vehicle_id: activeVehicleAId });
+      expect(attachError).toBeNull();
+
+      await admin.from("appointments").delete().eq("id", anonAppointmentId);
     });
   });
 
