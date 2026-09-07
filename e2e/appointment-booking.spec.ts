@@ -275,6 +275,32 @@ test("the owning showroom sees the appointment in its own dashboard, but a diffe
   await otherOwnerContext.close();
 });
 
+test("owner can edit and save availability from the dashboard, and it persists (exercises the real Save action + atomic replace_showroom_availability RPC)", async ({ page }) => {
+  // Runs after every other test that depends on the fixture showroom's
+  // Mon–Fri availability (this one adds Sunday on top of it, run serially
+  // so ordering is guaranteed); the remaining "no availability" test below
+  // uses an entirely separate showroom, so it's unaffected either way.
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(OWNER_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await page.waitForURL(/\/dashboard$/);
+  await page.goto("/dashboard/appointments", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByLabel("Monday", { exact: true })).toBeChecked();
+  await page.getByLabel("Sunday", { exact: true }).check();
+  await page.getByLabel("Sunday opening time").fill("10:00");
+  await page.getByLabel("Sunday closing time").fill("14:00");
+  await page.getByRole("button", { name: "Save availability" }).click();
+  await expect(page.getByText("Availability saved.")).toBeVisible({ timeout: 10000 });
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByLabel("Sunday", { exact: true })).toBeChecked();
+  await expect(page.getByLabel("Sunday opening time")).toHaveValue("10:00");
+  await expect(page.getByLabel("Monday", { exact: true })).toBeChecked();
+  await expect(page.getByLabel("Monday opening time")).toHaveValue("09:00");
+});
+
 test("a vehicle whose showroom hasn't configured availability shows the disabled placeholder, not a live button", async ({ page }) => {
   const supabase = admin();
   const { data: otherOwner } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });

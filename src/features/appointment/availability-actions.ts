@@ -69,26 +69,13 @@ export async function updateShowroomAvailabilityAction(showroomId: string, formD
     return { error: "Not found, or you don't have permission to do that." };
   }
 
-  const { error: deleteError } = await supabase.from("showroom_availability").delete().eq("showroom_id", showroomId);
-  if (deleteError) {
-    logger.error("Failed to clear existing showroom availability", deleteError, { showroomId });
+  const { error: replaceError } = await supabase.rpc("replace_showroom_availability", {
+    p_showroom_id: showroomId,
+    p_days: activeDays.map((day) => ({ dayOfWeek: day.dayOfWeek, startTime: day.startTime, endTime: day.endTime })),
+  });
+  if (replaceError) {
+    logger.error("Failed to save showroom availability", replaceError, { showroomId });
     return { error: "Failed to save availability." };
-  }
-
-  if (activeDays.length > 0) {
-    const { error: insertError } = await supabase.from("showroom_availability").insert(
-      activeDays.map((day) => ({
-        showroom_id: showroomId,
-        day_of_week: day.dayOfWeek,
-        start_time: day.startTime,
-        end_time: day.endTime,
-        is_available: true,
-      })),
-    );
-    if (insertError) {
-      logger.error("Failed to save new showroom availability", insertError, { showroomId });
-      return { error: "Failed to save availability." };
-    }
   }
 
   revalidatePath("/dashboard/appointments");

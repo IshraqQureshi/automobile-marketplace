@@ -1176,6 +1176,10 @@ export type Database = {
         Args: { anon_viewer_ip_hash?: string; target_vehicle_id: string }
         Returns: undefined
       }
+      replace_showroom_availability: {
+        Args: { p_days: Json; p_showroom_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       appointment_status:

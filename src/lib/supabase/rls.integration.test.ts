@@ -524,6 +524,39 @@ describe("RLS authorization (integration)", () => {
       expect(data).toBeNull();
     });
 
+    it("a customer cannot self-confirm their own PENDING booking via a direct update (PR #53 code review finding)", async () => {
+      // appointments_update_customer_or_showroom_or_admin is deliberately
+      // broad (a customer can update their own row at all, e.g. notes), so
+      // without the appointments_prevent_customer_status_change trigger a
+      // customer's own authenticated client could call
+      // .update({ status: "CONFIRMED" }) directly and bypass the showroom's
+      // confirm/decline workflow entirely — confirmAppointmentAction's
+      // .eq("status","PENDING") guard only protects the server action path,
+      // not a direct RLS-scoped call.
+      const { data, error } = await customerA.client
+        .from("appointments")
+        .update({ status: "CONFIRMED" })
+        .eq("id", appointmentId)
+        .select();
+      expect(error).not.toBeNull();
+      expect(data).toBeNull();
+
+      const { data: unchanged } = await ownerA.client.from("appointments").select("status").eq("id", appointmentId).single();
+      expect(unchanged?.status).toBe("PENDING");
+    });
+
+    it("the addressed showroom CAN confirm the booking via a direct update", async () => {
+      const { data, error } = await ownerA.client
+        .from("appointments")
+        .update({ status: "CONFIRMED" })
+        .eq("id", appointmentId)
+        .select();
+      expect(error).toBeNull();
+      expect(data?.[0]?.status).toBe("CONFIRMED");
+
+      await ownerA.client.from("appointments").update({ status: "PENDING" }).eq("id", appointmentId);
+    });
+
     it("a different customer cannot see another customer's appointment", async () => {
       const { data, error } = await customerB.client.from("appointments").select().eq("id", appointmentId);
       expect(error).toBeNull();
