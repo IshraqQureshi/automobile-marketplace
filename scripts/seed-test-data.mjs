@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Seeds a full, realistic local-dev test scenario: an admin, an APPROVED
 // showroom (with test-drive availability configured) owned by a real user,
-// and an ACTIVE vehicle with financing configured — enough to manually
-// exercise vehicle discovery, the finance calculator, financing
-// applications, inquiries, and appointment booking end to end.
+// and TWO ACTIVE vehicles (the primary one with financing configured) —
+// enough to manually exercise vehicle discovery, the finance calculator,
+// financing applications, inquiries, and appointment booking (including
+// booking a test drive for multiple cars from the same showroom in one
+// appointment) end to end.
 //
 // Follows the same rules as scripts/seed-admin.mjs: local Supabase only
 // unless explicitly overridden, credentials never written to a file, only
@@ -118,52 +120,76 @@ async function main() {
   );
   if (availabilityError) throw availabilityError;
 
-  const { data: existingVehicle } = await supabase
-    .from("vehicles")
-    .select("id, make, model")
-    .eq("showroom_id", showroomId)
-    .eq("title", "Test Drive Demo — Land Cruiser Prado")
-    .maybeSingle();
+  // find-or-create a vehicle by its unique title, then re-fetch the fields
+  // the caller needs (variant is needed for the slug scheme below, and the
+  // find-only query above it doesn't select it).
+  async function ensureVehicle(title, financingFields, insertOnlyFields) {
+    const { data: existing } = await supabase.from("vehicles").select("id").eq("showroom_id", showroomId).eq("title", title).maybeSingle();
 
-  let vehicle = existingVehicle;
-  if (!vehicle) {
+    if (existing) {
+      await supabase.from("vehicles").update({ status: "ACTIVE", ...financingFields }).eq("id", existing.id);
+      const { data: refetched, error } = await supabase.from("vehicles").select("id, make, model, variant").eq("id", existing.id).single();
+      if (error || !refetched) throw error ?? new Error(`vehicle ${title} not found after update`);
+      return refetched;
+    }
+
     const { data, error } = await supabase
       .from("vehicles")
-      .insert({
-        showroom_id: showroomId,
-        title: "Test Drive Demo — Land Cruiser Prado",
-        make: "Toyota",
-        model: "Land Cruiser Prado",
-        variant: "VX-L",
-        year: 2023,
-        price: 8_500_000,
-        mileage: 12_000,
-        fuel_type: "Diesel",
-        transmission: "Automatic",
-        body_type: "SUV",
-        color: "Pearl White",
-        description: "Seed fixture for local testing of vehicle discovery, the finance calculator, financing applications, inquiries, and appointment booking.",
-        status: "ACTIVE",
-        installment_enabled: true,
-        bank_finance_enabled: true,
-        financing_down_payment_percent: 20,
-        financing_interest_rate: 14,
-        financing_tenure_options_months: [12, 24, 36],
-        financing_partner: "HarakaGari Finance Partners",
-        financing_insurance_percent: 3,
-      })
+      .insert({ showroom_id: showroomId, title, status: "ACTIVE", ...insertOnlyFields, ...financingFields })
       .select("id, make, model, variant")
       .single();
-    if (error || !data) throw error ?? new Error("vehicle not created");
-    vehicle = data;
-  } else {
-    // Re-select variant too — the existing-vehicle lookup above only fetched
-    // id/make/model, and it's needed below for the same slug scheme the app
-    // itself uses.
-    const { data: refetched } = await supabase.from("vehicles").select("id, make, model, variant").eq("id", vehicle.id).single();
-    vehicle = refetched ?? vehicle;
-    await supabase.from("vehicles").update({ status: "ACTIVE", installment_enabled: true, bank_finance_enabled: true }).eq("id", vehicle.id);
+    if (error || !data) throw error ?? new Error(`vehicle ${title} not created`);
+    return data;
   }
+
+  const vehicle = await ensureVehicle(
+    "Test Drive Demo — Land Cruiser Prado",
+    {
+      installment_enabled: true,
+      bank_finance_enabled: true,
+      financing_down_payment_percent: 20,
+      financing_interest_rate: 14,
+      financing_tenure_options_months: [12, 24, 36],
+      financing_partner: "HarakaGari Finance Partners",
+      financing_insurance_percent: 3,
+    },
+    {
+      make: "Toyota",
+      model: "Land Cruiser Prado",
+      variant: "VX-L",
+      year: 2023,
+      price: 8_500_000,
+      mileage: 12_000,
+      fuel_type: "Diesel",
+      transmission: "Automatic",
+      body_type: "SUV",
+      color: "Pearl White",
+      description: "Seed fixture for local testing of vehicle discovery, the finance calculator, financing applications, inquiries, and appointment booking.",
+    },
+  );
+
+  // A second ACTIVE vehicle in the same showroom — the "Schedule Test
+  // Drive" popup only shows a vehicle-picker section at all once there's
+  // at least one *other* active listing to choose from, so without this,
+  // the multi-car-per-appointment requirement (APT-003) has nothing to
+  // manually test against.
+  await ensureVehicle(
+    "Test Drive Demo — Hilux",
+    {},
+    {
+      make: "Toyota",
+      model: "Hilux",
+      variant: "Legend 50",
+      year: 2022,
+      price: 6_200_000,
+      mileage: 8_000,
+      fuel_type: "Diesel",
+      transmission: "Manual",
+      body_type: "Pickup",
+      color: "Grey",
+      description: "Second seed fixture, same showroom as the Land Cruiser Prado — lets you test adding multiple cars to one appointment.",
+    },
+  );
 
   // Mirrors src/features/vehicle/slug.ts's slugify()/getVehicleDetailPath()
   // exactly (including the model+variant name-slug rule) — duplicated
@@ -191,6 +217,9 @@ async function main() {
   console.log(`   Showroom: HarakaGari Test Motors (APPROVED, Mon–Fri 09:00–17:00, 30 min slots / 15 min buffer)`);
   console.log(`\nTest vehicle (finance calculator, financing application, inquiry, test drive all live):`);
   console.log(`   ${vehicleUrl}`);
+  console.log(`\nA second vehicle ("Test Drive Demo — Hilux") is seeded in the same showroom, so the`);
+  console.log(`test-drive popup's "add another car" picker has something to show — pick a date/time on`);
+  console.log(`the Prado above, then check the Hilux too, to test booking multiple cars in one appointment.`);
   console.log("\nThis is local-dev test data only — fixed credentials, never use against a real deployment.\n");
 }
 
