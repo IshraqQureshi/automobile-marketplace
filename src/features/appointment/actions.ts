@@ -11,7 +11,7 @@ import { sendEmail } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { generateTimeSlots, type TimeSlot } from "./slots";
+import { generateTimeSlots, markSlotsForVehicleCount, type TimeSlot } from "./slots";
 import { appointmentFieldSchemas, appointmentVehicleIdsSchema } from "./schemas";
 
 const dateFormatter = new Intl.DateTimeFormat("en-KE", { day: "numeric", month: "long", year: "numeric" });
@@ -42,15 +42,21 @@ export interface AvailableSlotsResult {
  * already-booked appointments at that exact moment, not just static
  * config. Public data (showroom_availability's own SELECT RLS policy is
  * public read), so this is safe to call for an anonymous visitor too.
+ *
+ * `vehicleCount` (APT-003 — one slot per vehicle, not one shared slot for
+ * however many vehicles) marks a start time as booked/unavailable unless
+ * it can host that many consecutive open slots — see
+ * markSlotsForVehicleCount's own docs for exactly what "consecutive" means
+ * across a gap between two availability windows.
  */
-export async function getAvailableSlotsAction(showroomId: string, date: string): Promise<AvailableSlotsResult> {
+export async function getAvailableSlotsAction(showroomId: string, date: string, vehicleCount = 1): Promise<AvailableSlotsResult> {
   if (!showroomId || !date) return { slots: [], error: "Missing showroom or date." };
 
   const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
   const supabase = await createClient();
   // appointments_select_customer_or_showroom_or_admin is `to authenticated`
   // only — an anonymous visitor has zero SELECT visibility into the table
-  // at all, so this specific lookup (which already-booked start times
+  // at all, so this specific lookup (which already-booked appointments
   // exist) needs the service-role client to actually see them (confirmed
   // live: without this, every slot looked open to an anonymous visitor,
   // even an already-booked one). Only ever returns derived start_time
@@ -65,7 +71,7 @@ export async function getAvailableSlotsAction(showroomId: string, date: string):
       .eq("day_of_week", dayOfWeek)
       .eq("is_available", true),
     supabase.from("showrooms").select("slot_duration_minutes, buffer_minutes").eq("id", showroomId).maybeSingle(),
-    admin.from("appointments").select("start_time").eq("showroom_id", showroomId).eq("appointment_date", date).in("status", ["PENDING", "CONFIRMED"]),
+    admin.from("appointments").select("start_time, end_time").eq("showroom_id", showroomId).eq("appointment_date", date).in("status", ["PENDING", "CONFIRMED"]),
   ]);
 
   if (!showroom) return { slots: [], error: "Showroom not found." };
@@ -74,7 +80,13 @@ export async function getAvailableSlotsAction(showroomId: string, date: string):
   const today = new Date();
   const isToday = date === today.toISOString().slice(0, 10);
   const nowMinutes = isToday ? today.getHours() * 60 + today.getMinutes() : undefined;
-  const bookedStartTimes = (booked ?? []).map((row) => row.start_time);
+  // Each existing appointment may itself span multiple consecutive slots
+  // (one per vehicle it was booked with) — a candidate slot is marked
+  // booked whenever it overlaps an existing appointment's raw range
+  // (generateTimeSlots), which stays correct even if the showroom's slot
+  // cadence has changed since that appointment was booked (no need to
+  // reconstruct exact historical slot boundaries at all).
+  const bookedRanges = (booked ?? []).map((row) => ({ startTime: row.start_time, endTime: row.end_time }));
 
   const slots = windows.flatMap((window) =>
     generateTimeSlots({
@@ -82,13 +94,13 @@ export async function getAvailableSlotsAction(showroomId: string, date: string):
       windowEndTime: window.end_time,
       slotDurationMinutes: showroom.slot_duration_minutes,
       bufferMinutes: showroom.buffer_minutes,
-      bookedStartTimes,
+      bookedRanges,
       nowMinutes,
     }),
   );
   slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  return { slots };
+  return { slots: markSlotsForVehicleCount(slots, showroom.slot_duration_minutes, showroom.buffer_minutes, vehicleCount) };
 }
 
 export interface AppointmentActionResult {
@@ -154,13 +166,49 @@ export async function submitAppointmentAction(formData: FormData): Promise<Appoi
     return { error: "All vehicles in one appointment must belong to the same showroom." };
   }
 
-  const { data: showroom } = await supabase.from("showrooms").select("slot_duration_minutes").eq("id", showroomId).maybeSingle();
+  const { data: showroom } = await supabase.from("showrooms").select("slot_duration_minutes, buffer_minutes").eq("id", showroomId).maybeSingle();
   const slotDurationMinutes = showroom?.slot_duration_minutes ?? 30;
+  const bufferMinutes = showroom?.buffer_minutes ?? 0;
+  const step = slotDurationMinutes + bufferMinutes;
+  const vehicleCount = vehicleIdsResult.data.length;
+  // APT-003 — one slot per vehicle, not one shared slot for the whole
+  // appointment: the reserved range widens by (vehicleCount - 1) steps
+  // past the single slot's own end, covering vehicleCount consecutive
+  // slots in total. The picker only ever offers a start time where that
+  // many consecutive slots are genuinely free (markSlotsForVehicleCount),
+  // so this recomputes the same range the customer already saw, rather
+  // than trusting a client-sent end time.
   const [hours, minutes] = startTimeResult.data.split(":").map(Number);
-  const endTotalMinutes = (hours ?? 0) * 60 + (minutes ?? 0) + slotDurationMinutes;
+  const startTotalMinutes = (hours ?? 0) * 60 + (minutes ?? 0);
+  const endTotalMinutes = startTotalMinutes + (vehicleCount - 1) * step + slotDurationMinutes;
   const endTime = `${Math.floor(endTotalMinutes / 60)
     .toString()
     .padStart(2, "0")}:${(endTotalMinutes % 60).toString().padStart(2, "0")}`;
+
+  // The picker only ever offers a start time backed by markSlotsForVehicleCount's
+  // own within-one-window check, but that's client-supplied — re-validate
+  // server-side that the full widened range still fits inside one of the
+  // showroom's real availability windows for this exact date, rather than
+  // trusting the client's start_time/vehicle count blindly. Also catches a
+  // range that would run past midnight, which a `time` column can't
+  // represent and would otherwise surface as a confusing raw insert error.
+  const dayOfWeek = new Date(`${dateResult.data}T00:00:00`).getDay();
+  const { data: windowsForDay } = await supabase
+    .from("showroom_availability")
+    .select("start_time, end_time")
+    .eq("showroom_id", showroomId)
+    .eq("day_of_week", dayOfWeek)
+    .eq("is_available", true);
+  const fitsAWindow = (windowsForDay ?? []).some((w) => {
+    const [wStartH, wStartM] = w.start_time.split(":").map(Number);
+    const [wEndH, wEndM] = w.end_time.split(":").map(Number);
+    const windowStart = (wStartH ?? 0) * 60 + (wStartM ?? 0);
+    const windowEnd = (wEndH ?? 0) * 60 + (wEndM ?? 0);
+    return startTotalMinutes >= windowStart && endTotalMinutes <= windowEnd;
+  });
+  if (!fitsAWindow) {
+    return { error: "That time no longer fits within the showroom's availability. Please choose another slot." };
+  }
 
   const appointmentId = crypto.randomUUID();
   const bookingReference = generateBookingReference();
@@ -184,12 +232,13 @@ export async function submitAppointmentAction(formData: FormData): Promise<Appoi
     customer_notes: notesResult.data ?? null,
   });
   if (insertError) {
-    // The DB's own partial unique index (appointments_no_double_booking) is
-    // the real, race-safe guard against two customers booking the same
-    // slot at once — this is the one place that guard can actually fire,
-    // if someone else booked this exact slot between the customer loading
-    // the slot picker and submitting.
-    if (insertError.code === "23505") {
+    // The DB's own range-overlap exclusion constraint
+    // (appointments_no_double_booking) is the real, race-safe guard
+    // against two customers booking overlapping slots at once (error code
+    // 23P01, "exclusion_violation") — this is the one place that guard can
+    // actually fire, if someone else booked an overlapping slot between
+    // the customer loading the slot picker and submitting.
+    if (insertError.code === "23P01") {
       return { error: "That time slot was just booked by someone else. Please choose another." };
     }
     logger.error("Failed to create appointment", insertError, { showroomId });

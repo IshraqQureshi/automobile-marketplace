@@ -43,13 +43,17 @@ function formatSlotLabel(startTime: string): string {
 }
 
 /**
- * Real "Schedule Test Drive" flow (previously a disabled placeholder) —
- * a 3-step dialog: pick a date → pick an open time slot (fetched fresh
- * from the server, since it depends on live already-booked appointments,
- * not just static config) → confirm vehicles + contact info + submit.
- * Only rendered when the showroom has at least one open day configured
- * (see the caller in [brand]/[slug]/page.tsx) — same conditional-render
- * precedent as FinancingApplicationButton.
+ * Real "Schedule Test Drive" flow (previously a disabled placeholder) — a
+ * 3-step dialog: pick which vehicle(s) → pick a date and an open time slot
+ * (fetched fresh from the server, since it depends on both live
+ * already-booked appointments AND how many vehicles were just picked —
+ * APT-003 reserves one slot per vehicle, not one shared slot for however
+ * many) → contact info + submit. Vehicles are picked FIRST (not last, as
+ * originally built) because the slot picker can't know which start times
+ * have enough consecutive open slots without already knowing the vehicle
+ * count. Only rendered when the showroom has at least one open day
+ * configured (see the caller in [brand]/[slug]/page.tsx) — same
+ * conditional-render precedent as FinancingApplicationButton.
  */
 export function ScheduleTestDriveButton({
   vehicleId,
@@ -61,8 +65,10 @@ export function ScheduleTestDriveButton({
   initialValues,
 }: ScheduleTestDriveButtonProps) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<1 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitted, setSubmitted] = useState<string | null>(null); // booking reference once submitted
+
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([vehicleId]);
 
   const [viewMonth, setViewMonth] = useState(() => {
     const d = new Date();
@@ -75,7 +81,6 @@ export function ScheduleTestDriveButton({
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [selectedStartTime, setSelectedStartTime] = useState<string | null>(null);
 
-  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([vehicleId]);
   const [name, setName] = useState(initialValues?.fullName ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [phone, setPhone] = useState(initialValues ? stripKenyaPrefix(initialValues.phone) : "");
@@ -92,15 +97,30 @@ export function ScheduleTestDriveButton({
   function openDialog() {
     setStep(1);
     setSubmitted(null);
+    setSelectedVehicleIds([vehicleId]);
     setSelectedDate(null);
     setSlots([]);
     setSelectedStartTime(null);
-    setSelectedVehicleIds([vehicleId]);
     setNotes("");
     setFormError(null);
     setServerFieldErrors({});
     reset();
     setOpen(true);
+  }
+
+  function toggleVehicle(id: string) {
+    setSelectedVehicleIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  }
+
+  function goToDateStep() {
+    // The vehicle count picked in step 1 decides how many consecutive
+    // slots a start time needs to offer — any date/slot chosen against a
+    // stale count would be wrong, so always start step 2 fresh rather than
+    // risk reusing a slot list fetched for a different vehicle count.
+    setSelectedDate(null);
+    setSlots([]);
+    setSelectedStartTime(null);
+    setStep(2);
   }
 
   async function pickDate(date: Date) {
@@ -109,7 +129,7 @@ export function ScheduleTestDriveButton({
     setSelectedStartTime(null);
     setSlotsError(null);
     setSlotsLoading(true);
-    const result = await getAvailableSlotsAction(showroomId, dateString);
+    const result = await getAvailableSlotsAction(showroomId, dateString, selectedVehicleIds.length);
     setSlotsLoading(false);
     if (result.error) {
       setSlotsError(result.error);
@@ -122,10 +142,6 @@ export function ScheduleTestDriveButton({
   function pickSlot(startTime: string) {
     setSelectedStartTime(startTime);
     setStep(3);
-  }
-
-  function toggleVehicle(id: string) {
-    setSelectedVehicleIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -222,7 +238,44 @@ export function ScheduleTestDriveButton({
             <StepIndicator step={step} />
 
             {step === 1 && (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <FieldLabel htmlFor="vehicle-list">Vehicles for this appointment</FieldLabel>
+                  <p className="mb-2 text-xs text-neutral-500">Each vehicle you add reserves its own time slot (e.g. 3 cars need 3 consecutive slots).</p>
+                  <div id="vehicle-list" className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2 text-sm text-neutral-700">
+                      <input type="checkbox" checked disabled />
+                      {vehicleTitle}
+                    </label>
+                    {otherVehicles.map((v) => (
+                      <label key={v.id} className="flex items-center gap-2 text-sm text-neutral-700">
+                        <input type="checkbox" checked={selectedVehicleIds.includes(v.id)} onChange={() => toggleVehicle(v.id)} />
+                        {v.title}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={goToDateStep}
+                  className="w-full rounded-md bg-brand py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
+                >
+                  Continue to pick a date &amp; time
+                </button>
+              </div>
+            )}
+
+            {step === 2 && (
               <div>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="mb-3 self-start text-xs font-medium text-neutral-500 hover:text-neutral-700"
+                >
+                  ← Change vehicles
+                </button>
+
                 <div className="mb-3 flex items-center justify-between">
                   <button
                     type="button"
@@ -282,7 +335,9 @@ export function ScheduleTestDriveButton({
 
                 {selectedDate && (
                   <div className="mt-5 border-t border-neutral-100 pt-4">
-                    <p className="mb-2 text-sm font-medium text-neutral-700">Available times</p>
+                    <p className="mb-2 text-sm font-medium text-neutral-700">
+                      Available times{selectedVehicleIds.length > 1 ? ` (for all ${selectedVehicleIds.length} cars)` : ""}
+                    </p>
                     {slotsLoading ? (
                       <p className="text-sm text-neutral-400">Loading times…</p>
                     ) : slotsError ? (
@@ -315,32 +370,15 @@ export function ScheduleTestDriveButton({
 
             {step === 3 && selectedDate && selectedStartTime && (
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <button type="button" onClick={() => setStep(1)} className="self-start text-xs font-medium text-neutral-500 hover:text-neutral-700">
+                <button type="button" onClick={() => setStep(2)} className="self-start text-xs font-medium text-neutral-500 hover:text-neutral-700">
                   ← Change date/time
                 </button>
 
                 <div className="rounded-md bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
                   {new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(new Date(`${selectedDate}T00:00:00`))} at{" "}
                   {formatSlotLabel(selectedStartTime)}
+                  {selectedVehicleIds.length > 1 ? ` — ${selectedVehicleIds.length} consecutive slots reserved` : ""}
                 </div>
-
-                {otherVehicles.length > 0 && (
-                  <div>
-                    <FieldLabel htmlFor="vehicle-list">Vehicles for this appointment</FieldLabel>
-                    <div id="vehicle-list" className="flex flex-col gap-1.5">
-                      <label className="flex items-center gap-2 text-sm text-neutral-700">
-                        <input type="checkbox" checked disabled />
-                        {vehicleTitle}
-                      </label>
-                      {otherVehicles.map((v) => (
-                        <label key={v.id} className="flex items-center gap-2 text-sm text-neutral-700">
-                          <input type="checkbox" checked={selectedVehicleIds.includes(v.id)} onChange={() => toggleVehicle(v.id)} />
-                          {v.title}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
@@ -437,12 +475,14 @@ function addMonths(date: Date, delta: number): Date {
   return d;
 }
 
-function StepIndicator({ step }: { step: 1 | 3 }) {
+function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
   return (
     <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400">
-      <span className={step === 1 ? "text-brand" : ""}>1. Pick a date &amp; time</span>
+      <span className={step === 1 ? "text-brand" : ""}>1. Vehicles</span>
       <span>→</span>
-      <span className={step === 3 ? "text-brand" : ""}>2. Your details</span>
+      <span className={step === 2 ? "text-brand" : ""}>2. Date &amp; time</span>
+      <span>→</span>
+      <span className={step === 3 ? "text-brand" : ""}>3. Your details</span>
     </div>
   );
 }

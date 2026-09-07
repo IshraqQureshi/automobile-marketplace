@@ -26,6 +26,8 @@ let vehiclePath: string;
 let showroomId: string;
 let secondVehicleId: string;
 let secondVehicleTitle: string;
+let thirdVehicleId: string;
+let thirdVehicleTitle: string;
 
 // A fixed weekday/time far enough in the future that "today" never
 // collides with it during a test run, and whose day-of-week is always
@@ -141,6 +143,26 @@ test.beforeAll(async () => {
   // otherShowroomVehicleRows in [brand]/[slug]/page.tsx), not the vehicle's
   // own `title` column.
   secondVehicleTitle = `${secondVehicle.make} ${secondVehicle.model}`;
+
+  // A third vehicle — for the "N vehicles reserve N consecutive slots"
+  // test below, which needs more than 2 cars to meaningfully distinguish
+  // "one slot per vehicle" from "one slot for the whole appointment."
+  const { data: thirdVehicle, error: thirdVehicleError } = await supabase
+    .from("vehicles")
+    .insert({
+      showroom_id: showroomId,
+      title: `E2E Appointment Vehicle Gamma ${unique}`,
+      make: `E2eappointment${unique}`,
+      model: "Gamma",
+      year: 2024,
+      price: 3_000_000,
+      status: "ACTIVE",
+    })
+    .select("id, make, model")
+    .single();
+  if (thirdVehicleError || !thirdVehicle) throw thirdVehicleError ?? new Error("third vehicle not created");
+  thirdVehicleId = thirdVehicle.id;
+  thirdVehicleTitle = `${thirdVehicle.make} ${thirdVehicle.model}`;
 });
 
 test.afterEach(async () => {
@@ -151,6 +173,7 @@ test.afterAll(async () => {
   const supabase = admin();
   await supabase.from("vehicles").delete().eq("id", vehicleId);
   await supabase.from("vehicles").delete().eq("id", secondVehicleId);
+  await supabase.from("vehicles").delete().eq("id", thirdVehicleId);
   await supabase.from("showrooms").delete().eq("id", showroomId);
 });
 
@@ -172,6 +195,8 @@ async function navigateToBookingDate(page: import("@playwright/test").Page) {
 async function bookSlot(page: import("@playwright/test").Page, slotLabel: string, overrides: Partial<Record<string, string>> = {}) {
   await page.goto(vehiclePath);
   await page.getByRole("button", { name: "Schedule Test Drive" }).click();
+  // Step 1 (vehicles) — single-vehicle by default, so just continue.
+  await page.getByRole("button", { name: "Continue to pick a date & time" }).click();
   await navigateToBookingDate(page);
   await expect(page.getByRole("button", { name: slotLabel })).toBeVisible({ timeout: 10000 });
   await page.getByRole("button", { name: slotLabel }).click();
@@ -201,17 +226,23 @@ test("an anonymous visitor can book a test drive, stored with no customer_id", a
   expect(data?.booking_reference).toMatch(/^BK-/);
 });
 
-test("a customer can add a second vehicle from the same showroom to one appointment (APT-003)", async ({ page }) => {
+test("booking 3 cars from the same showroom reserves 3 consecutive slots, not 1 shared slot (APT-003)", async ({ page, context }) => {
   await page.goto(vehiclePath);
   await page.getByRole("button", { name: "Schedule Test Drive" }).click();
-  await navigateToBookingDate(page);
-  await expect(page.getByRole("button", { name: "2:00 pm", exact: true })).toBeVisible({ timeout: 10000 });
-  await page.getByRole("button", { name: "2:00 pm", exact: true }).click();
 
-  // The current vehicle is pre-checked and locked (disabled); the second,
-  // other-showroom-vehicle checkbox is what this test actually exercises.
+  // Step 1: vehicles. The current vehicle is pre-checked and locked
+  // (disabled); check the other two to book all 3 in one appointment.
   await expect(page.getByLabel("Alpha", { exact: false })).toBeChecked();
   await page.getByLabel(secondVehicleTitle).check();
+  await page.getByLabel(thirdVehicleTitle).check();
+  await page.getByRole("button", { name: "Continue to pick a date & time" }).click();
+
+  // Step 2: date & time — with 3 vehicles selected, only a start time with
+  // 3 consecutive open 30-min slots should be offered; 3:00 pm has
+  // 3:30/4:00 free right after it within the 09:00-17:00 window.
+  await navigateToBookingDate(page);
+  await expect(page.getByRole("button", { name: "3:00 pm", exact: true })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: "3:00 pm", exact: true }).click();
 
   await page.getByLabel("Full Name").fill("Multi Vehicle Tester");
   await page.getByLabel("Email").fill(`multi-vehicle-${unique}@example.com`);
@@ -222,11 +253,30 @@ test("a customer can add a second vehicle from the same showroom to one appointm
 
   const { data } = await admin()
     .from("appointments")
-    .select("id, appointment_vehicles(vehicle_id)")
+    .select("id, start_time, end_time, appointment_vehicles(vehicle_id)")
     .eq("contact_email", `multi-vehicle-${unique}@example.com`)
     .single();
   const attachedVehicleIds = (data?.appointment_vehicles ?? []).map((row) => row.vehicle_id).sort();
-  expect(attachedVehicleIds).toEqual([vehicleId, secondVehicleId].sort());
+  expect(attachedVehicleIds).toEqual([vehicleId, secondVehicleId, thirdVehicleId].sort());
+  // 3 vehicles × 30-min slots = a 90-minute block (15:00-16:30), not the
+  // single 30-minute slot a pre-fix appointment would have stored.
+  expect(data?.start_time).toBe("15:00:00");
+  expect(data?.end_time).toBe("16:30:00");
+
+  // A second visitor picking 3 vehicles on the same date must now see all
+  // 3 slots this appointment consumed (3:00, 3:30, 4:00) as unavailable —
+  // proving the showroom's capacity was genuinely reserved per car, not
+  // just at the single time the first customer clicked.
+  const secondPage = await context.newPage();
+  await secondPage.goto(vehiclePath);
+  await secondPage.getByRole("button", { name: "Schedule Test Drive" }).click();
+  await secondPage.getByLabel(secondVehicleTitle).check();
+  await secondPage.getByRole("button", { name: "Continue to pick a date & time" }).click();
+  await navigateToBookingDate(secondPage);
+  await expect(secondPage.getByRole("button", { name: "3:00 pm", exact: true })).toBeDisabled({ timeout: 10000 });
+  await expect(secondPage.getByRole("button", { name: "3:30 pm", exact: true })).toBeDisabled();
+  await expect(secondPage.getByRole("button", { name: "4:00 pm", exact: true })).toBeDisabled();
+  await secondPage.close();
 });
 
 test("booking an already-taken slot shows a clear conflict error, not a duplicate row", async ({ page, context }) => {
@@ -240,6 +290,7 @@ test("booking an already-taken slot shows a clear conflict error, not a duplicat
   const secondPage = await context.newPage();
   await secondPage.goto(vehiclePath);
   await secondPage.getByRole("button", { name: "Schedule Test Drive" }).click();
+  await secondPage.getByRole("button", { name: "Continue to pick a date & time" }).click();
   await navigateToBookingDate(secondPage);
   await expect(secondPage.getByRole("button", { name: "10:30 am" })).toBeDisabled({ timeout: 10000 });
 

@@ -120,6 +120,8 @@ export type Database = {
           customer_notes: string | null
           end_time: string
           id: string
+          range_end: string | null
+          range_start: string | null
           showroom_id: string
           showroom_notes: string | null
           start_time: string
@@ -137,6 +139,8 @@ export type Database = {
           customer_notes?: string | null
           end_time: string
           id?: string
+          range_end?: string | null
+          range_start?: string | null
           showroom_id: string
           showroom_notes?: string | null
           start_time: string
@@ -154,6 +158,8 @@ export type Database = {
           customer_notes?: string | null
           end_time?: string
           id?: string
+          range_end?: string | null
+          range_start?: string | null
           showroom_id?: string
           showroom_notes?: string | null
           start_time?: string
