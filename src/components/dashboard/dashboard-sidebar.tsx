@@ -50,6 +50,7 @@ export function DashboardSidebar({
     { label: "Financing", href: approved ? "/dashboard/financing" : null, icon: FinancingIcon, count: unreadFinancingCount },
     { label: "Appointments", href: approved ? "/dashboard/appointments" : null, icon: CalendarIcon, count: pendingAppointmentCount },
     { label: "Availability", href: approved ? "/dashboard/appointments/availability" : null, icon: AvailabilityIcon },
+    { label: "Reports", href: approved ? "/dashboard/reports" : null, icon: ReportsIcon },
     { label: "Profile", href: "/dashboard/profile", icon: ProfileIcon },
     { label: "My Account", href: "/dashboard/account", icon: AccountIcon },
   ];
@@ -177,6 +178,15 @@ function CalendarIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <rect x="3" y="4" width="18" height="17" rx="2" />
       <path d="M3 9h18M8 2v4M16 2v4" />
+    </svg>
+  );
+}
+
+function ReportsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <path d="M3 3v18h18" />
+      <path d="M7 15l4-5 3 3 5-7" />
     </svg>
   );
 }
