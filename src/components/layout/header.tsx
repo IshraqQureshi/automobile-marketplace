@@ -41,7 +41,7 @@ interface DropdownLinkItem {
   href: string;
 }
 
-/** Click-outside-to-close state, shared by the Profile menu and each nav dropdown. */
+/** Click-outside-to-close (+ Escape-to-close) state, shared by the Profile menu and each nav dropdown. */
 function useDropdown() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -53,8 +53,15 @@ function useDropdown() {
         setOpen(false);
       }
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   return { open, setOpen, ref };
@@ -83,19 +90,32 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
   );
   // The vehicle_types catalog table (admin-managed, shared with the "add
   // vehicle" form) mixes two different concepts under one flat list: real
-  // body shapes (Sedan, SUV, Hatchback, ...) alongside three FUEL_TYPES
-  // enum values (Diesel/Hybrid/Electric) — there's no schema-level
-  // distinction between them. /listing filters those on two different
-  // columns (bodyType -> vehicles.body_type, fuelType -> vehicles.fuel_type),
-  // so a catalog entry whose name is one of FUEL_TYPES routes to fuelType;
-  // everything else routes to bodyType, matching what it actually filters.
+  // body shapes (Sedan, SUV, Hatchback, ...) alongside FUEL_TYPES enum
+  // values (Diesel/Hybrid/Electric today) — there's no schema-level
+  // distinction between them, and no casing constraint on catalog_name
+  // either (an admin could enter "diesel"), so match case-insensitively
+  // rather than relying on an admin always typing the exact enum casing.
+  // /listing filters those on two different columns (bodyType ->
+  // vehicles.body_type, fuelType -> vehicles.fuel_type), so a catalog entry
+  // whose name is one of FUEL_TYPES routes to fuelType; everything else
+  // routes to bodyType, matching what it actually filters.
+  // vehicles.fuel_type is always stored with FUEL_TYPES' own canonical
+  // casing (populated from that exact enum via the vehicle form's <select>),
+  // and /listing matches it with an exact .eq(), not case-insensitively —
+  // so the link must carry that canonical casing, not necessarily whatever
+  // casing the catalog row happens to have, or a differently-cased catalog
+  // entry would silently match zero vehicles despite routing correctly.
+  const canonicalFuelTypeByLowercase = useMemo(() => new Map(FUEL_TYPES.map((f) => [f.toLowerCase(), f])), []);
   const typeItems = useMemo<DropdownLinkItem[]>(
     () =>
       navCatalog.types.map((t) => {
-        const param = (FUEL_TYPES as readonly string[]).includes(t.name) ? "fuelType" : "bodyType";
-        return { id: t.id, label: t.name, href: `/listing?${param}=${encodeURIComponent(t.name)}` };
+        const canonicalFuelType = canonicalFuelTypeByLowercase.get(t.name.toLowerCase());
+        const href = canonicalFuelType
+          ? `/listing?fuelType=${encodeURIComponent(canonicalFuelType)}`
+          : `/listing?bodyType=${encodeURIComponent(t.name)}`;
+        return { id: t.id, label: t.name, href };
       }),
-    [navCatalog.types],
+    [navCatalog.types, canonicalFuelTypeByLowercase],
   );
 
   return (
