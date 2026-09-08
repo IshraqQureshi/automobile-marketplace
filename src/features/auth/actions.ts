@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getOwnerShowroom } from "@/features/showroom/my-showroom";
@@ -20,10 +21,30 @@ const DUPLICATE_EMAIL_MESSAGE = "An account with this email already exists. Try 
 const RATE_LIMITED_MESSAGE = "We're sending a lot of emails right now — please wait a few minutes and try again.";
 
 /**
- * Reads the currently-authenticated user's role from their own `profiles`
- * row (allowed under RLS — everyone can read their own profile). Shared by
- * signInAction (rejects ADMIN) and adminSignInAction (requires ADMIN) so the
+ * Reads a user's role from their own `profiles` row by id (allowed under
+ * RLS — everyone can read their own profile). Wrapped in React's `cache()`
+ * (keyed by userId, same pattern as getOwnerShowroom) so that within one
+ * request, currentUserRole/resolveLoggedInHomePath being called from
+ * multiple places (a layout AND a page it renders, for instance) collapses
+ * into one query instead of one per call site.
+ */
+const getUserRole = cache(
+  async (userId: string): Promise<"CUSTOMER" | "SHOWROOM" | "ADMIN" | null> => {
+    const supabase = await createClient();
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).single();
+    return profile?.role ?? null;
+  },
+);
+
+/**
+ * Reads the currently-authenticated user's role. Shared by signInAction
+ * (rejects ADMIN) and adminSignInAction (requires ADMIN) so the
  * customer/showroom and admin login surfaces stay genuinely separate.
+ * Takes a `supabase` client (not just a userId) because most callers need
+ * one anyway right after an auth mutation (sign-in, etc.) where the caller
+ * doesn't yet have `user.id` in hand — prefer calling getUserRole(userId)
+ * directly instead when the caller already has the user, to avoid this
+ * doing its own extra supabase.auth.getUser() round trip.
  */
 export async function currentUserRole(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -33,8 +54,7 @@ export async function currentUserRole(
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  return profile?.role ?? null;
+  return getUserRole(user.id);
 }
 
 /**
@@ -60,18 +80,23 @@ export async function isCurrentUserActive(supabase: Awaited<ReturnType<typeof cr
  * (profiles.role never actually becomes "SHOWROOM" — see the note in
  * src/features/showroom/my-showroom.ts — so ownership has to be checked via
  * getOwnerShowroom, not read off role), everyone else lands on /account.
- * Shared by the already-authenticated guards on /login and /forgot-password
- * and by the public header's "Profile" link, so this destination logic
- * isn't duplicated across all three.
+ * The single source of truth for this destination — shared by the
+ * already-authenticated guards on /login and /forgot-password, by
+ * signInAction's post-login redirect, and by the public header's "Profile"
+ * link (getHeaderUser derives its label from this same call rather than
+ * re-deriving the branching itself).
+ *
+ * Takes `userId` directly rather than a supabase client — every real caller
+ * already has `user.id` in hand (from their own auth.getUser() call, which
+ * is a genuine Supabase Auth-server round trip, not a free/local read), so
+ * this doing its own redundant getUser() call would otherwise run on every
+ * (site)-wrapped public page for every logged-in visitor.
  */
-export async function resolveLoggedInHomePath(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string> {
-  const role = await currentUserRole(supabase);
+export async function resolveLoggedInHomePath(userId: string): Promise<string> {
+  const role = await getUserRole(userId);
   if (role === "ADMIN") return "/admin";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const showroom = user && (await getOwnerShowroom(user.id));
+  const showroom = await getOwnerShowroom(userId);
   return showroom ? "/dashboard" : "/account";
 }
 
@@ -196,7 +221,10 @@ export async function signInAction(
   // Send a showroom owner straight to their dashboard (ADMIN never reaches
   // here — rejected above) rather than the generic account page they'd
   // otherwise have to know to navigate away from.
-  redirect(await resolveLoggedInHomePath(supabase));
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  redirect(user ? await resolveLoggedInHomePath(user.id) : "/account");
 }
 
 export async function signInWithGoogleAction(): Promise<void> {

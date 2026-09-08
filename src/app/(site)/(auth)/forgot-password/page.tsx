@@ -15,7 +15,7 @@ export default async function ForgotPasswordPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect(await resolveLoggedInHomePath(supabase));
+    redirect(await resolveLoggedInHomePath(user.id));
   }
 
   return (
