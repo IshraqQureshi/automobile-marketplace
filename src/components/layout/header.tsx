@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { signOutAction } from "@/features/auth/actions";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,11 +17,38 @@ import { cn } from "@/lib/utils";
  */
 const NAV_ITEMS = ["Brands", "Model", "Type"] as const;
 
-export function Header() {
+export interface HeaderUser {
+  email: string;
+  // Where "Profile" sends this user — /admin for an admin, /dashboard for a
+  // showroom owner, /account for everyone else (see getHeaderUser in
+  // (site)/layout.tsx). No account page in between for the first two: the
+  // link goes straight there.
+  profileHref: string;
+  profileLabel: string;
+}
+
+interface HeaderProps {
+  user?: HeaderUser | null;
+}
+
+export function Header({ user = null }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [profileMenuOpen]);
 
   return (
-    <header className="border-b border-neutral-200 bg-white">
+    <header className="relative z-20 border-b border-neutral-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <Link href="/" className="shrink-0">
           <Image src="/logo.png" alt="HarakaGari — Powered by Arresa" width={146} height={38} priority />
@@ -51,15 +79,60 @@ export function Header() {
           <Link href="/ready-to-sell" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
             Sell your car
           </Link>
-          <Link href="/login" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
-            Log in
-          </Link>
-          <Link
-            href="/login"
-            className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
-          >
-            Sign up
-          </Link>
+          {user ? (
+            <div ref={profileMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((open) => !open)}
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+                className="flex items-center gap-2 rounded-full py-1 pr-2 pl-1 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+                  {user.email.slice(0, 2).toUpperCase()}
+                </span>
+                Profile
+                <ChevronDownIcon />
+              </button>
+              {profileMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-10 mt-2 w-56 rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
+                >
+                  <p className="truncate border-b border-neutral-100 px-3 py-2 text-xs text-neutral-400">{user.email}</p>
+                  <Link
+                    href={user.profileHref}
+                    role="menuitem"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="block px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    {user.profileLabel}
+                  </Link>
+                  <form action={signOutAction}>
+                    <button
+                      type="submit"
+                      role="menuitem"
+                      className="block w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                    >
+                      Log out
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <Link href="/login" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
+                Log in
+              </Link>
+              <Link
+                href="/login"
+                className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+              >
+                Sign up
+              </Link>
+            </>
+          )}
         </div>
 
         <button
@@ -86,12 +159,33 @@ export function Header() {
           <Link href="/ready-to-sell" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
             Sell your car
           </Link>
-          <Link href="/login" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
-            Log in
-          </Link>
-          <Link href="/login" className="rounded-md bg-brand px-2 py-2 text-center text-sm font-medium text-white">
-            Sign up
-          </Link>
+          {user ? (
+            <>
+              <Link
+                href={user.profileHref}
+                className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+              >
+                {user.profileLabel}
+              </Link>
+              <form action={signOutAction}>
+                <button
+                  type="submit"
+                  className="w-full rounded-md px-2 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                >
+                  Log out
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+                Log in
+              </Link>
+              <Link href="/login" className="rounded-md bg-brand px-2 py-2 text-center text-sm font-medium text-white">
+                Sign up
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

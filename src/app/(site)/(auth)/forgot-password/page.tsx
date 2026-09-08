@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { resolveLoggedInHomePath } from "@/features/auth/actions";
 import { createClient } from "@/lib/supabase/server";
 import { ForgotPasswordForm } from "./forgot-password-form";
 
@@ -14,7 +15,7 @@ export default async function ForgotPasswordPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/account");
+    redirect(await resolveLoggedInHomePath(user.id));
   }
 
   return (
