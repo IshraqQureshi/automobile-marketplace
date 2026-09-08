@@ -76,7 +76,7 @@ export default async function ShowroomsPage({ searchParams }: ShowroomsPageProps
               <p className="mt-1 text-xs text-neutral-400">Try adjusting or clearing your filters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               {showrooms.map((showroom) => (
                 <ShowroomCard key={showroom.id} showroom={showroom} />
               ))}
