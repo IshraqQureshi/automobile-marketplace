@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Register as a Showroom — HarakaGari",
+  description:
+    "List your dealership on HarakaGari — reach verified buyers across Kenya, manage your inventory, and offer bank finance and HP installments.",
+  alternates: { canonical: "/register-showroom" },
 };
 
 export default async function RegisterShowroomPage() {

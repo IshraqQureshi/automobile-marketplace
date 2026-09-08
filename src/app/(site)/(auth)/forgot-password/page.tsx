@@ -6,6 +6,8 @@ import { ForgotPasswordForm } from "./forgot-password-form";
 
 export const metadata: Metadata = {
   title: "Reset your password — HarakaGari",
+  description: "Request a password reset link for your HarakaGari account.",
+  alternates: { canonical: "/forgot-password" },
 };
 
 export default async function ForgotPasswordPage() {

@@ -37,7 +37,13 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     >
       <div className="relative h-43.75 overflow-hidden bg-neutral-200">
         {primaryPhoto ? (
-          <Image src={primaryPhoto.url} alt="" fill unoptimized className="object-cover transition-transform duration-300 group-hover:scale-105" />
+          <Image
+            src={primaryPhoto.url}
+            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+            fill
+            unoptimized
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <CarIcon />

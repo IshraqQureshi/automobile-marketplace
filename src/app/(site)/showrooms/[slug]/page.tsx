@@ -62,7 +62,7 @@ export async function generateMetadata({ params }: ShowroomDetailPageProps): Pro
   const result = id ? await getShowroomData(id) : null;
   if (!result) return { title: "Showroom not found — HarakaGari" };
 
-  const { showroom } = result;
+  const { showroom, logoUrl } = result;
   const title = `${showroom.business_name} — HarakaGari`;
   const description = showroom.description || `Browse vehicle listings from ${showroom.business_name} on HarakaGari.`;
   const path = getShowroomDetailPath({ id: showroom.id, businessName: showroom.business_name });
@@ -70,7 +70,12 @@ export async function generateMetadata({ params }: ShowroomDetailPageProps): Pro
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { title, description, url: path },
+    // A page that sets its own `openGraph` object entirely replaces the
+    // root layout's file-convention default image rather than merging with
+    // it (confirmed live — the same gap the homepage had) — `images` must
+    // be set explicitly here (not left undefined and assumed to inherit),
+    // falling back to the site default when this showroom has no logo.
+    openGraph: { title, description, url: path, images: [logoUrl ?? "/opengraph-image"] },
   };
 }
 

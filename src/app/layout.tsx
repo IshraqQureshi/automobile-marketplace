@@ -9,6 +9,17 @@ export const metadata: Metadata = {
   metadataBase: new URL(publicEnv.NEXT_PUBLIC_SITE_URL),
   title: "HarakaGari",
   description: "Kenya's premium automobile marketplace — verified showrooms, bank finance, and HP installments.",
+  keywords: [
+    "cars for sale in Kenya",
+    "buy a car in Kenya",
+    "Kenya car dealership",
+    "verified car showroom Kenya",
+    "car financing Kenya",
+    "hire purchase car Kenya",
+    "used cars Kenya",
+    "HarakaGari",
+  ],
+  authors: [{ name: "HarakaGari" }],
   openGraph: {
     siteName: "HarakaGari",
     type: "website",
@@ -17,6 +28,10 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
   },
+  // No blanket root-level `robots` override — the public site stays
+  // indexable by default, and /admin, /dashboard explicitly noindex
+  // themselves (their own layout.tsx metadata) since they need the
+  // opposite of every other page's default, not the common case.
 };
 
 export default function RootLayout({
