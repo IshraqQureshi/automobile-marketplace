@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { ShowroomVehicleBrowser } from "@/components/showroom/showroom-vehicle-browser";
@@ -8,7 +9,9 @@ import { getShowroomDetailPath, parseShowroomIdFromSlug } from "@/features/showr
 import { buildWhatsAppLink } from "@/features/showroom/whatsapp";
 import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
 import { getSystemSettingString } from "@/lib/system-settings";
+import { buildBreadcrumbListJsonLd } from "@/lib/structured-data";
 import { createClient } from "@/lib/supabase/server";
+import { publicEnv } from "@/lib/env";
 
 const dateFormatter = new Intl.DateTimeFormat("en-KE", { year: "numeric" });
 
@@ -30,7 +33,9 @@ const getShowroomData = cache(async (id: string) => {
   // returning no row for an unrelated reason.
   const { data: showroom } = await supabase
     .from("showrooms")
-    .select("id, business_name, city, description, opening_hours, verified, created_at, logo_storage_path, youtube_channel_url")
+    .select(
+      "id, business_name, city, address, phone, latitude, longitude, description, opening_hours, verified, created_at, logo_storage_path, youtube_channel_url",
+    )
     .eq("id", id)
     .eq("status", "APPROVED")
     .maybeSingle();
@@ -101,8 +106,59 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
   const whatsappLink = buildWhatsAppLink(whatsappNumber, `Hi, I'm interested in vehicles from ${showroom.business_name} on HarakaGari.`);
   const openingHours = typeof showroom.opening_hours === "string" ? showroom.opening_hours : null;
 
+  // AutoDealer (schema.org's dedicated type for a car dealership, a more
+  // specific LocalBusiness subtype) — phone/address/geo are all real
+  // columns on this exact row, not fabricated; opening_hours is stored as
+  // free text (not per-day structured data), so it's deliberately not
+  // forced into schema.org's openingHoursSpecification microformat, which
+  // would misrepresent it as machine-structured when it isn't.
+  const autoDealerJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "AutoDealer",
+    name: showroom.business_name,
+    url: `${publicEnv.NEXT_PUBLIC_SITE_URL}${canonicalPath}`,
+    ...(logoUrl ? { image: logoUrl } : {}),
+    ...(showroom.description ? { description: showroom.description } : {}),
+    telephone: showroom.phone,
+    ...(showroom.city || showroom.address
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            ...(showroom.address ? { streetAddress: showroom.address } : {}),
+            ...(showroom.city ? { addressLocality: showroom.city } : {}),
+            addressCountry: "KE",
+          },
+        }
+      : {}),
+    ...(showroom.latitude != null && showroom.longitude != null
+      ? { geo: { "@type": "GeoCoordinates", latitude: showroom.latitude, longitude: showroom.longitude } }
+      : {}),
+  };
+  const breadcrumbJsonLd = buildBreadcrumbListJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Showrooms", path: "/showrooms" },
+    { name: showroom.business_name, path: canonicalPath },
+  ]);
+
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(autoDealerJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+
+      <nav aria-label="Breadcrumb" className="border-b border-neutral-200 bg-white px-6 py-2.5 md:px-12">
+        <div className="mx-auto flex max-w-7xl items-center gap-1.5 text-xs text-neutral-400">
+          <Link href="/" className="text-neutral-500 no-underline hover:text-neutral-700">
+            Home
+          </Link>
+          <span className="text-neutral-300">/</span>
+          <Link href="/showrooms" className="text-neutral-500 no-underline hover:text-neutral-700">
+            Showrooms
+          </Link>
+          <span className="text-neutral-300">/</span>
+          <span className="font-medium text-neutral-900">{showroom.business_name}</span>
+        </div>
+      </nav>
+
       <div className="border-b border-neutral-200 bg-white px-6 pt-8 md:px-12">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col gap-5 pb-6 md:flex-row md:items-end">

@@ -6,6 +6,7 @@ import { MostSearchedVehicles } from "@/components/home/most-searched-vehicles";
 import { PopularBrands } from "@/components/home/popular-brands";
 import { PopularModels, type PopularModelItem } from "@/components/home/popular-models";
 import { getSystemSettingString } from "@/lib/system-settings";
+import { buildOrganizationJsonLd } from "@/lib/structured-data";
 import { createClient } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -165,16 +166,23 @@ export default async function Home() {
     thumbnailUrl: getHighlightThumbnailUrl(row.thumbnail_storage_path),
   }));
 
-  const jsonLd = {
+  const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "HarakaGari",
     url: publicEnv.NEXT_PUBLIC_SITE_URL,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${publicEnv.NEXT_PUBLIC_SITE_URL}/listing?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
   };
+  const organizationJsonLd = buildOrganizationJsonLd([tiktokProfileUrl, youtubeChannelUrl]);
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
 
       <HeroSearch showroomCount={showroomCount ?? 0} vehicleCount={vehicleCount ?? 0} showrooms={certifiedShowrooms} />
       <BrowseByBrand brands={brandTiles} />

@@ -13,7 +13,9 @@ import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type V
 import { getVehicleBrandSlug, getVehicleDetailPath, parseVehicleIdFromSlug, slugify } from "@/features/vehicle/slug";
 import { getShowroomDetailPath } from "@/features/showroom/slug";
 import { extractClientIp, hashClientIp } from "@/features/vehicle/view-tracking";
+import { buildBreadcrumbListJsonLd } from "@/lib/structured-data";
 import { createClient } from "@/lib/supabase/server";
+import { publicEnv } from "@/lib/env";
 
 const dateFormatter = new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" });
 const mileageFormatter = new Intl.NumberFormat("en-KE");
@@ -163,7 +165,13 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
     model: vehicle.model,
     vehicleModelDate: String(vehicle.year),
     mileageFromOdometer: vehicle.mileage ?? undefined,
+    ...(vehicle.photos.length > 0 ? { image: vehicle.photos.map((photo) => photo.url) } : {}),
     offers: { "@type": "Offer", price: vehicle.price, priceCurrency: "KES", availability: "https://schema.org/InStock" },
+    seller: {
+      "@type": "AutoDealer",
+      name: vehicle.showroomName,
+      url: `${publicEnv.NEXT_PUBLIC_SITE_URL}${getShowroomDetailPath({ id: vehicle.showroomId, businessName: vehicle.showroomName })}`,
+    },
   };
 
   const hasRealFinancing =
@@ -180,9 +188,21 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
 
   const bodyTypePlural = vehicle.bodyType ? `${vehicle.bodyType}s` : null;
 
+  // Mirrors the visible breadcrumb nav below exactly (same hrefs, same
+  // conditional body-type crumb) — schema.org's own guidance is that
+  // structured data should reflect the page's real, visible content.
+  const breadcrumbJsonLd = buildBreadcrumbListJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Listing", path: "/listing" },
+    ...(bodyTypePlural ? [{ name: bodyTypePlural, path: `/listing/type/${slugify(vehicle.bodyType!)}` }] : []),
+    { name: vehicle.make, path: `/listing/${getVehicleBrandSlug(vehicle.make)}` },
+    { name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`, path: getVehicleDetailPath(vehicle) },
+  ]);
+
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
 
       <nav aria-label="Breadcrumb" className="border-b border-neutral-200 bg-white px-6 py-2.5 md:px-12">
         <div className="mx-auto flex max-w-7xl items-center gap-1.5 text-xs text-neutral-400">
