@@ -418,6 +418,40 @@ describe("Database schema integrity (integration)", () => {
       expect(error?.code).toBe("23P01");
     });
 
+    it("rejects an UPDATE (reschedule) that moves a different appointment onto the fixture's range (exclusion constraint applies to UPDATE, not just INSERT)", async () => {
+      // rescheduleAppointmentAction (APT-008) relies on this exact guard as
+      // its final, race-safe defense against a reschedule colliding with a
+      // different appointment — the exclusion constraint must fire on
+      // UPDATE, not only at INSERT time (which every other test in this
+      // block exercises).
+      const { data: other, error: insertError } = await supabase
+        .from("appointments")
+        .insert({
+          booking_reference: `BK-TEST-${testId}-reschedule-source`,
+          customer_id: customerId,
+          showroom_id: showroomId,
+          appointment_date: "2026-12-05",
+          start_time: "09:00",
+          end_time: "09:30",
+          contact_name: "Test Customer",
+          contact_email: "test-customer@example.com",
+          contact_phone: "+254712345678",
+        })
+        .select()
+        .single();
+      expect(insertError).toBeNull();
+      if (!other) throw new Error("reschedule-source appointment not created");
+
+      const { error: updateError } = await supabase
+        .from("appointments")
+        .update({ appointment_date: "2026-12-01", start_time: "10:00", end_time: "10:30" })
+        .eq("id", other.id);
+      expect(updateError).not.toBeNull();
+      expect(updateError?.code).toBe("23P01");
+
+      await supabase.from("appointments").delete().eq("id", other.id);
+    });
+
     it("allows a back-to-back, non-overlapping range immediately after an existing appointment", async () => {
       // Fixture appointment ends at 10:30 — a request starting exactly at
       // 10:30 doesn't overlap it (end-exclusive range), same as two

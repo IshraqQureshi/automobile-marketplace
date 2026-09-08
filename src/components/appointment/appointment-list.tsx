@@ -4,8 +4,12 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FilterBar, SearchInput, StatusBadge, TableEmptyState, TableShell, filterSelectClassName } from "@/components/admin/admin-ui";
 import { Dialog } from "@/components/ui/dialog";
+import { RescheduleDialog } from "@/components/appointment/reschedule-dialog";
 import { confirmAppointmentAction, declineAppointmentAction } from "@/features/appointment/actions";
 import type { AppointmentListItem } from "@/features/appointment/queries";
+
+const RESCHEDULABLE_STATUSES: AppointmentListItem["status"][] = ["PENDING", "CONFIRMED", "RESCHEDULED"];
+const FINALIZABLE_STATUSES: AppointmentListItem["status"][] = ["PENDING", "RESCHEDULED"];
 
 interface AppointmentListProps {
   items: AppointmentListItem[];
@@ -33,6 +37,29 @@ export function AppointmentList({ items, showShowroomColumn = false }: Appointme
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [rescheduling, setRescheduling] = useState<AppointmentListItem | null>(null);
+
+  function handleRescheduled(
+    appointmentId: string,
+    persisted: { appointmentDate: string; startTime: string; endTime: string },
+  ) {
+    let updated: AppointmentListItem | null = null;
+    setLocalItems((prev) =>
+      prev.map((i) => {
+        if (i.id !== appointmentId) return i;
+        updated = {
+          ...i,
+          status: "RESCHEDULED",
+          appointmentDate: persisted.appointmentDate,
+          startTime: persisted.startTime,
+          endTime: persisted.endTime,
+        };
+        return updated;
+      }),
+    );
+    setSelected((prev) => (prev && prev.id === appointmentId && updated ? updated : prev));
+    router.refresh();
+  }
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -77,6 +104,7 @@ export function AppointmentList({ items, showShowroomColumn = false }: Appointme
           <option value="">All Statuses</option>
           <option value="PENDING">Pending</option>
           <option value="CONFIRMED">Confirmed</option>
+          <option value="RESCHEDULED">Rescheduled</option>
           <option value="DECLINED">Declined</option>
           <option value="CANCELLED">Cancelled</option>
           <option value="COMPLETED">Completed</option>
@@ -120,23 +148,35 @@ export function AppointmentList({ items, showShowroomColumn = false }: Appointme
                     <StatusBadge status={item.status} />
                   </td>
                   <td className="px-5 py-3">
-                    {item.status === "PENDING" ? (
-                      <div className="flex gap-2">
+                    {RESCHEDULABLE_STATUSES.includes(item.status) ? (
+                      <div className="flex flex-wrap gap-2">
+                        {FINALIZABLE_STATUSES.includes(item.status) && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={pending && pendingId === item.id}
+                              onClick={() => runTransition(item.id, "CONFIRMED", confirmAppointmentAction)}
+                              className="rounded-md bg-brand px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pending && pendingId === item.id}
+                              onClick={() => runTransition(item.id, "DECLINED", declineAppointmentAction)}
+                              className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Decline
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           disabled={pending && pendingId === item.id}
-                          onClick={() => runTransition(item.id, "CONFIRMED", confirmAppointmentAction)}
-                          className="rounded-md bg-brand px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          type="button"
-                          disabled={pending && pendingId === item.id}
-                          onClick={() => runTransition(item.id, "DECLINED", declineAppointmentAction)}
+                          onClick={() => setRescheduling(item)}
                           className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Decline
+                          Reschedule
                         </button>
                       </div>
                     ) : (
@@ -199,29 +239,50 @@ export function AppointmentList({ items, showShowroomColumn = false }: Appointme
                 <p className="rounded-md bg-neutral-50 p-3 text-sm whitespace-pre-line text-neutral-700">{selected.customerNotes}</p>
               </div>
             )}
-            {selected.status === "PENDING" && (
-              <div className="flex gap-2 border-t border-neutral-200 pt-4">
+            {RESCHEDULABLE_STATUSES.includes(selected.status) && (
+              <div className="flex flex-wrap gap-2 border-t border-neutral-200 pt-4">
+                {FINALIZABLE_STATUSES.includes(selected.status) && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={pending && pendingId === selected.id}
+                      onClick={() => runTransition(selected.id, "CONFIRMED", confirmAppointmentAction)}
+                      className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Confirm appointment
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pending && pendingId === selected.id}
+                      onClick={() => runTransition(selected.id, "DECLINED", declineAppointmentAction)}
+                      className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Decline
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   disabled={pending && pendingId === selected.id}
-                  onClick={() => runTransition(selected.id, "CONFIRMED", confirmAppointmentAction)}
-                  className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Confirm appointment
-                </button>
-                <button
-                  type="button"
-                  disabled={pending && pendingId === selected.id}
-                  onClick={() => runTransition(selected.id, "DECLINED", declineAppointmentAction)}
+                  onClick={() => setRescheduling(selected)}
                   className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Decline
+                  Reschedule
                 </button>
               </div>
             )}
           </div>
         )}
       </Dialog>
+
+      {rescheduling && (
+        <RescheduleDialog
+          open={rescheduling != null}
+          appointment={rescheduling}
+          onClose={() => setRescheduling(null)}
+          onRescheduled={handleRescheduled}
+        />
+      )}
     </>
   );
 }

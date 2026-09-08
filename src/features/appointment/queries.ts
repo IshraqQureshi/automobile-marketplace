@@ -15,6 +15,7 @@ export interface AppointmentListItem {
   contactPhone: string;
   customerNotes: string | null;
   showroomNotes: string | null;
+  showroomId: string;
   showroomName: string;
   vehicles: { id: string; title: string }[];
 }
@@ -54,6 +55,7 @@ function rowToListItem(row: AppointmentRow): AppointmentListItem {
     contactPhone: row.contact_phone,
     customerNotes: row.customer_notes,
     showroomNotes: row.showroom_notes,
+    showroomId: row.showroom_id,
     showroomName: row.showrooms?.business_name ?? "Unknown showroom",
     vehicles: (row.appointment_vehicles ?? [])
       .map((av) => av.vehicles)

@@ -38,6 +38,15 @@ function nextMonday(): string {
   return d.toISOString().slice(0, 10);
 }
 const BOOKING_DATE = nextMonday();
+// A different weekday in the same fixture's Mon-Fri window, so the
+// reschedule test moves to a genuinely different date, not just a
+// different time on the same day.
+function nextTuesday(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + ((2 + 7 - d.getDay()) % 7 || 7));
+  return d.toISOString().slice(0, 10);
+}
+const RESCHEDULE_DATE = nextTuesday();
 
 test.beforeAll(async () => {
   const supabase = admin();
@@ -352,6 +361,51 @@ test("owner can decline a pending appointment", async ({ page }) => {
 
   const { data } = await admin().from("appointments").select("status").eq("showroom_id", showroomId).single();
   expect(data?.status).toBe("DECLINED");
+});
+
+test("owner can reschedule a pending appointment to a new date/time, and then confirm it (APT-008)", async ({ page }) => {
+  await bookSlot(page, "4:30 pm", { name: "Reschedule Test", email: `reschedule-${unique}@example.com` });
+  await expect(page.getByText("Request sent!")).toBeVisible({ timeout: 10000 });
+
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(OWNER_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await page.waitForURL(/\/dashboard$/);
+
+  await page.goto("/dashboard/appointments", { waitUntil: "domcontentloaded" });
+  const row = page.getByRole("row", { name: /Reschedule Test/ });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Reschedule" }).click();
+
+  await page.getByLabel("New date").fill(RESCHEDULE_DATE);
+  await expect(page.getByRole("button", { name: "9:00 am" })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: "9:00 am" }).click();
+  await page.getByRole("button", { name: "Confirm new time" }).click();
+
+  await expect(row.getByText("rescheduled", { exact: true })).toBeVisible({ timeout: 10000 });
+
+  const { data: rescheduled } = await admin()
+    .from("appointments")
+    .select("status, appointment_date, start_time")
+    .eq("contact_email", `reschedule-${unique}@example.com`)
+    .single();
+  expect(rescheduled?.status).toBe("RESCHEDULED");
+  expect(rescheduled?.appointment_date).toBe(RESCHEDULE_DATE);
+  expect(rescheduled?.start_time).toBe("09:00:00");
+
+  // Rescheduled → Confirmed must still be reachable, otherwise a
+  // rescheduled appointment would be permanently stuck with no way to
+  // finalize it.
+  await row.getByRole("button", { name: "Confirm" }).click();
+  await expect(row.getByText("confirmed", { exact: true })).toBeVisible();
+
+  const { data: confirmed } = await admin()
+    .from("appointments")
+    .select("status")
+    .eq("contact_email", `reschedule-${unique}@example.com`)
+    .single();
+  expect(confirmed?.status).toBe("CONFIRMED");
 });
 
 test("the owning showroom sees the appointment in its own dashboard, but a different showroom does not", async ({ page, browser }) => {

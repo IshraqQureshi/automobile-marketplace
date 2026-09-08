@@ -288,6 +288,36 @@ export function renderAppointmentDeclinedEmail(data: AppointmentEmailData): { su
   return { subject, html };
 }
 
+export interface AppointmentRescheduledEmailData extends AppointmentEmailData {
+  // appointmentDate/timeRange (inherited) hold the NEW schedule; these two
+  // hold what it used to be, so the email can show the change rather than
+  // just the new time in isolation.
+  previousAppointmentDate: string;
+  previousTimeRange: string;
+}
+
+/** Sent to the customer when the showroom/admin reschedules their appointment (APT-008) to a new date/time. */
+export function renderAppointmentRescheduledEmail(data: AppointmentRescheduledEmailData): { subject: string; html: string } {
+  const subject = `Your test drive was rescheduled — ${data.bookingReference}`;
+  const html = renderEmailShell({
+    preheader: `${escapeHtml(data.showroomName)} moved your test drive to ${escapeHtml(data.appointmentDate)}.`,
+    heading: "Test Drive Rescheduled",
+    bodyHtml: `
+      <p style="margin:0 0 12px 0;">Hi ${escapeHtml(data.contactName)},</p>
+      <p style="margin:0 0 16px 0;"><strong>${escapeHtml(data.showroomName)}</strong> has moved your test drive appointment to a new time.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0; border:1px solid ${BORDER}; border-radius:8px;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Booking reference</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.bookingReference)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Previously</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; text-align:right; text-decoration:line-through; color:${MUTED};">${escapeHtml(data.previousAppointmentDate)}, ${escapeHtml(data.previousTimeRange)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">New date</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.appointmentDate)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">New time</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.timeRange)}</td></tr>
+        <tr><td style="padding:12px 16px; font-size:13px; color:${MUTED};">Vehicles</td><td style="padding:12px 16px; font-size:13px; font-weight:600; text-align:right;">${vehicleListHtml(data.vehicleTitles)}</td></tr>
+      </table>
+    `,
+    footnote: "If the new time doesn't work for you, contact the showroom directly using the details on their page.",
+  });
+  return { subject, html };
+}
+
 export interface ShowroomRegistrationEmailData {
   businessName: string;
   ownerFullName: string;

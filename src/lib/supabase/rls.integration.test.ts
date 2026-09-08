@@ -557,6 +557,45 @@ describe("RLS authorization (integration)", () => {
       await ownerA.client.from("appointments").update({ status: "PENDING" }).eq("id", appointmentId);
     });
 
+    it("a customer cannot reschedule their own appointment via a direct update (APT-008 trigger hardening)", async () => {
+      // appointments_update_customer_or_showroom_or_admin lets a customer
+      // update their own row (e.g. notes) — prevent_appointment_customer_status_change
+      // originally only guarded `status`, silently leaving
+      // appointment_date/start_time/end_time changeable directly by the
+      // customer, bypassing the showroom-initiated reschedule workflow
+      // entirely. Extended (this migration) to guard the schedule columns
+      // too, same as it already guarded status.
+      const { data, error } = await customerA.client
+        .from("appointments")
+        .update({ appointment_date: "2026-12-20", start_time: "14:00", end_time: "14:30" })
+        .eq("id", appointmentId)
+        .select();
+      expect(error).not.toBeNull();
+      expect(data).toBeNull();
+
+      const { data: unchanged } = await ownerA.client
+        .from("appointments")
+        .select("appointment_date, start_time")
+        .eq("id", appointmentId)
+        .single();
+      expect(unchanged?.appointment_date).toBe("2026-12-15");
+    });
+
+    it("the addressed showroom CAN reschedule the booking via a direct update", async () => {
+      const { data, error } = await ownerA.client
+        .from("appointments")
+        .update({ appointment_date: "2026-12-20", start_time: "14:00", end_time: "14:30", status: "RESCHEDULED" })
+        .eq("id", appointmentId)
+        .select();
+      expect(error).toBeNull();
+      expect(data?.[0]?.appointment_date).toBe("2026-12-20");
+
+      await ownerA.client
+        .from("appointments")
+        .update({ appointment_date: "2026-12-15", start_time: "10:00", end_time: "10:30", status: "PENDING" })
+        .eq("id", appointmentId);
+    });
+
     it("a different customer cannot see another customer's appointment", async () => {
       const { data, error } = await customerB.client.from("appointments").select().eq("id", appointmentId);
       expect(error).toBeNull();
