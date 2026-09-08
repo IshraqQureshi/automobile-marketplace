@@ -54,6 +54,27 @@ export async function isCurrentUserActive(supabase: Awaited<ReturnType<typeof cr
   return profile?.is_active ?? true;
 }
 
+/**
+ * Where a logged-in user belongs when there's nowhere more specific to send
+ * them: an admin's own surface is /admin, a showroom owner's is /dashboard
+ * (profiles.role never actually becomes "SHOWROOM" — see the note in
+ * src/features/showroom/my-showroom.ts — so ownership has to be checked via
+ * getOwnerShowroom, not read off role), everyone else lands on /account.
+ * Shared by the already-authenticated guards on /login and /forgot-password
+ * and by the public header's "Profile" link, so this destination logic
+ * isn't duplicated across all three.
+ */
+export async function resolveLoggedInHomePath(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string> {
+  const role = await currentUserRole(supabase);
+  if (role === "ADMIN") return "/admin";
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const showroom = user && (await getOwnerShowroom(user.id));
+  return showroom ? "/dashboard" : "/account";
+}
+
 export async function signUpAction(
   _prevState: AuthActionState,
   formData: FormData,
@@ -172,16 +193,10 @@ export async function signInAction(
     return { status: "error", message: "This account has been suspended. Contact support for help." };
   }
 
-  // profiles.role never actually becomes "SHOWROOM" (registering a showroom
-  // doesn't change it — see src/features/showroom/my-showroom.ts), so a
-  // showroom owner is identified by owning a showroom row, not by role.
-  // Send them straight to their dashboard rather than the generic account
-  // page they'd otherwise have to know to navigate away from.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const showroom = user && (await getOwnerShowroom(user.id));
-  redirect(showroom ? "/dashboard" : "/account");
+  // Send a showroom owner straight to their dashboard (ADMIN never reaches
+  // here — rejected above) rather than the generic account page they'd
+  // otherwise have to know to navigate away from.
+  redirect(await resolveLoggedInHomePath(supabase));
 }
 
 export async function signInWithGoogleAction(): Promise<void> {

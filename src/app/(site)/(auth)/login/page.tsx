@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces } from "next/font/google";
 import Image from "next/image";
 import { redirect } from "next/navigation";
+import { resolveLoggedInHomePath } from "@/features/auth/actions";
 import { createClient } from "@/lib/supabase/server";
 import { AuthCard } from "./auth-card";
 
@@ -39,7 +40,7 @@ export default async function LoginPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/account");
+    redirect(await resolveLoggedInHomePath(supabase));
   }
 
   return (
