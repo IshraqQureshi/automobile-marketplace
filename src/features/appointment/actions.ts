@@ -427,6 +427,16 @@ async function transitionAppointmentStatus(
 export interface RescheduleAppointmentResult {
   error?: string;
   fieldErrors?: Record<string, string>;
+  // The as-persisted date/time — the widened end time is derived from the
+  // showroom's CURRENT slot_duration_minutes/buffer_minutes (fetched fresh
+  // here), which can differ from whatever those settings were when the
+  // appointment was originally booked. Returning the real persisted values
+  // (rather than making the caller re-derive endTime client-side from the
+  // appointment's old duration) is what keeps the dashboard's optimistic
+  // update from silently drifting from the database.
+  appointmentDate?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 /**
@@ -495,7 +505,7 @@ export async function rescheduleAppointmentAction(
     .update({ appointment_date: dateResult.data, start_time: startTimeResult.data, end_time: endTime, status: "RESCHEDULED" })
     .eq("id", appointmentId)
     .in("status", ["PENDING", "CONFIRMED", "RESCHEDULED"])
-    .select("id");
+    .select("id, appointment_date, start_time, end_time");
   if (updateError) {
     // Same range-overlap exclusion constraint submitAppointmentAction
     // relies on — fires here too since it applies to UPDATE, not just
@@ -533,5 +543,6 @@ export async function rescheduleAppointmentAction(
   revalidatePath("/admin", "layout");
   revalidatePath("/dashboard", "layout");
 
-  return {};
+  const persisted = updated[0]!;
+  return { appointmentDate: persisted.appointment_date, startTime: persisted.start_time, endTime: persisted.end_time };
 }

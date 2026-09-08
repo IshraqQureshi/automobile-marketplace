@@ -10,7 +10,7 @@ interface RescheduleDialogProps {
   open: boolean;
   appointment: AppointmentListItem;
   onClose: () => void;
-  onRescheduled: (appointmentId: string, newDate: string, newStartTime: string) => void;
+  onRescheduled: (appointmentId: string, persisted: { appointmentDate: string; startTime: string; endTime: string }) => void;
 }
 
 function todayDateString(): string {
@@ -86,7 +86,14 @@ export function RescheduleDialog({ open, appointment, onClose, onRescheduled }: 
         setError(Object.values(result.fieldErrors)[0] ?? "Please choose a valid date and time.");
         return;
       }
-      onRescheduled(appointment.id, date, selectedStartTime);
+      // Use the server's as-persisted values rather than re-deriving them
+      // client-side — the widened end time depends on the showroom's
+      // CURRENT slot/buffer settings, which the client doesn't have.
+      onRescheduled(appointment.id, {
+        appointmentDate: result.appointmentDate ?? date,
+        startTime: result.startTime ?? `${selectedStartTime}:00`,
+        endTime: result.endTime ?? `${selectedStartTime}:00`,
+      });
       resetAndClose();
     });
   }

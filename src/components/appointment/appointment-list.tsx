@@ -11,19 +11,6 @@ import type { AppointmentListItem } from "@/features/appointment/queries";
 const RESCHEDULABLE_STATUSES: AppointmentListItem["status"][] = ["PENDING", "CONFIRMED", "RESCHEDULED"];
 const FINALIZABLE_STATUSES: AppointmentListItem["status"][] = ["PENDING", "RESCHEDULED"];
 
-function toMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-}
-
-function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(":").map(Number);
-  const total = (h ?? 0) * 60 + (m ?? 0) + minutes;
-  const hours = Math.floor(total / 60) % 24;
-  const mins = total % 60;
-  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
-}
-
 interface AppointmentListProps {
   items: AppointmentListItem[];
   showShowroomColumn?: boolean;
@@ -52,18 +39,20 @@ export function AppointmentList({ items, showShowroomColumn = false }: Appointme
   const [actionError, setActionError] = useState<string | null>(null);
   const [rescheduling, setRescheduling] = useState<AppointmentListItem | null>(null);
 
-  function handleRescheduled(appointmentId: string, newDate: string, newStartTime: string) {
+  function handleRescheduled(
+    appointmentId: string,
+    persisted: { appointmentDate: string; startTime: string; endTime: string },
+  ) {
     let updated: AppointmentListItem | null = null;
     setLocalItems((prev) =>
       prev.map((i) => {
         if (i.id !== appointmentId) return i;
-        const durationMinutes = (toMinutes(i.endTime) - toMinutes(i.startTime) + 24 * 60) % (24 * 60);
         updated = {
           ...i,
           status: "RESCHEDULED",
-          appointmentDate: newDate,
-          startTime: `${newStartTime}:00`,
-          endTime: addMinutesToTime(newStartTime, durationMinutes),
+          appointmentDate: persisted.appointmentDate,
+          startTime: persisted.startTime,
+          endTime: persisted.endTime,
         };
         return updated;
       }),
