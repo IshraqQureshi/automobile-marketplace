@@ -283,6 +283,11 @@ function NavDropdown({ label, items }: { label: string; items: DropdownLinkItem[
         <ChevronDownIcon />
       </button>
       {open && (
+        // max-h-112 (448px) comfortably fits the current ~10-row catalog
+        // tables (10 items render at ~368px) with margin to spare — if a
+        // future catalog grows past roughly 12 items, this cap (not
+        // overflow-y-auto itself) is what reintroduces a scrollbar and is
+        // the value to revisit.
         <div
           role="menu"
           className="absolute left-0 z-10 mt-2 max-h-112 w-56 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
