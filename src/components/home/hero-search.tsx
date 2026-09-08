@@ -36,7 +36,10 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
       />
 
       <div className="relative z-10 px-6 pt-10 pb-8 text-center">
-        <p className="mb-2 text-xs font-semibold tracking-[0.2em] text-white/60 uppercase">The Premium Car Marketplace</p>
+        {/* The homepage's only <h1> — same small eyebrow-label styling as
+            designed (semantic level and visual size are independent; this
+            was a <p> with no <h1> anywhere on the page at all before). */}
+        <h1 className="mb-2 text-xs font-semibold tracking-[0.2em] text-white/60 uppercase">The Premium Car Marketplace</h1>
         <p className="mb-7 text-sm text-white/65">
           Search across {numberFormatter.format(showroomCount)}+ certified showrooms — {numberFormatter.format(vehicleCount)}+ verified listings.
         </p>

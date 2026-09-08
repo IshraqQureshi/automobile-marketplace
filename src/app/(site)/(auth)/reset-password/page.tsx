@@ -5,6 +5,10 @@ import { ResetPasswordForm } from "./reset-password-form";
 
 export const metadata: Metadata = {
   title: "Set a new password — HarakaGari",
+  // A transient, token-gated page reached only via a real reset-link email
+  // (redirects away without an active recovery session) — not a landing
+  // page anyone should find via search.
+  robots: { index: false, follow: false },
 };
 
 export default async function ResetPasswordPage() {

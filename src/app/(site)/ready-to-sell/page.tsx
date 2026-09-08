@@ -3,6 +3,8 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Ready to Sell? — HarakaGari",
+  description: "Selling your car in Kenya? Learn how HarakaGari connects sellers with verified showrooms and buyers.",
+  alternates: { canonical: "/ready-to-sell" },
 };
 
 export default function ReadyToSellPage() {

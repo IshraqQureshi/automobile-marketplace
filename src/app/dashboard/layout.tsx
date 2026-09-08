@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { ToastProvider } from "@/components/ui/toast";
@@ -10,6 +11,19 @@ import { createClient } from "@/lib/supabase/server";
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
+
+// robots.txt already disallows crawling /dashboard, but a disallow rule
+// only blocks the crawl, not indexing a URL discovered via an external
+// link — this is the real noindex signal.
+//
+// CAUTION for future pages: Next.js metadata objects for the same field
+// (here, `robots`) are replaced wholesale by a child segment's own value,
+// not deep-merged (see the equivalent note in src/app/admin/layout.tsx). If
+// any future page under /dashboard ever adds its own `metadata.robots`
+// without including `index: false`, it will silently un-noindex itself.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 /**
  * Showroom-owner dashboard guard (SHR-004). There is no "SHOWROOM" profile

@@ -21,6 +21,10 @@ export const metadata: Metadata = {
     url: "/",
     siteName: "HarakaGari",
     type: "website",
+    // A page that sets its own `openGraph` object entirely replaces the
+    // root layout's file-convention default image rather than merging with
+    // it (confirmed live) — must be set explicitly here.
+    images: ["/opengraph-image"],
   },
   twitter: {
     card: "summary_large_image",

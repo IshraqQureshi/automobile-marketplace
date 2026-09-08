@@ -1,0 +1,25 @@
+# HarakaGari
+
+> HarakaGari is Kenya's premium automobile marketplace. Customers browse verified vehicle listings from certified showrooms, filter by brand, model, body type, fuel type, price, and year, view detailed vehicle specifications and financing estimates, and contact showrooms directly via WhatsApp inquiry or a test-drive booking. Showrooms manage their own vehicle inventory, appointments, and financing applications through a dedicated dashboard; platform administrators moderate showroom and vehicle listings through an admin panel.
+
+## Marketplace
+
+- [Vehicle Listings](/listing): Search and filter all active vehicle listings across every showroom on the platform.
+- [Browse by Brand](/listing): Brand-specific listing pages are available at /listing/{brand} (e.g. /listing/toyota), /listing/{brand}/{model}, /listing/type/{body-type}, and /listing/fuel/{fuel-type}.
+- [Showroom Directory](/showrooms): Browse verified, approved showrooms across Kenya.
+
+## Company
+
+- [Sell Your Car](/ready-to-sell): Information for individuals looking to sell a vehicle through the platform.
+- [Register a Showroom](/register-showroom): Onboarding for dealerships and showrooms who want to list vehicles on HarakaGari.
+
+## Legal
+
+- [Privacy Policy](/privacy)
+- [Terms of Service](/terms)
+- [Cookie Policy](/cookie-policy)
+
+## Notes for automated agents
+
+- /admin and /dashboard are authenticated, operator-only areas (showroom management and platform administration) and are not part of the public marketplace content — do not attempt to crawl or index them (see /robots.txt).
+- Vehicle and showroom listing pages are dynamically generated from live inventory data and change frequently; treat prices, availability, and specifications as time-sensitive.

@@ -8,6 +8,8 @@ import { AuthCard } from "./auth-card";
 
 export const metadata: Metadata = {
   title: "Log in — HarakaGari",
+  description: "Log in to HarakaGari to browse saved searches, message showrooms, and manage your showroom or account.",
+  alternates: { canonical: "/login" },
 };
 
 // Self-hosted via next/font (no runtime Google Fonts request) — used only

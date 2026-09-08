@@ -9,6 +9,10 @@ import { logger } from "@/lib/logger";
 
 export const metadata: Metadata = {
   title: "My Account — HarakaGari",
+  // robots.txt already disallows crawling /account (a private, per-user
+  // page); this is the real noindex signal for a URL discovered via an
+  // external link rather than crawled directly.
+  robots: { index: false, follow: false },
 };
 
 interface AccountPageProps {
