@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CarIcon } from "@/components/admin/admin-ui";
+import { slugify } from "@/features/vehicle/slug";
 
 export interface PopularModelItem {
   key: string;
@@ -31,7 +32,7 @@ export function PopularModels({ models }: PopularModelsProps) {
           {models.map((model) => (
             <Link
               key={model.key}
-              href={`/listing?make=${encodeURIComponent(model.make)}&model=${encodeURIComponent(model.model)}`}
+              href={`/listing/${slugify(model.make)}/${slugify(model.model)}`}
               className="overflow-hidden rounded-lg border border-neutral-200 bg-white no-underline"
             >
               <div className="flex h-24 items-center justify-center bg-neutral-100">

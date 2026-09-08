@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { InitialAvatar } from "@/components/admin/admin-ui";
+import { slugify } from "@/features/vehicle/slug";
 
 export interface BrandTileItem {
   id: string;
@@ -12,9 +13,11 @@ interface BrowseByBrandProps {
 }
 
 /**
- * Each tile filters the marketplace vehicle listing (MKT-002, /listing) by
- * brand name — vehicles.make is a plain text column, not FK'd to the brands
- * catalog table, so this links on the brand's real name rather than its id.
+ * Each tile links to the SEO-friendly per-brand landing page
+ * (/listing/{brand-slug}, e.g. /listing/toyota) rather than
+ * /listing?make=Toyota — vehicles.make is a plain text column, not FK'd to
+ * the brands catalog table, so /listing/[brand] resolves the slug against
+ * both this catalog and real listings, not by id.
  */
 export function BrowseByBrand({ brands }: BrowseByBrandProps) {
   if (brands.length === 0) return null;
@@ -30,7 +33,7 @@ export function BrowseByBrand({ brands }: BrowseByBrandProps) {
           {brands.map((brand) => (
             <Link
               key={brand.id}
-              href={`/listing?make=${encodeURIComponent(brand.name)}`}
+              href={`/listing/${slugify(brand.name)}`}
               className="flex flex-col items-center gap-1.5 rounded-lg py-2 no-underline hover:bg-neutral-50"
             >
               {brand.logoUrl ? (
