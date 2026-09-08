@@ -3,7 +3,9 @@ import { Pagination } from "@/components/vehicle/pagination";
 import { ShowroomCard, type ShowroomCardData } from "@/components/showroom/showroom-card";
 import { ShowroomFilters, type ShowroomFilterOptions } from "@/components/showroom/showroom-filters";
 import { ShowroomSortSelect } from "@/components/showroom/showroom-sort-select";
+import { getShowroomDetailPath } from "@/features/showroom/slug";
 import { parseShowroomSearchFilters, SHOWROOMS_PER_PAGE, showroomSearchFiltersToParams, type ShowroomSearchParamsInput } from "@/features/showroom/search";
+import { buildShowroomItemListJsonLd } from "@/lib/structured-data";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -53,8 +55,17 @@ export default async function ShowroomsPage({ searchParams }: ShowroomsPageProps
 
   const totalCount = count ?? 0;
 
+  const itemListJsonLd = buildShowroomItemListJsonLd(
+    showrooms.map((showroom) => ({
+      id: showroom.id,
+      businessName: showroom.businessName,
+      path: getShowroomDetailPath({ id: showroom.id, businessName: showroom.businessName }),
+    })),
+  );
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-10 md:px-12">
+      {showrooms.length > 0 && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }} />}
       <h1 className="font-display text-3xl font-bold text-neutral-900">Certified Showrooms</h1>
       <p className="mt-1 text-sm text-neutral-500">
         {totalCount === 0 ? "No showrooms match your search" : `${totalCount.toLocaleString("en-KE")} showroom${totalCount === 1 ? "" : "s"} found`}
