@@ -285,7 +285,7 @@ function NavDropdown({ label, items }: { label: string; items: DropdownLinkItem[
       {open && (
         <div
           role="menu"
-          className="absolute left-0 z-10 mt-2 max-h-80 w-56 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
+          className="absolute left-0 z-10 mt-2 max-h-112 w-56 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
         >
           {items.map((item) => (
             <Link
