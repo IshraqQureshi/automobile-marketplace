@@ -1,11 +1,5 @@
+import type { VehicleFilterOptions } from "@/features/vehicle/listing-query";
 import type { VehicleSearchFilters } from "@/features/vehicle/search";
-
-export interface VehicleFilterOptions {
-  makes: string[];
-  models: string[];
-  bodyTypes: string[];
-  fuelTypes: string[];
-}
 
 interface VehicleFiltersProps {
   filters: VehicleSearchFilters;

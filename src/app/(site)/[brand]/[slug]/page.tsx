@@ -10,7 +10,7 @@ import { ScheduleTestDriveButton } from "@/components/vehicle/schedule-test-driv
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
 import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-button";
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
-import { getVehicleDetailPath, parseVehicleIdFromSlug } from "@/features/vehicle/slug";
+import { getVehicleBrandSlug, getVehicleDetailPath, parseVehicleIdFromSlug, slugify } from "@/features/vehicle/slug";
 import { getShowroomDetailPath } from "@/features/showroom/slug";
 import { extractClientIp, hashClientIp } from "@/features/vehicle/view-tracking";
 import { createClient } from "@/lib/supabase/server";
@@ -196,13 +196,13 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
           {bodyTypePlural && (
             <>
               <span className="text-neutral-300">/</span>
-              <Link href={`/listing?bodyType=${encodeURIComponent(vehicle.bodyType!)}`} className="text-neutral-500 no-underline hover:text-neutral-700">
+              <Link href={`/listing/type/${slugify(vehicle.bodyType!)}`} className="text-neutral-500 no-underline hover:text-neutral-700">
                 {bodyTypePlural}
               </Link>
             </>
           )}
           <span className="text-neutral-300">/</span>
-          <Link href={`/listing?make=${encodeURIComponent(vehicle.make)}`} className="text-neutral-500 no-underline hover:text-neutral-700">
+          <Link href={`/listing/${getVehicleBrandSlug(vehicle.make)}`} className="text-neutral-500 no-underline hover:text-neutral-700">
             {vehicle.make}
           </Link>
           <span className="text-neutral-300">/</span>
@@ -445,7 +445,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
             <div className="mt-4">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-lg font-bold tracking-tight text-neutral-900">Similar Cars</h2>
-                <Link href={`/listing?make=${encodeURIComponent(vehicle.make)}`} className="text-sm font-medium text-brand no-underline hover:text-brand-dark">
+                <Link href={`/listing/${getVehicleBrandSlug(vehicle.make)}`} className="text-sm font-medium text-brand no-underline hover:text-brand-dark">
                   View all →
                 </Link>
               </div>

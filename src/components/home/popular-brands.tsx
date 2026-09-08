@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { InitialAvatar } from "@/components/admin/admin-ui";
+import { slugify } from "@/features/vehicle/slug";
 
 export interface PopularBrandItem {
   id: string;
@@ -29,7 +30,7 @@ export function PopularBrands({ brands }: PopularBrandsProps) {
           {brands.map((brand) => (
             <Link
               key={brand.id}
-              href={`/listing?make=${encodeURIComponent(brand.name)}`}
+              href={`/listing/${slugify(brand.name)}`}
               className="flex flex-col items-center gap-2 text-center no-underline"
             >
               {brand.logoUrl ? (

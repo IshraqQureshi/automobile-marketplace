@@ -5,6 +5,12 @@ import { VEHICLE_SORT_OPTIONS, type VehicleSortKey } from "@/features/vehicle/se
 
 interface VehicleSortSelectProps {
   value: VehicleSortKey;
+  // "/listing" by default, or "/listing/{brand-slug}" on the SEO-friendly
+  // per-brand landing page (/listing/[brand]) — the brand there lives in
+  // the path, not the query string, so it's already absent from
+  // searchParams and needs no special handling beyond navigating relative
+  // to the right base path.
+  basePath?: string;
 }
 
 /**
@@ -13,7 +19,7 @@ interface VehicleSortSelectProps {
  * its own button) — small enough to justify being the sole "use client"
  * piece here rather than making the whole filter bar client-side.
  */
-export function VehicleSortSelect({ value }: VehicleSortSelectProps) {
+export function VehicleSortSelect({ value, basePath = "/listing" }: VehicleSortSelectProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,7 +32,7 @@ export function VehicleSortSelect({ value }: VehicleSortSelectProps) {
     }
     params.delete("page");
     const query = params.toString();
-    router.push(query ? `/listing?${query}` : "/listing");
+    router.push(query ? `${basePath}?${query}` : basePath);
   }
 
   return (

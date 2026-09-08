@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOutAction } from "@/features/auth/actions";
 import { FUEL_TYPES } from "@/features/vehicle/schemas";
+import { slugify } from "@/features/vehicle/slug";
 import { cn } from "@/lib/utils";
 
 export interface HeaderUser {
@@ -71,20 +72,26 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { open: profileMenuOpen, setOpen: setProfileMenuOpen, ref: profileMenuRef } = useDropdown();
 
-  // vehicles.make/model/body_type are plain text, not FK'd to the
-  // brands/models/vehicle_types catalog tables — filtering /listing by name
-  // (encodeURIComponent'd) matches the homepage's existing BrowseByBrand
-  // convention, not by id.
+  // /listing/{brand-slug} is the SEO-friendly landing page (vs.
+  // /listing?make=Toyota) — same slugify() vehicle detail pages already use
+  // for their own brand URL segment.
   const brandItems = useMemo<DropdownLinkItem[]>(
-    () => navCatalog.brands.map((b) => ({ id: b.id, label: b.name, href: `/listing?make=${encodeURIComponent(b.name)}` })),
+    () => navCatalog.brands.map((b) => ({ id: b.id, label: b.name, href: `/listing/${slugify(b.name)}` })),
     [navCatalog.brands],
   );
+  // /listing/{brand-slug}/{model-slug} when the model's brand is known (the
+  // models catalog table is FK'd to brands, so this is normally always
+  // true) — falls back to the flat query form on the rare row with no
+  // resolvable brand, rather than link to a URL /listing/[brand]/[model]
+  // can't actually resolve.
   const modelItems = useMemo<DropdownLinkItem[]>(
     () =>
       navCatalog.models.map((m) => ({
         id: m.id,
         label: m.brandName ? `${m.brandName} ${m.name}` : m.name,
-        href: `/listing?model=${encodeURIComponent(m.name)}`,
+        href: m.brandName
+          ? `/listing/${slugify(m.brandName)}/${slugify(m.name)}`
+          : `/listing?model=${encodeURIComponent(m.name)}`,
       })),
     [navCatalog.models],
   );
@@ -95,24 +102,17 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
   // distinction between them, and no casing constraint on catalog_name
   // either (an admin could enter "diesel"), so match case-insensitively
   // rather than relying on an admin always typing the exact enum casing.
-  // /listing filters those on two different columns (bodyType ->
-  // vehicles.body_type, fuelType -> vehicles.fuel_type), so a catalog entry
-  // whose name is one of FUEL_TYPES routes to fuelType; everything else
-  // routes to bodyType, matching what it actually filters.
-  // vehicles.fuel_type is always stored with FUEL_TYPES' own canonical
-  // casing (populated from that exact enum via the vehicle form's <select>),
-  // and /listing matches it with an exact .eq(), not case-insensitively —
-  // so the link must carry that canonical casing, not necessarily whatever
-  // casing the catalog row happens to have, or a differently-cased catalog
-  // entry would silently match zero vehicles despite routing correctly.
+  // A catalog entry whose name is one of FUEL_TYPES routes to the
+  // /listing/fuel/{slug} SEO page; everything else routes to
+  // /listing/type/{slug} — the same split resolveCanonicalBodyType/
+  // resolveCanonicalFuelType (src/features/vehicle/listing-slugs.ts) make on
+  // the receiving end, so a link built here always resolves there.
   const canonicalFuelTypeByLowercase = useMemo(() => new Map(FUEL_TYPES.map((f) => [f.toLowerCase(), f])), []);
   const typeItems = useMemo<DropdownLinkItem[]>(
     () =>
       navCatalog.types.map((t) => {
         const canonicalFuelType = canonicalFuelTypeByLowercase.get(t.name.toLowerCase());
-        const href = canonicalFuelType
-          ? `/listing?fuelType=${encodeURIComponent(canonicalFuelType)}`
-          : `/listing?bodyType=${encodeURIComponent(t.name)}`;
+        const href = canonicalFuelType ? `/listing/fuel/${slugify(canonicalFuelType)}` : `/listing/type/${slugify(t.name)}`;
         return { id: t.id, label: t.name, href };
       }),
     [navCatalog.types, canonicalFuelTypeByLowercase],
