@@ -1,37 +1,30 @@
 import Link from "next/link";
 import { buildPageNumbers } from "@/features/vehicle/pagination-utils";
-import type { VehicleSearchFilters } from "@/features/vehicle/search";
-import { vehicleSearchFiltersToParams } from "@/features/vehicle/search";
 
 interface PaginationProps {
-  filters: VehicleSearchFilters;
+  currentPage: number;
   totalCount: number;
   perPage: number;
-  basePath: string;
+  // Builds the href for a given page number — the caller owns how its own
+  // filters serialize to a query string (vehicleSearchFiltersToParams,
+  // showroomSearchFiltersToParams, ...), so this component itself carries
+  // no knowledge of any one feature's filter shape. Originally built
+  // vehicle-listing-specific (MKT-002, the first page in this project to
+  // need real pagination); generalized once the showroom directory became
+  // a second real consumer rather than forking a near-identical copy.
+  buildHref: (page: number) => string;
 }
 
-// First-generation pagination for this project (no existing pattern to
-// reuse — every other list is fetched in one shot and filtered client-side
-// at admin/dashboard scale; the public marketplace can't assume that stays
-// small). Plain page-number links (page is just another searchParam) rather
-// than client-side state, so pages are directly shareable/bookmarkable and
-// work without JS.
-export function Pagination({ filters, totalCount, perPage, basePath }: PaginationProps) {
+export function Pagination({ currentPage, totalCount, perPage, buildHref }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
   if (totalPages <= 1) return null;
 
-  function hrefForPage(page: number) {
-    const params = vehicleSearchFiltersToParams({ ...filters, page });
-    const query = params.toString();
-    return query ? `${basePath}?${query}` : basePath;
-  }
-
-  const current = Math.min(filters.page, totalPages);
+  const current = Math.min(currentPage, totalPages);
   const pageNumbers = buildPageNumbers(current, totalPages);
 
   return (
     <nav aria-label="Pagination" className="mt-10 flex items-center justify-center gap-1.5">
-      <PageLink href={hrefForPage(current - 1)} disabled={current <= 1} label="Previous page">
+      <PageLink href={buildHref(current - 1)} disabled={current <= 1} label="Previous page">
         ←
       </PageLink>
 
@@ -41,13 +34,13 @@ export function Pagination({ filters, totalCount, perPage, basePath }: Paginatio
             …
           </span>
         ) : (
-          <PageLink key={page} href={hrefForPage(page)} active={page === current} label={`Page ${page}`}>
+          <PageLink key={page} href={buildHref(page)} active={page === current} label={`Page ${page}`}>
             {page}
           </PageLink>
         ),
       )}
 
-      <PageLink href={hrefForPage(current + 1)} disabled={current >= totalPages} label="Next page">
+      <PageLink href={buildHref(current + 1)} disabled={current >= totalPages} label="Next page">
         →
       </PageLink>
     </nav>

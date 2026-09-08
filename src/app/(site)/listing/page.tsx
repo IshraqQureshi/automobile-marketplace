@@ -3,7 +3,7 @@ import { Pagination } from "@/components/vehicle/pagination";
 import { VehicleCard } from "@/components/vehicle/vehicle-card";
 import { VehicleFilters, type VehicleFilterOptions } from "@/components/vehicle/vehicle-filters";
 import { VehicleSortSelect } from "@/components/vehicle/vehicle-sort-select";
-import { parseVehicleSearchFilters, VEHICLES_PER_PAGE, type VehicleSearchParamsInput } from "@/features/vehicle/search";
+import { parseVehicleSearchFilters, VEHICLES_PER_PAGE, vehicleSearchFiltersToParams, type VehicleSearchParamsInput } from "@/features/vehicle/search";
 import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -80,7 +80,16 @@ export default async function VehiclesPage({ searchParams }: VehiclesPageProps) 
             </div>
           )}
 
-          <Pagination filters={filters} totalCount={totalCount} perPage={VEHICLES_PER_PAGE} basePath="/listing" />
+          <Pagination
+            currentPage={filters.page}
+            totalCount={totalCount}
+            perPage={VEHICLES_PER_PAGE}
+            buildHref={(page) => {
+              const params = vehicleSearchFiltersToParams({ ...filters, page });
+              const query = params.toString();
+              return query ? `/listing?${query}` : "/listing";
+            }}
+          />
         </div>
       </div>
     </div>

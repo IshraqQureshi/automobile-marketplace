@@ -45,6 +45,9 @@ export function Header() {
           <Link href="/listing" aria-label="Search vehicles" className="text-neutral-500 hover:text-neutral-700">
             <SearchIcon />
           </Link>
+          <Link href="/showrooms" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
+            Showrooms
+          </Link>
           <Link href="/ready-to-sell" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
             Sell your car
           </Link>
@@ -77,6 +80,9 @@ export function Header() {
               {item} <span className="text-xs">(coming soon)</span>
             </span>
           ))}
+          <Link href="/showrooms" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+            Showrooms
+          </Link>
           <Link href="/ready-to-sell" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
             Sell your car
           </Link>
