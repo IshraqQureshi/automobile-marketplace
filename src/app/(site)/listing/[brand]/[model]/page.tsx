@@ -59,7 +59,7 @@ export default async function BrandModelListingPage({ params, searchParams }: Br
       options={options}
       vehicles={vehicles}
       totalCount={totalCount}
-      sortSelectBasePath={`/listing/${brand}/${model}`}
+      basePath={`/listing/${brand}/${model}`}
       buildPaginationHref={(page) => {
         const params = vehicleSearchFiltersToParams({ ...filters, make: "", model: "", page });
         const query = params.toString();

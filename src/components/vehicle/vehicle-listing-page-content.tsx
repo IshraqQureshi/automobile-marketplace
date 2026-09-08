@@ -9,7 +9,7 @@ interface VehicleListingPageContentProps {
   options: VehicleFilterOptions;
   vehicles: VehicleWithShowroom[];
   totalCount: number;
-  sortSelectBasePath: string;
+  basePath: string;
   buildPaginationHref: (page: number) => string;
 }
 
@@ -27,7 +27,7 @@ export function VehicleListingPageContent({
   options,
   vehicles,
   totalCount,
-  sortSelectBasePath,
+  basePath,
   buildPaginationHref,
 }: VehicleListingPageContentProps) {
   return (
@@ -42,7 +42,7 @@ export function VehicleListingPageContent({
         options={options}
         vehicles={vehicles}
         totalCount={totalCount}
-        sortSelectBasePath={sortSelectBasePath}
+        basePath={basePath}
         buildPaginationHref={buildPaginationHref}
       />
     </div>

@@ -51,7 +51,7 @@ export default async function BodyTypeListingPage({ params, searchParams }: Body
       options={options}
       vehicles={vehicles}
       totalCount={totalCount}
-      sortSelectBasePath={`/listing/type/${bodyType}`}
+      basePath={`/listing/type/${bodyType}`}
       buildPaginationHref={(page) => {
         const params = vehicleSearchFiltersToParams({ ...filters, bodyType: "", page });
         const query = params.toString();

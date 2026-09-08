@@ -4,6 +4,11 @@ import type { VehicleSearchFilters } from "@/features/vehicle/search";
 interface VehicleFiltersProps {
   filters: VehicleSearchFilters;
   options: VehicleFilterOptions;
+  // "/listing" by default, or the current SEO landing page's own path
+  // (e.g. "/listing/toyota/camry") — submitting this form must stay on
+  // that page's own filter context, not silently bounce back to the flat
+  // /listing form and drop whichever facet(s) the path itself encodes.
+  action?: string;
 }
 
 const selectClassName =
@@ -19,9 +24,9 @@ const selectClassName =
  * Sort has its own small client component (vehicle-sort-select.tsx) since,
  * unlike these, it's expected to apply immediately on change.
  */
-export function VehicleFilters({ filters, options }: VehicleFiltersProps) {
+export function VehicleFilters({ filters, options, action = "/listing" }: VehicleFiltersProps) {
   return (
-    <form method="GET" action="/listing" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-1 lg:gap-4">
+    <form method="GET" action={action} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-1 lg:gap-4">
       <div className="col-span-2 sm:col-span-3 lg:col-span-1">
         <label htmlFor="vehicle-search-q" className="mb-1.5 block text-xs font-semibold text-neutral-600">
           Keyword
@@ -94,6 +99,15 @@ export function VehicleFilters({ filters, options }: VehicleFiltersProps) {
 }
 
 function FilterSelect({ label, name, value, options }: { label: string; name: string; value: string; options: string[] }) {
+  // A currently-active filter value can be legitimately absent from
+  // `options` (derived only from what real listings actually have right
+  // now) — e.g. an SEO landing page for a brand/model with zero current
+  // matches. Without this, the browser silently falls back to the
+  // unselected "All {label}" option, and re-submitting the form (e.g. just
+  // to change Min Price) would then drop this filter entirely rather than
+  // just losing the page's pretty URL. Adding it explicitly keeps the
+  // select truthful to what's actually filtered.
+  const allOptions = value && !options.includes(value) ? [value, ...options] : options;
   return (
     <div>
       <label htmlFor={`vehicle-filter-${name}`} className="mb-1.5 block text-xs font-semibold text-neutral-600">
@@ -101,7 +115,7 @@ function FilterSelect({ label, name, value, options }: { label: string; name: st
       </label>
       <select id={`vehicle-filter-${name}`} name={name} defaultValue={value} className={selectClassName}>
         <option value="">All {label}</option>
-        {options.map((option) => (
+        {allOptions.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>

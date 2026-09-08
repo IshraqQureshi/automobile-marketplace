@@ -52,7 +52,7 @@ export default async function BrandListingPage({ params, searchParams }: BrandLi
       options={options}
       vehicles={vehicles}
       totalCount={totalCount}
-      sortSelectBasePath={`/listing/${brand}`}
+      basePath={`/listing/${brand}`}
       buildPaginationHref={(page) => {
         // make deliberately omitted here — it's already encoded in the
         // path (/listing/{brand}), so re-adding it as a query param would

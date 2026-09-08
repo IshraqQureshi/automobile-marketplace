@@ -48,7 +48,7 @@ export default async function FuelTypeListingPage({ params, searchParams }: Fuel
       options={options}
       vehicles={vehicles}
       totalCount={totalCount}
-      sortSelectBasePath={`/listing/fuel/${fuelType}`}
+      basePath={`/listing/fuel/${fuelType}`}
       buildPaginationHref={(page) => {
         const params = vehicleSearchFiltersToParams({ ...filters, fuelType: "", page });
         const query = params.toString();

@@ -72,8 +72,60 @@ test("a curated brand with zero current listings still renders a real page, not 
 });
 
 test("an unresolvable brand slug renders not-found", async ({ page }) => {
-  await page.goto("/listing/not-a-real-brand-xyz", { waitUntil: "networkidle" });
+  const response = await page.goto("/listing/not-a-real-brand-xyz", { waitUntil: "networkidle" });
+  // KNOWN LIMITATION (pre-existing, app-wide — not introduced by this PR):
+  // the root src/app/loading.tsx Suspense boundary flushes a 200 response
+  // before a nested notFound() can turn into a real HTTP 404 (same gap
+  // documented on the vehicle-detail page's own canonicalize-redirect,
+  // B-009). The visible content is correct (the real not-found UI renders),
+  // but a crawler sees 200, not 404, for every notFound() page in this app,
+  // these new SEO routes included.
+  expect(response?.status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+});
+
+test("an unresolvable model slug under a valid brand renders not-found", async ({ page }) => {
+  await page.goto("/listing/toyota/not-a-real-model-xyz", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+});
+
+test("an unresolvable body type slug renders not-found", async ({ page }) => {
+  await page.goto("/listing/type/not-a-real-type-xyz", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+});
+
+test("an unresolvable fuel type slug renders not-found", async ({ page }) => {
+  await page.goto("/listing/fuel/not-a-real-fuel-xyz", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+});
+
+test("a curated model with zero current listings still renders a real page, not a 404", async ({ page }) => {
+  // Camry is seeded in the models catalog (under Toyota) but the seed
+  // script's own Toyota vehicles are Hilux/Land Cruiser Prado, not Camry —
+  // same "curated but currently empty" case as the Porsche brand test
+  // above, one level deeper.
+  const response = await page.goto("/listing/toyota/camry", { waitUntil: "networkidle" });
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { name: "Toyota Camry for Sale in Kenya" })).toBeVisible();
+  await expect(page.getByText("No vehicles match your search")).toBeVisible();
+});
+
+test("submitting the filter form on an SEO landing page with zero current listings preserves its own filter", async ({ page }) => {
+  // Regression test for a real bug found in code review: the "Model"
+  // <select> didn't include "Camry" as an option (derived only from real
+  // current listings), so its defaultValue silently fell back to unselected
+  // — and because the filter form used to always submit to a hardcoded
+  // /listing, resubmitting it (e.g. to change price) silently dropped the
+  // Camry filter entirely, not just the pretty URL.
+  await page.goto("/listing/toyota/camry", { waitUntil: "networkidle" });
+  await expect(page.locator("#vehicle-filter-make")).toHaveValue("Toyota");
+  await expect(page.locator("#vehicle-filter-model")).toHaveValue("Camry");
+
+  await page.locator("#vehicle-min-price").fill("100000");
+  await page.getByRole("button", { name: "Apply Filters" }).click();
+  await page.waitForURL(/\/listing\/toyota\/camry\?/);
+  expect(page.url()).toContain("make=Toyota");
+  expect(page.url()).toContain("model=Camry");
 });
 
 test("the old flat query-string URLs still work (not broken by the SEO route change)", async ({ page }) => {

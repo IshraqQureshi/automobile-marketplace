@@ -11,10 +11,13 @@ interface VehicleListingResultsProps {
   options: VehicleFilterOptions;
   vehicles: VehicleWithShowroom[];
   totalCount: number;
-  // "/listing" for the flat filter UI, or "/listing/{brand-slug}" for the
-  // SEO-friendly per-brand landing page — passed through to VehicleSortSelect
-  // so an immediate sort change navigates relative to the right base path.
-  sortSelectBasePath: string;
+  // "/listing" for the flat filter UI, or the current SEO landing page's
+  // own path (e.g. "/listing/toyota/camry") — passed through to both
+  // VehicleSortSelect (so an immediate sort change navigates relative to
+  // this page, not back to flat /listing) and VehicleFilters (so
+  // submitting the filter form stays on this page's own filter context
+  // instead of silently dropping whichever facet(s) the path encodes).
+  basePath: string;
   buildPaginationHref: (page: number) => string;
 }
 
@@ -29,18 +32,18 @@ export function VehicleListingResults({
   options,
   vehicles,
   totalCount,
-  sortSelectBasePath,
+  basePath,
   buildPaginationHref,
 }: VehicleListingResultsProps) {
   return (
     <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[260px_1fr]">
       <aside>
-        <VehicleFilters filters={filters} options={options} />
+        <VehicleFilters filters={filters} options={options} action={basePath} />
       </aside>
 
       <div>
         <div className="mb-5 flex justify-end">
-          <VehicleSortSelect value={filters.sort} basePath={sortSelectBasePath} />
+          <VehicleSortSelect value={filters.sort} basePath={basePath} />
         </div>
 
         {vehicles.length === 0 ? (

@@ -31,7 +31,7 @@ export default async function VehiclesPage({ searchParams }: VehiclesPageProps) 
       options={options}
       vehicles={vehicles}
       totalCount={totalCount}
-      sortSelectBasePath="/listing"
+      basePath="/listing"
       buildPaginationHref={(page) => {
         const params = vehicleSearchFiltersToParams({ ...filters, page });
         const query = params.toString();
