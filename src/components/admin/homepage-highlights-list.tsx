@@ -51,9 +51,11 @@ interface HighlightFormState {
 
 const BLANK_FORM: HighlightFormState = { title: "", platform: "TIKTOK", videoUrl: "", sortOrder: "0", isActive: true };
 
+export type SocialLinksState = Record<keyof typeof socialLinkFieldSchemas, string>;
+
 interface HomepageHighlightsListProps {
   items: HighlightItem[];
-  socialLinks: { tiktokProfileUrl: string; youtubeChannelUrl: string };
+  socialLinks: SocialLinksState;
   onCreate: (formData: FormData) => Promise<{ error?: string }>;
   onUpdate: (formData: FormData) => Promise<{ error?: string }>;
   onDelete: (id: string) => Promise<{ error?: string }>;
@@ -325,31 +327,40 @@ export function HomepageHighlightsList({ items, socialLinks, onCreate, onUpdate,
   );
 }
 
+const SOCIAL_LINK_FIELDS: { key: keyof SocialLinksState; label: string; id: string; placeholder: string }[] = [
+  { key: "facebookUrl", label: "Facebook page URL", id: "facebook-url", placeholder: "https://www.facebook.com/harakagari" },
+  { key: "xUrl", label: "X (Twitter) profile URL", id: "x-url", placeholder: "https://x.com/harakagari" },
+  { key: "instagramUrl", label: "Instagram profile URL", id: "instagram-url", placeholder: "https://www.instagram.com/harakagari" },
+  { key: "youtubeChannelUrl", label: "YouTube channel URL", id: "youtube-channel-url", placeholder: "https://www.youtube.com/@harakagari" },
+  { key: "tiktokProfileUrl", label: "TikTok profile URL", id: "tiktok-profile-url", placeholder: "https://www.tiktok.com/@harakagari" },
+];
+
 function SocialLinksCard({
   socialLinks,
   onUpdateSocialLinks,
 }: {
-  socialLinks: { tiktokProfileUrl: string; youtubeChannelUrl: string };
+  socialLinks: SocialLinksState;
   onUpdateSocialLinks: (formData: FormData) => Promise<{ error?: string }>;
 }) {
   const toast = useToast();
   const { validate, errorFor } = useFieldValidation(socialLinkFieldSchemas);
-  const [tiktokProfileUrl, setTiktokProfileUrl] = useState(socialLinks.tiktokProfileUrl);
-  const [youtubeChannelUrl, setYoutubeChannelUrl] = useState(socialLinks.youtubeChannelUrl);
+  const [values, setValues] = useState<SocialLinksState>(socialLinks);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function setField(key: keyof SocialLinksState, value: string) {
+    setValues((prev) => ({ ...prev, [key]: value }));
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
 
     let hasError = false;
-    for (const [field, value] of [
-      ["tiktokProfileUrl", tiktokProfileUrl],
-      ["youtubeChannelUrl", youtubeChannelUrl],
-    ] as const) {
-      if (value && !socialLinkFieldSchemas[field].safeParse(value).success) {
-        validate(field, value);
+    for (const { key } of SOCIAL_LINK_FIELDS) {
+      const value = values[key];
+      if (value && !socialLinkFieldSchemas[key].safeParse(value).success) {
+        validate(key, value);
         hasError = true;
       }
     }
@@ -357,8 +368,7 @@ function SocialLinksCard({
 
     startTransition(async () => {
       const formData = new FormData();
-      formData.set("tiktokProfileUrl", tiktokProfileUrl);
-      formData.set("youtubeChannelUrl", youtubeChannelUrl);
+      for (const { key } of SOCIAL_LINK_FIELDS) formData.set(key, values[key]);
       const result = await onUpdateSocialLinks(formData);
       if (result.error) {
         setFormError(result.error);
@@ -372,36 +382,27 @@ function SocialLinksCard({
     <form onSubmit={handleSubmit} noValidate className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
       <h2 className="font-display text-lg font-semibold text-neutral-900">Social links</h2>
       <p className="mt-0.5 text-sm text-neutral-500">
-        Linked from the &ldquo;@HarakaGari&rdquo; buttons on the homepage&rsquo;s Watch &amp; Discover / Reviews &amp; Guides sections.
+        Shown as the footer&rsquo;s &ldquo;Follow us&rdquo; icons on every page, plus the homepage&rsquo;s Watch &amp; Discover / Reviews &amp; Guides
+        &ldquo;@HarakaGari&rdquo; buttons (TikTok/YouTube only). Leave a field blank to hide that icon.
       </p>
 
       {formError && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <FieldLabel htmlFor="tiktok-profile-url">TikTok profile URL</FieldLabel>
-          <Input
-            id="tiktok-profile-url"
-            value={tiktokProfileUrl}
-            onChange={(e) => setTiktokProfileUrl(e.target.value)}
-            onBlur={(e) => validate("tiktokProfileUrl", e.target.value)}
-            placeholder="https://www.tiktok.com/@harakagari"
-            error={!!errorFor("tiktokProfileUrl")}
-          />
-          {errorFor("tiktokProfileUrl") && <p className="mt-1 text-sm text-red-600">{errorFor("tiktokProfileUrl")}</p>}
-        </div>
-        <div>
-          <FieldLabel htmlFor="youtube-channel-url">YouTube channel URL</FieldLabel>
-          <Input
-            id="youtube-channel-url"
-            value={youtubeChannelUrl}
-            onChange={(e) => setYoutubeChannelUrl(e.target.value)}
-            onBlur={(e) => validate("youtubeChannelUrl", e.target.value)}
-            placeholder="https://www.youtube.com/@harakagari"
-            error={!!errorFor("youtubeChannelUrl")}
-          />
-          {errorFor("youtubeChannelUrl") && <p className="mt-1 text-sm text-red-600">{errorFor("youtubeChannelUrl")}</p>}
-        </div>
+        {SOCIAL_LINK_FIELDS.map(({ key, label, id, placeholder }) => (
+          <div key={key}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            <Input
+              id={id}
+              value={values[key]}
+              onChange={(e) => setField(key, e.target.value)}
+              onBlur={(e) => validate(key, e.target.value)}
+              placeholder={placeholder}
+              error={!!errorFor(key)}
+            />
+            {errorFor(key) && <p className="mt-1 text-sm text-red-600">{errorFor(key)}</p>}
+          </div>
+        ))}
       </div>
 
       <button

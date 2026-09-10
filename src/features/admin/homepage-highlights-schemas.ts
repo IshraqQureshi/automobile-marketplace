@@ -21,4 +21,7 @@ export const highlightFieldSchemas = {
 export const socialLinkFieldSchemas = {
   tiktokProfileUrl: z.string().trim().url("Enter a valid URL").or(z.literal("")),
   youtubeChannelUrl: z.string().trim().url("Enter a valid URL").or(z.literal("")),
+  facebookUrl: z.string().trim().url("Enter a valid URL").or(z.literal("")),
+  instagramUrl: z.string().trim().url("Enter a valid URL").or(z.literal("")),
+  xUrl: z.string().trim().url("Enter a valid URL").or(z.literal("")),
 };

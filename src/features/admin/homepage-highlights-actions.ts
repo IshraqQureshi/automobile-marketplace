@@ -157,16 +157,24 @@ export interface UpdateSocialLinksResult {
   error?: string;
 }
 
-// Two scalar homepage settings stored in the existing system_settings
-// catalog (category 'homepage') rather than a dedicated table — see that
-// migration's own comment.
+// Five scalar homepage/social-profile settings stored in the existing
+// system_settings catalog (category 'homepage') rather than a dedicated
+// table — see that migration's own comment. Also read by the site footer's
+// "Follow us" section ((site)/layout.tsx), not just the homepage's own
+// Watch & Discover/Reviews & Guides sections.
 export async function updateSocialLinksAction(formData: FormData): Promise<UpdateSocialLinksResult> {
   const parsed = {
     tiktokProfileUrl: socialLinkFieldSchemas.tiktokProfileUrl.safeParse(formData.get("tiktokProfileUrl")),
     youtubeChannelUrl: socialLinkFieldSchemas.youtubeChannelUrl.safeParse(formData.get("youtubeChannelUrl")),
+    facebookUrl: socialLinkFieldSchemas.facebookUrl.safeParse(formData.get("facebookUrl")),
+    instagramUrl: socialLinkFieldSchemas.instagramUrl.safeParse(formData.get("instagramUrl")),
+    xUrl: socialLinkFieldSchemas.xUrl.safeParse(formData.get("xUrl")),
   };
   if (!parsed.tiktokProfileUrl.success) return { error: parsed.tiktokProfileUrl.error.issues[0]?.message ?? "Invalid TikTok URL." };
   if (!parsed.youtubeChannelUrl.success) return { error: parsed.youtubeChannelUrl.error.issues[0]?.message ?? "Invalid YouTube URL." };
+  if (!parsed.facebookUrl.success) return { error: parsed.facebookUrl.error.issues[0]?.message ?? "Invalid Facebook URL." };
+  if (!parsed.instagramUrl.success) return { error: parsed.instagramUrl.error.issues[0]?.message ?? "Invalid Instagram URL." };
+  if (!parsed.xUrl.success) return { error: parsed.xUrl.error.issues[0]?.message ?? "Invalid X URL." };
 
   const supabase = await createClient();
   const {
@@ -182,6 +190,9 @@ export async function updateSocialLinksAction(formData: FormData): Promise<Updat
   const updates = [
     { key: "homepage_tiktok_profile_url", value: parsed.tiktokProfileUrl.data },
     { key: "homepage_youtube_channel_url", value: parsed.youtubeChannelUrl.data },
+    { key: "homepage_facebook_url", value: parsed.facebookUrl.data },
+    { key: "homepage_instagram_url", value: parsed.instagramUrl.data },
+    { key: "homepage_x_url", value: parsed.xUrl.data },
   ];
 
   for (const { key, value } of updates) {
