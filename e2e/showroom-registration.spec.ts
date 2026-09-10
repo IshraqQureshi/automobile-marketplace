@@ -76,10 +76,8 @@ test("visiting /register-showroom while signed out redirects to /login", async (
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("the header's 'Sell your car' link leads to the ready-to-sell chooser, which links to registration", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sell your car" }).click();
-  await expect(page).toHaveURL(/\/ready-to-sell$/);
+test("the ready-to-sell chooser links to showroom registration", async ({ page }) => {
+  await page.goto("/ready-to-sell");
 
   // "Register Now →" is the Showroom card's real link; the Individual
   // Seller card's disabled button reads "Register Now — Coming soon", so

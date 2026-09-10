@@ -18,11 +18,6 @@ interface HeroSearchProps {
 const numberFormatter = new Intl.NumberFormat("en-KE");
 
 /**
- * Search is visually present per the design but not yet wired to a real
- * destination — public vehicle search/listing (MKT-002) doesn't exist yet,
- * same "designed but dependency not ready" reasoning as the header's own
- * disabled Brands/Model/Type nav and search icon (src/components/layout/header.tsx).
- *
  * The certified-showrooms marquee is part of this same section (not a
  * separate component) — it's visually one continuous dark band with the
  * search banner above it, confirmed against the real rendered design.
@@ -44,28 +39,35 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
           Search across {numberFormatter.format(showroomCount)}+ certified showrooms — {numberFormatter.format(vehicleCount)}+ verified listings.
         </p>
 
-        <div className="mx-auto flex max-w-2xl flex-col gap-2 sm:flex-row sm:gap-0 sm:rounded-md sm:shadow-lg">
+        {/* Plain GET form straight to /listing's own search (same `q` param
+            /listing's own filter form and VehicleSortSelect already use) —
+            no client JS needed, and it stays correct if /listing's search
+            logic ever changes since this doesn't duplicate any of it. */}
+        <form
+          method="GET"
+          action="/listing"
+          role="search"
+          className="mx-auto flex max-w-2xl flex-col gap-2 sm:flex-row sm:gap-0 sm:rounded-md sm:shadow-lg"
+        >
           <div className="flex flex-1 items-stretch overflow-hidden rounded-md sm:rounded-l-md sm:rounded-r-none">
             <div className="flex items-center bg-white pr-2 pl-4 text-neutral-400">
               <SearchIcon />
             </div>
             <input
               type="search"
-              disabled
-              title="Vehicle search — coming soon"
-              placeholder="Search by make, model, or showroom…"
-              className="w-full bg-white py-3.5 pr-3 pl-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 disabled:cursor-not-allowed"
+              name="q"
+              aria-label="Search vehicles by make, model, or keyword"
+              placeholder="Search by make, model, or keyword…"
+              className="w-full bg-white py-3.5 pr-3 pl-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
             />
           </div>
           <button
-            type="button"
-            disabled
-            title="Vehicle search — coming soon"
-            className="rounded-md bg-brand-dark px-7 py-3.5 text-sm font-semibold text-white sm:rounded-l-none sm:rounded-r-md disabled:cursor-not-allowed disabled:opacity-90"
+            type="submit"
+            className="rounded-md bg-brand-dark px-7 py-3.5 text-sm font-semibold text-white sm:rounded-l-none sm:rounded-r-md hover:bg-brand-dark/90"
           >
             Search
           </button>
-        </div>
+        </form>
 
         <div className="flex items-center justify-center pt-6 pb-2">
           <Image src="/aresa-logo.jpg" alt="Powered by Arresa" width={105} height={45} className="rounded-[3px]" />
