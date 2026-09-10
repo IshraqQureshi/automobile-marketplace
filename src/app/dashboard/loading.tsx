@@ -6,7 +6,7 @@
 // feedback until the whole destination page's data fetch finished.
 export default function DashboardLoading() {
   return (
-    <div className="flex flex-1 items-center justify-center" role="status" aria-label="Loading">
+    <div className="flex min-h-[60vh] flex-1 items-center justify-center lg:min-h-0" role="status" aria-label="Loading">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-brand" />
     </div>
   );
