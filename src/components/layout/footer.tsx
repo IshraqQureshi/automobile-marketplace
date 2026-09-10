@@ -16,6 +16,14 @@ interface FooterProps {
 
 const FOOTER_COLUMN_TITLES = { brands: "Brands", models: "Model", types: "Type" } as const;
 
+// The original design shipped exactly 10 static items per column — capping
+// here keeps that shape as the real catalog grows (models in particular
+// grows fastest, many-per-brand) rather than letting a footer column turn
+// into an unbounded wall of links. The header's own nav dropdowns solve the
+// same growth problem with a scrollable max-height instead, since a
+// dropdown can scroll where a footer shouldn't.
+const FOOTER_COLUMN_LIMIT = 10;
+
 const SOCIAL_PLATFORMS = [
   { key: "facebookUrl", label: "Facebook", icon: FacebookIcon },
   { key: "xUrl", label: "X (Twitter)", icon: XIcon },
@@ -28,9 +36,9 @@ export function Footer({ navCatalog, socialLinks }: FooterProps) {
   // Real SEO-friendly links now (previously static inert text) — same
   // brand/model/type catalog + href-building logic the header's own nav
   // dropdowns use, so the two can't silently resolve differently.
-  const brandLinks = buildBrandCatalogLinks(navCatalog.brands);
-  const modelLinks = buildModelCatalogLinks(navCatalog.models);
-  const typeLinks = buildTypeCatalogLinks(navCatalog.types);
+  const brandLinks = buildBrandCatalogLinks(navCatalog.brands).slice(0, FOOTER_COLUMN_LIMIT);
+  const modelLinks = buildModelCatalogLinks(navCatalog.models).slice(0, FOOTER_COLUMN_LIMIT);
+  const typeLinks = buildTypeCatalogLinks(navCatalog.types).slice(0, FOOTER_COLUMN_LIMIT);
 
   const activeSocialLinks = SOCIAL_PLATFORMS.filter((platform) => socialLinks[platform.key]);
 
@@ -72,6 +80,12 @@ export function Footer({ navCatalog, socialLinks }: FooterProps) {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-white/50 sm:flex-row sm:px-6">
           <span>© {new Date().getFullYear()} HarakaGari by Arresa. All rights reserved.</span>
+          {/* "Showrooms" and "Sell your car" were deliberately removed from
+              here per direct request — both pages stay live, in sitemap.ts,
+              and reachable via direct URL/search (and /showrooms via the
+              showroom-detail breadcrumb, /register-showroom straight from
+              the header's own Profile menu) — they're just not linked from
+              this footer. Don't re-add them without checking that request. */}
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-white/80">
               Privacy Policy
