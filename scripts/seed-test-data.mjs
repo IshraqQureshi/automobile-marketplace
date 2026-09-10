@@ -32,9 +32,22 @@ if (!isLocalUrl && process.env.SEED_TEST_DATA_ALLOW_REMOTE !== "true") {
 }
 
 const ADMIN_EMAIL = "admin@harakagari.local";
-const ADMIN_PASSWORD = "TestingAdmin!123";
 const OWNER_EMAIL = "owner@harakagari.local";
-const OWNER_PASSWORD = "TestingOwner!123";
+// Hardcoded defaults are fine for local dev (this repo is public on
+// GitHub, so they're already effectively public) — but a run against a
+// real remote database (SEED_TEST_DATA_ALLOW_REMOTE=true) must not reset
+// an existing admin/owner account to a publicly-known password (ensureUser
+// below calls updateUserById with whatever password it's given, even for a
+// user that already exists — see scripts/seed-full-marketplace.mjs's own
+// identical guard, added after this exact class of bug was found live).
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || "TestingAdmin!123";
+const OWNER_PASSWORD = process.env.SEED_OWNER_PASSWORD || "TestingOwner!123";
+
+if (!isLocalUrl && (!process.env.SEED_ADMIN_PASSWORD || !process.env.SEED_OWNER_PASSWORD)) {
+  console.error("Refusing to run against a remote database with the hardcoded default passwords (they're public — this repo is public on GitHub).");
+  console.error("Set SEED_ADMIN_PASSWORD and SEED_OWNER_PASSWORD to fresh, non-committed values first.");
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
