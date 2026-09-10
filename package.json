@@ -14,7 +14,8 @@
     "test:e2e": "node --env-file=.env.local scripts/test-e2e.mjs",
     "db:types": "supabase gen types typescript --local | grep -v '^Connecting to db' > src/types/database.ts",
     "seed:admin": "node --env-file=.env.local scripts/seed-admin.mjs",
-    "seed:test-data": "node --env-file=.env.local scripts/seed-test-data.mjs"
+    "seed:test-data": "node --env-file=.env.local scripts/seed-test-data.mjs",
+    "seed:marketplace": "node --env-file=.env.local scripts/seed-full-marketplace.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
