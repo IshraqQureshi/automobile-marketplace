@@ -4,9 +4,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOutAction } from "@/features/auth/actions";
-import { FUEL_TYPES } from "@/features/vehicle/schemas";
-import { slugify } from "@/features/vehicle/slug";
+import {
+  buildBrandCatalogLinks,
+  buildModelCatalogLinks,
+  buildTypeCatalogLinks,
+  EMPTY_NAV_CATALOG,
+  type CatalogLinkItem,
+  type NavCatalog,
+} from "@/features/vehicle/nav-catalog-links";
 import { cn } from "@/lib/utils";
+
+export type { NavCatalog, NavCatalogItem } from "@/features/vehicle/nav-catalog-links";
 
 export interface HeaderUser {
   email: string;
@@ -18,29 +26,12 @@ export interface HeaderUser {
   profileLabel: string;
 }
 
-export interface NavCatalogItem {
-  id: string;
-  name: string;
-}
-
-export interface NavCatalog {
-  brands: NavCatalogItem[];
-  models: (NavCatalogItem & { brandName: string | null })[];
-  types: NavCatalogItem[];
-}
-
 interface HeaderProps {
   user?: HeaderUser | null;
   navCatalog?: NavCatalog;
 }
 
-const EMPTY_NAV_CATALOG: NavCatalog = { brands: [], models: [], types: [] };
-
-interface DropdownLinkItem {
-  id: string;
-  label: string;
-  href: string;
-}
+type DropdownLinkItem = CatalogLinkItem;
 
 /** Click-outside-to-close (+ Escape-to-close) state, shared by the Profile menu and each nav dropdown. */
 function useDropdown() {
@@ -72,51 +63,11 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { open: profileMenuOpen, setOpen: setProfileMenuOpen, ref: profileMenuRef } = useDropdown();
 
-  // /listing/{brand-slug} is the SEO-friendly landing page (vs.
-  // /listing?make=Toyota) — same slugify() vehicle detail pages already use
-  // for their own brand URL segment.
-  const brandItems = useMemo<DropdownLinkItem[]>(
-    () => navCatalog.brands.map((b) => ({ id: b.id, label: b.name, href: `/listing/${slugify(b.name)}` })),
-    [navCatalog.brands],
-  );
-  // /listing/{brand-slug}/{model-slug} when the model's brand is known (the
-  // models catalog table is FK'd to brands, so this is normally always
-  // true) — falls back to the flat query form on the rare row with no
-  // resolvable brand, rather than link to a URL /listing/[brand]/[model]
-  // can't actually resolve.
-  const modelItems = useMemo<DropdownLinkItem[]>(
-    () =>
-      navCatalog.models.map((m) => ({
-        id: m.id,
-        label: m.brandName ? `${m.brandName} ${m.name}` : m.name,
-        href: m.brandName
-          ? `/listing/${slugify(m.brandName)}/${slugify(m.name)}`
-          : `/listing?model=${encodeURIComponent(m.name)}`,
-      })),
-    [navCatalog.models],
-  );
-  // The vehicle_types catalog table (admin-managed, shared with the "add
-  // vehicle" form) mixes two different concepts under one flat list: real
-  // body shapes (Sedan, SUV, Hatchback, ...) alongside FUEL_TYPES enum
-  // values (Diesel/Hybrid/Electric today) — there's no schema-level
-  // distinction between them, and no casing constraint on catalog_name
-  // either (an admin could enter "diesel"), so match case-insensitively
-  // rather than relying on an admin always typing the exact enum casing.
-  // A catalog entry whose name is one of FUEL_TYPES routes to the
-  // /listing/fuel/{slug} SEO page; everything else routes to
-  // /listing/type/{slug} — the same split resolveCanonicalBodyType/
-  // resolveCanonicalFuelType (src/features/vehicle/listing-slugs.ts) make on
-  // the receiving end, so a link built here always resolves there.
-  const canonicalFuelTypeByLowercase = useMemo(() => new Map(FUEL_TYPES.map((f) => [f.toLowerCase(), f])), []);
-  const typeItems = useMemo<DropdownLinkItem[]>(
-    () =>
-      navCatalog.types.map((t) => {
-        const canonicalFuelType = canonicalFuelTypeByLowercase.get(t.name.toLowerCase());
-        const href = canonicalFuelType ? `/listing/fuel/${slugify(canonicalFuelType)}` : `/listing/type/${slugify(t.name)}`;
-        return { id: t.id, label: t.name, href };
-      }),
-    [navCatalog.types, canonicalFuelTypeByLowercase],
-  );
+  // Link-building itself lives in nav-catalog-links.ts, shared with the
+  // footer's own Brands/Model/Type columns — only the memoization is local.
+  const brandItems = useMemo(() => buildBrandCatalogLinks(navCatalog.brands), [navCatalog.brands]);
+  const modelItems = useMemo(() => buildModelCatalogLinks(navCatalog.models), [navCatalog.models]);
+  const typeItems = useMemo(() => buildTypeCatalogLinks(navCatalog.types), [navCatalog.types]);
 
   return (
     <header className="relative z-20 border-b border-neutral-200 bg-white">

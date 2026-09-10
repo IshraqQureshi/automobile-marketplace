@@ -12,10 +12,13 @@ export const metadata: Metadata = {
 export default async function AdminHighlightsPage() {
   const supabase = await createClient();
 
-  const [{ data: highlights }, tiktokProfileUrl, youtubeChannelUrl] = await Promise.all([
+  const [{ data: highlights }, tiktokProfileUrl, youtubeChannelUrl, facebookUrl, instagramUrl, xUrl] = await Promise.all([
     supabase.from("homepage_highlights").select("id, platform, title, video_url, thumbnail_storage_path, sort_order, is_active").order("sort_order"),
     getSystemSettingString(supabase, "homepage_tiktok_profile_url"),
     getSystemSettingString(supabase, "homepage_youtube_channel_url"),
+    getSystemSettingString(supabase, "homepage_facebook_url"),
+    getSystemSettingString(supabase, "homepage_instagram_url"),
+    getSystemSettingString(supabase, "homepage_x_url"),
   ]);
 
   const items: HighlightItem[] = (highlights ?? []).map((row) => ({
@@ -34,7 +37,7 @@ export default async function AdminHighlightsPage() {
       <main className="flex-1 px-7 py-6">
         <HomepageHighlightsList
           items={items}
-          socialLinks={{ tiktokProfileUrl, youtubeChannelUrl }}
+          socialLinks={{ tiktokProfileUrl, youtubeChannelUrl, facebookUrl, instagramUrl, xUrl }}
           onCreate={createHighlightAction}
           onUpdate={updateHighlightAction}
           onDelete={deleteHighlightAction}

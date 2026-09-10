@@ -160,6 +160,42 @@ test("admin can update the TikTok/YouTube social links, and the homepage's butto
   await expect(page.getByRole("link", { name: "@HarakaGari" }).first()).toHaveAttribute("href", tiktokUrl);
 });
 
+test("admin can set Facebook/X/Instagram links, and the footer's Follow Us icons reflect them", async ({ page }) => {
+  const unique = Date.now();
+  const facebookUrl = `https://www.facebook.com/e2e-test-${unique}`;
+  const xUrl = `https://x.com/e2e-test-${unique}`;
+  const instagramUrl = `https://www.instagram.com/e2e-test-${unique}`;
+
+  await loginAsFixtureAdmin(page);
+  await page.goto("/admin/highlights");
+
+  await page.locator("#facebook-url").fill(facebookUrl);
+  await page.locator("#x-url").fill(xUrl);
+  await page.locator("#instagram-url").fill(instagramUrl);
+  await page.getByRole("button", { name: "Save links" }).click();
+  await expect(page.getByText("Social links updated.")).toBeVisible();
+
+  await page.goto("/");
+  const footer = page.locator("footer");
+  await expect(footer.getByRole("link", { name: "Facebook" })).toHaveAttribute("href", facebookUrl);
+  await expect(footer.getByRole("link", { name: "X (Twitter)" })).toHaveAttribute("href", xUrl);
+  await expect(footer.getByRole("link", { name: "Instagram" })).toHaveAttribute("href", instagramUrl);
+  await expect(footer.getByRole("link", { name: "Showrooms" })).toHaveCount(0);
+  await expect(footer.getByRole("link", { name: "Sell your car" })).toHaveCount(0);
+});
+
+test("the footer's Brands/Model/Type columns link to real SEO listing pages", async ({ page }) => {
+  await page.goto("/");
+  const footer = page.locator("footer");
+  const brandLink = footer.getByRole("link").filter({ hasText: /^(BMW|Mercedes-Benz|Audi|Toyota|Porsche|Tesla|Honda|Hyundai|Volkswagen|Range Rover)$/ });
+  await expect(brandLink.first()).toBeVisible();
+  const href = await brandLink.first().getAttribute("href");
+  expect(href).toMatch(/^\/listing\//);
+
+  await brandLink.first().click();
+  await expect(page).toHaveURL(/\/listing\//);
+});
+
 test("admin can delete a highlight, removing it from the homepage", async ({ page }) => {
   const unique = Date.now();
   const title = `E2E Highlight Delete ${unique}`;

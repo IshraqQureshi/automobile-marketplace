@@ -1,7 +1,9 @@
-import { Header, type NavCatalog } from "@/components/layout/header";
+import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { resolveLoggedInHomePath } from "@/features/auth/actions";
+import type { NavCatalog } from "@/features/vehicle/nav-catalog-links";
 import { createClient } from "@/lib/supabase/server";
+import { getSystemSettingString } from "@/lib/system-settings";
 
 interface SiteLayoutProps {
   children: React.ReactNode;
@@ -62,14 +64,33 @@ async function getNavCatalog(): Promise<NavCatalog> {
   };
 }
 
+/**
+ * The footer's "Follow us" links — admin-editable (see
+ * /admin/highlights's "Social links" card, same system_settings rows the
+ * homepage's own TikTok/YouTube "Watch & Discover"/"Reviews & Guides"
+ * sections already read). "" means not configured yet, which the footer
+ * treats as "don't show this icon" rather than a dead link.
+ */
+async function getFooterSocialLinks() {
+  const supabase = await createClient();
+  const [facebookUrl, instagramUrl, xUrl, youtubeUrl, tiktokUrl] = await Promise.all([
+    getSystemSettingString(supabase, "homepage_facebook_url"),
+    getSystemSettingString(supabase, "homepage_instagram_url"),
+    getSystemSettingString(supabase, "homepage_x_url"),
+    getSystemSettingString(supabase, "homepage_youtube_channel_url"),
+    getSystemSettingString(supabase, "homepage_tiktok_profile_url"),
+  ]);
+  return { facebookUrl, instagramUrl, xUrl, youtubeUrl, tiktokUrl };
+}
+
 export default async function SiteLayout({ children }: SiteLayoutProps) {
-  const [headerUser, navCatalog] = await Promise.all([getHeaderUser(), getNavCatalog()]);
+  const [headerUser, navCatalog, socialLinks] = await Promise.all([getHeaderUser(), getNavCatalog(), getFooterSocialLinks()]);
 
   return (
     <div className="flex min-h-screen flex-col">
       <Header user={headerUser} navCatalog={navCatalog} />
       <div className="flex-1">{children}</div>
-      <Footer />
+      <Footer navCatalog={navCatalog} socialLinks={socialLinks} />
     </div>
   );
 }
