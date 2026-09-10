@@ -17,14 +17,18 @@
 //
 // Same safety rules as the other scripts/seed-*.mjs: local Supabase only
 // unless explicitly overridden, credentials never written to a file, only
-// printed once to the terminal. Real vehicle/showroom photos are
-// deliberately NOT uploaded (no real photo assets exist to seed with, and
-// fabricating fake ones would misrepresent real inventory) — the UI's
-// existing no-photo fallback (a placeholder car icon / initials avatar)
-// renders correctly either way, already covered by this codebase's own
-// tests. Video URLs are structurally valid but plausible placeholders
-// (same convention e2e/homepage-highlights.spec.ts already uses for its
-// own TikTok/YouTube test fixtures), not real third-party content.
+// printed once to the terminal. Vehicle photos, showroom logos, and the
+// homepage highlight thumbnail are real photos fetched from Unsplash's
+// direct CDN (images.unsplash.com/photo-<id> — the old source.unsplash.com
+// redirect service is deprecated) using a small pool of known, verified
+// photo ids, downloaded once and re-uploaded to the same local Supabase
+// Storage buckets/paths the app itself uses (vehicle-media, showroom-logos,
+// homepage-highlights) — free to use under the Unsplash License. Brand
+// logos (BMW, Toyota, etc.) come from real local image files placed under
+// /brands-logo instead, uploaded to the brand-logos bucket. Video URLs are
+// structurally valid but plausible placeholders (same convention
+// e2e/homepage-highlights.spec.ts already uses for its own TikTok/YouTube
+// test fixtures), not real third-party content.
 //
 // Usage:
 //   npm run seed:marketplace
@@ -115,6 +119,113 @@ const BODY_TYPES = ["Sedan", "SUV", "Coupe", "Hatchback", "Pickup", "Convertible
 const FUEL_TYPES = ["Petrol", "Diesel", "Hybrid", "Electric", "LPG"];
 const TRANSMISSIONS = ["Manual", "Automatic", "CVT"];
 const COLORS = ["Pearl White", "Jet Black", "Silver", "Grey", "Navy Blue", "Maroon", "Champagne Gold"];
+
+// Real Unsplash photo ids (verified live against images.unsplash.com before
+// writing this list — a nonexistent id 404s on that CDN, so every id below
+// is a genuine, currently-served photo, not a guess). Reused across many
+// vehicles/showrooms — a dev seed doesn't need a unique photo per row, and
+// caching each id's bytes once (below) keeps this to a couple dozen network
+// calls no matter how many vehicles get seeded.
+const VEHICLE_PHOTO_IDS = [
+  "1494905998402-395d579af36f",
+  "1503376780353-7e6692767b70",
+  "1552519507-da3b142c6e3d",
+  "1494976388531-d1058494cdd8",
+  "1533473359331-0135ef1b58bf",
+  "1583121274602-3e2820c69888",
+  "1605559911160-a3d95d213904",
+  "1493238792000-8113da705763",
+  "1541899481282-d53bffe3c35d",
+  "1571607388263-1044f9ea01dd",
+  "1502877338535-766e1452684a",
+  "1580273916550-e323be2ae537",
+  "1592840062661-a5a7f78e2056",
+  "1511919884226-fd3cad34687c",
+  "1600661653561-629509216228",
+  "1614200187524-dc4b892acf16",
+  "1616422285623-13ff0162193c",
+  "1550355291-bbee04a92027",
+  "1607853202273-797f1c22a38e",
+  "1601362840469-51e4d8d58785",
+  "1618843479313-40f8afb4b4d8",
+  "1567818735868-e71b99932e29",
+  "1568844293986-8d0400bd4745",
+  "1626668893632-6f3a4466d22f",
+  "1552642986-ccb41e7059e7",
+  "1606152421802-db97b9c7a11b",
+  "1517524008697-84bbe3c3fd98",
+  "1503736334956-4c8f8e92946d",
+];
+const SHOWROOM_LOGO_PHOTO_IDS = VEHICLE_PHOTO_IDS.slice(0, 8);
+const HIGHLIGHT_THUMBNAIL_PHOTO_ID = "1494976388531-d1058494cdd8";
+
+// Real brand logo files supplied locally (project root /brands-logo) —
+// mapped to the exact `brands` catalog rows seeded by
+// supabase/migrations/20260905010002_seed_catalog_data.sql. Only brands
+// with a matching file get a logo; "Range Rover" has no file in that
+// folder, so it's deliberately left without one rather than faked.
+const BRAND_LOGO_FILES = {
+  BMW: "bmw.jpeg",
+  "Mercedes-Benz": "mercedes.jpeg",
+  Audi: "audi.jpeg",
+  Toyota: "toyota.jpeg",
+  Porsche: "porche.jpeg",
+  Tesla: "tesla.png",
+  Honda: "honda.jpeg",
+  Hyundai: "hundai.jpeg",
+  Volkswagen: "vw.jpeg",
+};
+function mimeTypeForFile(filename) {
+  return filename.endsWith(".png") ? "image/png" : "image/jpeg";
+}
+
+function unsplashUrl(id, params) {
+  return `https://images.unsplash.com/photo-${id}?${new URLSearchParams(params).toString()}`;
+}
+
+// The Unsplash CDN fetch is occasionally flaky under many parallel
+// connections (transient "fetch failed" with no HTTP response at all) —
+// retry a few times with a short backoff before giving up for real.
+async function fetchImageBytes(url, attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to fetch seed image ${url}: ${res.status}`);
+      return Buffer.from(await res.arrayBuffer());
+    } catch (error) {
+      if (attempt === attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    }
+  }
+  throw new Error("unreachable");
+}
+
+/** Runs `fn` over `items` with at most `limit` in flight at once — the Unsplash
+ * CDN fetch above is more reliable at modest concurrency than firing all
+ * requests via a single Promise.all. */
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/** Picks `n` distinct random entries from `arr` (n capped at arr.length). */
+function pickDistinct(arr, n) {
+  const pool = [...arr];
+  const result = [];
+  for (let i = 0; i < n && pool.length > 0; i++) {
+    result.push(pool.splice(randomInt(0, pool.length - 1), 1)[0]);
+  }
+  return result;
+}
 
 const CUSTOMER_FIRST_NAMES = [
   "John", "Grace", "Peter", "Mary", "James", "Faith", "David", "Ann", "Samuel", "Joyce",
@@ -211,9 +322,48 @@ async function main() {
   await supabase.from("system_settings").update({ value: "https://www.youtube.com/@harakagari" }).eq("key", "homepage_youtube_channel_url");
   console.log("✅ Global WhatsApp/TikTok/YouTube settings configured.");
 
+  // --- Real photo pools (fetched once, reused across many rows) ---------
+  console.log("Downloading Unsplash photo pool (vehicles, showroom logos, highlight thumbnail)...");
+  const vehiclePhotoEntries = await mapWithConcurrency(VEHICLE_PHOTO_IDS, 6, async (id) => [
+    id,
+    await fetchImageBytes(unsplashUrl(id, { w: "1200", q: "75", fm: "jpg", fit: "crop", auto: "format" })),
+  ]);
+  const vehiclePhotoBytesById = new Map(vehiclePhotoEntries);
+  const logoPhotoEntries = await mapWithConcurrency(SHOWROOM_LOGO_PHOTO_IDS, 6, async (id) => [
+    id,
+    await fetchImageBytes(unsplashUrl(id, { w: "400", h: "400", q: "75", fm: "jpg", fit: "crop", auto: "format" })),
+  ]);
+  const logoPhotoBytesById = new Map(logoPhotoEntries);
+  console.log(`✅ ${vehiclePhotoBytesById.size} vehicle photos + ${logoPhotoBytesById.size} logo photos downloaded.`);
+
+  // --- Real brand logos (local files under /brands-logo) ----------------
+  const { data: brandRows } = await supabase.from("brands").select("id, name");
+  let brandLogoCount = 0;
+  for (const brand of brandRows ?? []) {
+    const fileName = BRAND_LOGO_FILES[brand.name];
+    if (!fileName) continue;
+    // brands-logo/ is gitignored (local source assets, not shipped in the
+    // repo) — skip gracefully rather than aborting the whole seed run on a
+    // fresh clone that doesn't have it.
+    let bytes;
+    try {
+      bytes = await readFile(new URL(`../brands-logo/${fileName}`, import.meta.url));
+    } catch {
+      console.warn(`⚠️  brands-logo/${fileName} not found — skipping ${brand.name}'s logo.`);
+      continue;
+    }
+    const path = `${brand.id}/logo-seed.${fileName.split(".").pop()}`;
+    await supabase.storage.from("brand-logos").upload(path, bytes, { contentType: mimeTypeForFile(fileName), upsert: true });
+    await supabase.from("brands").update({ logo_storage_path: path }).eq("id", brand.id);
+    brandLogoCount += 1;
+  }
+  console.log(`✅ ${brandLogoCount} brand logos uploaded.`);
+
   // --- Homepage highlights (TikTok + YouTube), with a real thumbnail ---
   // upload so the cards render an actual image, not a broken link.
-  const thumbnailBytes = await readFile(new URL("../public/aresa-logo.jpg", import.meta.url));
+  const thumbnailBytes = await fetchImageBytes(
+    unsplashUrl(HIGHLIGHT_THUMBNAIL_PHOTO_ID, { w: "800", q: "75", fm: "jpg", fit: "crop", auto: "format" }),
+  );
   const thumbnailPath = "seed/highlight-thumbnail.jpg";
   await supabase.storage.from("homepage-highlights").upload(thumbnailPath, thumbnailBytes, { contentType: "image/jpeg", upsert: true });
 
@@ -279,6 +429,16 @@ async function main() {
       showroomId = data.id;
     }
     allShowrooms.push({ id: showroomId, businessName: s.name, ownerEmail });
+
+    // Logo — stable path keyed off showroomId (which is itself stable
+    // across reruns via the find-or-create above), so upsert:true keeps
+    // this idempotent rather than accumulating storage orphans.
+    const logoId = SHOWROOM_LOGO_PHOTO_IDS[i % SHOWROOM_LOGO_PHOTO_IDS.length];
+    const logoPath = `${showroomId}/logo-seed.jpg`;
+    await supabase.storage
+      .from("showroom-logos")
+      .upload(logoPath, logoPhotoBytesById.get(logoId), { contentType: "image/jpeg", upsert: true });
+    await supabase.from("showrooms").update({ logo_storage_path: logoPath }).eq("id", showroomId);
 
     // Mon-Sat availability, real slots so appointment booking is fully live.
     await supabase.from("showroom_availability").delete().eq("showroom_id", showroomId);
@@ -350,11 +510,27 @@ async function main() {
     }
     const { data: insertedVehicles, error: vehicleError } = await supabase.from("vehicles").insert(rows).select("id, price");
     if (vehicleError || !insertedVehicles) throw vehicleError ?? new Error(`vehicles for ${s.name} not created`);
+
+    // 2-3 real photos per vehicle. Vehicles are always freshly re-inserted
+    // (deleted above), so vehicle_media rows never need their own cleanup —
+    // the FK's `on delete cascade` already removed the prior batch's rows
+    // along with the vehicles themselves.
     for (const v of insertedVehicles) {
       allVehicleIds.push({ id: v.id, showroomId, price: v.price });
+      const photoIds = pickDistinct(VEHICLE_PHOTO_IDS, randomInt(2, 3));
+      const mediaRows = [];
+      for (let idx = 0; idx < photoIds.length; idx++) {
+        const storagePath = `${showroomId}/${v.id}/seed-${idx}.jpg`;
+        await supabase.storage
+          .from("vehicle-media")
+          .upload(storagePath, vehiclePhotoBytesById.get(photoIds[idx]), { contentType: "image/jpeg", upsert: true });
+        mediaRows.push({ vehicle_id: v.id, storage_path: storagePath, sort_order: idx, is_primary: idx === 0 });
+      }
+      const { error: mediaError } = await supabase.from("vehicle_media").insert(mediaRows);
+      if (mediaError) throw mediaError;
     }
 
-    console.log(`✅ ${s.name} (${s.city}) — ${vehicleCount} vehicles, availability, 2 videos.`);
+    console.log(`✅ ${s.name} (${s.city}) — ${vehicleCount} vehicles with photos, logo, availability, 2 videos.`);
   }
 
   // --- Customers ---------------------------------------------------------

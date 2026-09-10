@@ -121,25 +121,21 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
   return (
     <header className="relative z-20 border-b border-neutral-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <Link href="/" className="shrink-0">
-          <Image src="/logo.png" alt="HarakaGari — Powered by Arresa" width={146} height={38} priority />
-        </Link>
+        <div className="flex items-center gap-8">
+          <Link href="/" className="shrink-0">
+            <Image src="/logo.png" alt="HarakaGari — Powered by Arresa" width={146} height={38} priority />
+          </Link>
 
-        <nav aria-label="Vehicle categories" className="hidden items-center gap-6 md:flex">
-          <NavDropdown label="Brands" items={brandItems} />
-          <NavDropdown label="Model" items={modelItems} />
-          <NavDropdown label="Type" items={typeItems} />
-        </nav>
+          <nav aria-label="Vehicle categories" className="hidden items-center gap-6 md:flex">
+            <NavDropdown label="Brands" items={brandItems} />
+            <NavDropdown label="Model" items={modelItems} />
+            <NavDropdown label="Type" items={typeItems} />
+          </nav>
+        </div>
 
         <div className="hidden items-center gap-4 md:flex">
           <Link href="/listing" aria-label="Search vehicles" className="text-neutral-500 hover:text-neutral-700">
             <SearchIcon />
-          </Link>
-          <Link href="/showrooms" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
-            Showrooms
-          </Link>
-          <Link href="/ready-to-sell" className="text-sm font-medium text-neutral-700 hover:text-neutral-900">
-            Sell your car
           </Link>
           {user ? (
             <div ref={profileMenuRef} className="relative">
@@ -169,6 +165,14 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
                     className="block px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
                   >
                     {user.profileLabel}
+                  </Link>
+                  <Link
+                    href="/register-showroom"
+                    role="menuitem"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="block px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    Register Showroom
                   </Link>
                   <form action={signOutAction}>
                     <button
@@ -213,12 +217,6 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
           <MobileNavGroup label="Brands" items={brandItems} onNavigate={() => setMobileMenuOpen(false)} />
           <MobileNavGroup label="Model" items={modelItems} onNavigate={() => setMobileMenuOpen(false)} />
           <MobileNavGroup label="Type" items={typeItems} onNavigate={() => setMobileMenuOpen(false)} />
-          <Link href="/showrooms" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
-            Showrooms
-          </Link>
-          <Link href="/ready-to-sell" className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
-            Sell your car
-          </Link>
           {user ? (
             <>
               <Link
@@ -226,6 +224,12 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
                 className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 {user.profileLabel}
+              </Link>
+              <Link
+                href="/register-showroom"
+                className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+              >
+                Register Showroom
               </Link>
               <form action={signOutAction}>
                 <button
