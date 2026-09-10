@@ -105,7 +105,7 @@ export function DashboardShell({ email, showroom, unreadInquiryCount, unreadFina
       <div
         inert={!isDesktop && !open ? true : undefined}
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-[248px] transform bg-white transition-transform duration-200 ease-out lg:static lg:z-auto lg:w-auto lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 w-[248px] transform bg-white transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-auto lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
