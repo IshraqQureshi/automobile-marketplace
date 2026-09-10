@@ -56,9 +56,21 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 const ADMIN_EMAIL = "admin@harakagari.local";
-const ADMIN_PASSWORD = "TestingAdmin!123";
-const OWNER_PASSWORD = "TestingOwner!123";
-const CUSTOMER_PASSWORD = "TestingCustomer!123";
+// Hardcoded defaults are fine for local dev (this repo is public on
+// GitHub, so they're already effectively public) — but a run against a
+// real remote database (SEED_MARKETPLACE_ALLOW_REMOTE=true) must not hand
+// out admin/owner/customer logins to anyone who reads the source. These
+// env var overrides let a remote run supply fresh, one-off passwords
+// instead, generated and passed in by the caller, never committed.
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || "TestingAdmin!123";
+const OWNER_PASSWORD = process.env.SEED_OWNER_PASSWORD || "TestingOwner!123";
+const CUSTOMER_PASSWORD = process.env.SEED_CUSTOMER_PASSWORD || "TestingCustomer!123";
+
+if (!isLocalUrl && (!process.env.SEED_ADMIN_PASSWORD || !process.env.SEED_OWNER_PASSWORD || !process.env.SEED_CUSTOMER_PASSWORD)) {
+  console.error("Refusing to run against a remote database with the hardcoded default passwords (they're public — this repo is public on GitHub).");
+  console.error("Set SEED_ADMIN_PASSWORD, SEED_OWNER_PASSWORD, and SEED_CUSTOMER_PASSWORD to fresh, non-committed values first.");
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // Real-world-shaped reference data
