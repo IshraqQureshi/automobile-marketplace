@@ -57,7 +57,7 @@ export function AdminSidebar({
   const billingItems: NavEntry[] = [{ label: "Payments", href: "/admin/payments", icon: PaymentIcon, count: dueSubscriptionsCount }];
 
   return (
-    <aside className="flex flex-col gap-7 border-r border-neutral-200 bg-white px-4 py-5">
+    <aside className="sticky top-0 flex h-screen flex-col gap-7 overflow-y-auto border-r border-neutral-200 bg-white px-4 py-5">
       <Link href="/admin" className="px-2">
         <Image src="/logo.png" alt="HarakaGari — Powered by Arresa" width={130} height={34} priority />
       </Link>
