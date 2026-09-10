@@ -506,39 +506,39 @@ Regression Test
 
 ## Production Deployment
 
-* [ ] Production build
-* [ ] Environment configuration
-* [ ] Database verification
-* [ ] Deploy application
-* [ ] Smoke tests
-* [ ] Authentication verified
-* [ ] Marketplace verified
-* [ ] Vehicle pages verified
+* [x] Production build (Vercel, project `automobile-marketplace`, GitHub-connected to `main`)
+* [x] Environment configuration (Supabase URL/anon/service-role keys, NEXT_PUBLIC_SITE_URL, CRON_SECRET set as `Config` type — not `Secret` — for the `NEXT_PUBLIC_*` ones specifically, see Decisions log; Google OAuth/Mailtrap left unset, non-blocking)
+* [x] Database verification (all 55 migrations applied to the production Supabase project `iesbtxlgkcxaawvwziot`; found and fixed real schema drift — see Decisions log)
+* [x] Deploy application (live at https://automobile-marketplace.vercel.app)
+* [x] Smoke tests (homepage, `/listing`, vehicle detail, showroom detail, admin, showroom dashboard — user-confirmed working after the schema-drift fix)
+* [ ] Authentication verified (not explicitly re-tested against production this session)
+* [x] Marketplace verified
+* [x] Vehicle pages verified
 * [ ] Finance calculator verified
 * [ ] WhatsApp inquiry verified
-* [ ] Admin verified
+* [x] Admin verified (was one of the pages showing no data pre-fix, confirmed working post-fix)
 
 ## Production Verification
 
-* [ ] Homepage working
-* [ ] Login working
-* [ ] Marketplace working
-* [ ] Search/filter working
-* [ ] Vehicle details working
-* [ ] Showroom pages working
+* [x] Homepage working
+* [ ] Login working (not explicitly re-tested against production this session)
+* [x] Marketplace working
+* [x] Search/filter working
+* [x] Vehicle details working
+* [x] Showroom pages working
 * [ ] Finance calculator working
 * [ ] WhatsApp inquiry working
-* [ ] Admin working
-* [ ] No critical production errors
+* [x] Admin working
+* [x] No critical production errors (as of this session's verification)
 
 ### FINAL RELEASE GATE
 
-* [ ] All required tests pass
-* [ ] No critical/high release blockers
+* [ ] All required tests pass (full local suite passes; not re-run specifically against production)
+* [ ] No critical/high release blockers (the schema-drift incident below is resolved, but the full release checklist hasn't been run end-to-end)
 * [ ] Release Agent approved
-* [ ] Production smoke tests pass
+* [x] Production smoke tests pass (partial — see checkboxes above; finance calculator/WhatsApp/login not yet covered)
 
-**Production Status:** ⬜
+**Production Status:** 🟡 Live, partially verified — not yet a formal RELEASED gate pass (finance calculator, WhatsApp inquiry, and login haven't been re-verified against production specifically)
 
 ---
 
@@ -848,6 +848,8 @@ Record important scope or architectural decisions here.
 | 2026-09-10 | Fully wiped and repopulated local dev per direct request: `npx supabase db reset --local` (reapplies every migration from scratch, including the brands/models/vehicle_types catalog seed migration — the standard, safest way to reset local Supabase, rather than hand-writing a DELETE/TRUNCATE chain across every table in FK dependency order) followed by a new `scripts/seed-full-marketplace.mjs` (PR #68): 1 admin, 20 showrooms, 242 vehicles, ~20 customers, ~60 appointments across every status, ~50 inquiries, ~30 financing applications, homepage TikTok/YouTube highlights. Found and fixed two real bugs live while building the script (a NOT-NULL batch-insert gotcha, and a non-idempotent vehicles insert that produced 514 vehicles instead of ~263 on a retried run) before ever opening the PR — see the PR #68 row above for the full mechanism. Deliberately did not seed real vehicle/showroom photos (no real assets exist to seed honestly with) or fetch real third-party video content (used the same structurally-valid-placeholder convention `e2e/homepage-highlights.spec.ts`'s own test fixtures already use) — both confirmed live to render correctly via the app's existing no-photo/placeholder-thumbnail fallbacks | User: "First clean all the database one super admin with all the marketplace data Add 20 Showroom with All the proper data 10-15 veicheles for each showroom youtube videos tiktok videos 10-20 customers appointments inquireies data all the data" |
 | 2026-09-10 | Follow-up fix batch, PR #69: (1) enabled the homepage hero search (was a `disabled` input/button) as a real GET form to `/listing?q=`; (2) regrouped the header so the logo and Brands/Model/Type nav sit together on the left instead of centered by a 3-child `justify-between` row; (3) removed the "Showrooms" and "Sell your car" header links entirely (desktop + mobile) per direct request — updated `e2e/showroom-registration.spec.ts`'s test that clicked the now-removed header link to navigate to `/ready-to-sell` directly instead, since `/ready-to-sell` itself is untouched and still reachable; (4) added a "Register Showroom" link to the logged-in Profile menu/mobile menu only, reasoning that `/register-showroom` already redirects an anonymous visitor straight to `/login` so a public nav link would just bounce them. Separately, replaced `scripts/seed-full-marketplace.mjs`'s previous no-photo approach per "Use UnSplash Images for seed data": vehicle photos (2-3 each) and showroom logos now come from a small pool of real Unsplash photo ids verified live against `images.unsplash.com` before use (a nonexistent id 404s there, so every id is a genuine served photo — the old `source.unsplash.com` redirect service is deprecated and wasn't used), fetched once and reused across many rows to keep network calls low, uploaded to the real `vehicle-media`/`showroom-logos` buckets the app itself reads from, with retry-on-transient-failure and limited concurrency added after live-testing surfaced an intermittent "fetch failed" under 36-way parallel requests. Mid-task the user separately flagged "brand logos are missing use the brands-logo folder there i had placed it" — added a second, local-file-based path (not Unsplash) mapping the 9 real logo files already in the gitignored `/brands-logo` folder to their matching `brands` catalog rows by name (BMW, Toyota, Mercedes-Benz, Audi, Porsche, Tesla, Honda, Hyundai, Volkswagen); "Range Rover" has no file there and is deliberately left without a fabricated one — confirmed live it correctly falls back to its existing letter-initial placeholder. Made the brand-logo step tolerant of the folder being absent (a plain try/catch skip with a warning) since `/brands-logo` is gitignored and won't exist on a fresh clone — without that, a script that worked on this machine would hard-crash for anyone else. All four image types (vehicle photos, showroom logos, brand logos, homepage highlight thumbnail — also switched from reusing the site's own `aresa-logo.jpg` to a real Unsplash photo) verified live via Playwright screenshots across the homepage, `/listing`, a vehicle detail page, and a showroom detail page, with no broken-image/404s for any Supabase Storage asset | User: "few fixes \nHomepage search is disabled\nMove the nav to side by logo Brands, Models, Type\nHide the Showrooms and Ready to Sell Nav\nAdd the Showroom register link in header after logged in\nUse UnSplash Images for seed data", then mid-task: "brand logos are missing use the brands-logo folder there i had placed it" |
 | 2026-09-10 | PR #69 code review round: 1 HIGH + 3 MEDIUM findings, all fixed and re-reviewed APPROVED before merge (squash-merged as `63f4205`). H-1: the newly-enabled homepage search and the conditional Register Showroom link had zero E2E coverage for a critical customer journey — added `e2e/homepage-search.spec.ts` (own dedicated fixture showroom/vehicle, 4 tests: search→results, search→empty state, link absent signed-out, link present+correct href signed-in), all passing. M-1: 3 new (plus 1 pre-existing) `supabase.storage.from(...).upload()` calls in the seed script never checked their returned `{ error }`, so a failed upload could still let the script persist a DB row pointing at nothing and print a false success — added explicit error-checks-and-throws at all 4 sites. M-2: the newly-enabled search `<input>` had no accessible name — added `aria-label` + `role="search"`. M-3: removing the header's Showrooms/Sell-your-car links left `/ready-to-sell` completely unlinked anywhere in the app and `/showrooms` reachable only via a breadcrumb already inside that section, while both stayed in `sitemap.ts` as crawlable — restored reachability via new footer links rather than silently orphaning completed Day-3 MVP pages. Also addressed 3 LOW suggestions while at it: vehicle photo storage paths now key on each vehicle's position within its showroom (not its freshly-regenerated-every-rerun id), so seed reruns overwrite instead of orphaning storage objects; vehicle photo uploads now use the seed script's own existing concurrency helper instead of running strictly sequentially; a catalog brand with no local logo file mapped at all now warns, matching the already-warned missing-file case | Continuation of the PR #69 request above — review findings, not new user input |
+| 2026-09-10 | First production deployment, to Vercel (project `automobile-marketplace`, GitHub-connected to `main`), against the already-linked Supabase project `iesbtxlgkcxaawvwziot`. Found that project had only 2 of 55 migrations applied — pushed the rest via `supabase db push --linked --include-all` (plain `db push` refused: two remote migrations were out of order relative to the rest, `--include-all` is the CLI's own documented way past that). Caught a real security issue before it shipped: `scripts/seed-full-marketplace.mjs`'s admin/owner/customer passwords are hardcoded and this repo is public on GitHub, so running the seed script as-is against production would have handed out live admin credentials to anyone reading the source — added `SEED_ADMIN_PASSWORD`/`SEED_OWNER_PASSWORD`/`SEED_CUSTOMER_PASSWORD` env var overrides and made the script refuse a remote run without them, then seeded production with freshly generated one-off passwords instead (shown once, not committed). Also caught and fixed a Vercel config mistake mid-setup: the `NEXT_PUBLIC_*` Supabase env vars had been saved as Type "Secret" (write-only), which silently breaks any `NEXT_PUBLIC_` variable since Next.js must read the real value at build time to inline it into the browser bundle — had to delete and recreate those three as Type "Config" | User: "now i want to deploy this project to vercel", then step-by-step guidance through the Vercel New Project form, then "yes use that supabase", then "run the seed on prodution db" |
+| 2026-09-10 | Post-deploy incident: after seeding, "not a single car showing on home page, search, showroom detail page, admin, showroom dashboard" despite the DB genuinely having ~250 vehicles (confirmed live in the Supabase Table Editor) and a fresh Vercel deployment. Root-caused by directly curling the production PostgREST API with the (non-secret) anon key to reproduce the app's exact queries rather than guessing: two migrations (`20260906020000` add `vehicles.view_count`, `20260906030000` create `vehicle_views`/`record_vehicle_view()`) were recorded as "applied" in the remote migration history table without their actual DDL ever having run — a phantom/drifted history entry, not a caching or credentials problem (initially suspected and ruled out: a PostgREST schema-cache reload was tried first and didn't fix it, since the columns/tables never existed in the first place; plain counts and non-embedded queries worked fine throughout, which is exactly what you'd expect since only queries touching the missing `view_count` column or `vehicle_views` table — i.e. nearly every real vehicle listing query — would fail). Fixed via `supabase migration repair --linked --status reverted` on both versions (marks them pending again without touching any other history) followed by `supabase db push --linked --include-all` to apply the real SQL; verified by reproducing the app's exact failing query against the REST API before and after, and by the user confirming all previously-broken pages now show data. Both destructive-adjacent remote-DB commands (the repair, and the very first `db push`) were correctly blocked by the auto-mode safety classifier and only proceeded after explicit user confirmation via AskUserQuestion — the right outcome for anything that rewrites production database/migration state | User: "no listing still" → "perfect now working" |
 
 Full rationale: `.claude/docs/requirements/MVP_REQUIREMENTS.md` §29 (Scope Decision Log) and §29.1 (Design Review Decisions).
 
