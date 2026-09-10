@@ -51,6 +51,16 @@ export function Footer() {
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-white/50 sm:flex-row sm:px-6">
           <span>© {new Date().getFullYear()} HarakaGari by Arresa. All rights reserved.</span>
           <div className="flex gap-4">
+            {/* The header no longer links to either of these (PR #69), so
+                the footer is now their only in-app entry point — keep them
+                reachable rather than orphaned, since both are real, live
+                pages still in sitemap.ts. */}
+            <Link href="/showrooms" className="hover:text-white/80">
+              Showrooms
+            </Link>
+            <Link href="/ready-to-sell" className="hover:text-white/80">
+              Sell your car
+            </Link>
             <Link href="/privacy" className="hover:text-white/80">
               Privacy Policy
             </Link>

@@ -341,7 +341,10 @@ async function main() {
   let brandLogoCount = 0;
   for (const brand of brandRows ?? []) {
     const fileName = BRAND_LOGO_FILES[brand.name];
-    if (!fileName) continue;
+    if (!fileName) {
+      console.warn(`⚠️  No local logo file mapped for brand "${brand.name}" — leaving it without a logo.`);
+      continue;
+    }
     // brands-logo/ is gitignored (local source assets, not shipped in the
     // repo) — skip gracefully rather than aborting the whole seed run on a
     // fresh clone that doesn't have it.
@@ -353,7 +356,10 @@ async function main() {
       continue;
     }
     const path = `${brand.id}/logo-seed.${fileName.split(".").pop()}`;
-    await supabase.storage.from("brand-logos").upload(path, bytes, { contentType: mimeTypeForFile(fileName), upsert: true });
+    const { error: brandLogoUploadError } = await supabase.storage
+      .from("brand-logos")
+      .upload(path, bytes, { contentType: mimeTypeForFile(fileName), upsert: true });
+    if (brandLogoUploadError) throw brandLogoUploadError;
     await supabase.from("brands").update({ logo_storage_path: path }).eq("id", brand.id);
     brandLogoCount += 1;
   }
@@ -365,7 +371,10 @@ async function main() {
     unsplashUrl(HIGHLIGHT_THUMBNAIL_PHOTO_ID, { w: "800", q: "75", fm: "jpg", fit: "crop", auto: "format" }),
   );
   const thumbnailPath = "seed/highlight-thumbnail.jpg";
-  await supabase.storage.from("homepage-highlights").upload(thumbnailPath, thumbnailBytes, { contentType: "image/jpeg", upsert: true });
+  const { error: thumbnailUploadError } = await supabase.storage
+    .from("homepage-highlights")
+    .upload(thumbnailPath, thumbnailBytes, { contentType: "image/jpeg", upsert: true });
+  if (thumbnailUploadError) throw thumbnailUploadError;
 
   await supabase.from("homepage_highlights").delete().like("title", "Seed:%");
   const highlightRows = [
@@ -435,9 +444,10 @@ async function main() {
     // this idempotent rather than accumulating storage orphans.
     const logoId = SHOWROOM_LOGO_PHOTO_IDS[i % SHOWROOM_LOGO_PHOTO_IDS.length];
     const logoPath = `${showroomId}/logo-seed.jpg`;
-    await supabase.storage
+    const { error: showroomLogoUploadError } = await supabase.storage
       .from("showroom-logos")
       .upload(logoPath, logoPhotoBytesById.get(logoId), { contentType: "image/jpeg", upsert: true });
+    if (showroomLogoUploadError) throw showroomLogoUploadError;
     await supabase.from("showrooms").update({ logo_storage_path: logoPath }).eq("id", showroomId);
 
     // Mon-Sat availability, real slots so appointment booking is fully live.
@@ -511,24 +521,35 @@ async function main() {
     const { data: insertedVehicles, error: vehicleError } = await supabase.from("vehicles").insert(rows).select("id, price");
     if (vehicleError || !insertedVehicles) throw vehicleError ?? new Error(`vehicles for ${s.name} not created`);
 
-    // 2-3 real photos per vehicle. Vehicles are always freshly re-inserted
-    // (deleted above), so vehicle_media rows never need their own cleanup —
-    // the FK's `on delete cascade` already removed the prior batch's rows
-    // along with the vehicles themselves.
     for (const v of insertedVehicles) {
       allVehicleIds.push({ id: v.id, showroomId, price: v.price });
+    }
+
+    // 2-3 real photos per vehicle, uploaded with modest concurrency (each
+    // vehicle's own uploads still happen in order, since sort_order/
+    // is_primary depend on it). Storage paths are keyed on the vehicle's
+    // position within this showroom (not its id), so a rerun's freshly
+    // generated vehicle ids still land on the same paths — upsert:true then
+    // keeps this idempotent instead of orphaning a new batch of objects
+    // every run, matching how the showroom/brand logo paths already work.
+    // Vehicles themselves are always freshly re-inserted (deleted above),
+    // so vehicle_media rows never need their own cleanup — the FK's
+    // `on delete cascade` already removed the prior batch's rows along with
+    // the vehicles themselves.
+    await mapWithConcurrency(insertedVehicles, 6, async (v, vehicleIndex) => {
       const photoIds = pickDistinct(VEHICLE_PHOTO_IDS, randomInt(2, 3));
       const mediaRows = [];
       for (let idx = 0; idx < photoIds.length; idx++) {
-        const storagePath = `${showroomId}/${v.id}/seed-${idx}.jpg`;
-        await supabase.storage
+        const storagePath = `${showroomId}/vehicle-${vehicleIndex}/seed-${idx}.jpg`;
+        const { error: vehiclePhotoUploadError } = await supabase.storage
           .from("vehicle-media")
           .upload(storagePath, vehiclePhotoBytesById.get(photoIds[idx]), { contentType: "image/jpeg", upsert: true });
+        if (vehiclePhotoUploadError) throw vehiclePhotoUploadError;
         mediaRows.push({ vehicle_id: v.id, storage_path: storagePath, sort_order: idx, is_primary: idx === 0 });
       }
       const { error: mediaError } = await supabase.from("vehicle_media").insert(mediaRows);
       if (mediaError) throw mediaError;
-    }
+    });
 
     console.log(`✅ ${s.name} (${s.city}) — ${vehicleCount} vehicles with photos, logo, availability, 2 videos.`);
   }

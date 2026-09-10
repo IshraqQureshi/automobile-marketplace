@@ -43,7 +43,12 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
             /listing's own filter form and VehicleSortSelect already use) —
             no client JS needed, and it stays correct if /listing's search
             logic ever changes since this doesn't duplicate any of it. */}
-        <form method="GET" action="/listing" className="mx-auto flex max-w-2xl flex-col gap-2 sm:flex-row sm:gap-0 sm:rounded-md sm:shadow-lg">
+        <form
+          method="GET"
+          action="/listing"
+          role="search"
+          className="mx-auto flex max-w-2xl flex-col gap-2 sm:flex-row sm:gap-0 sm:rounded-md sm:shadow-lg"
+        >
           <div className="flex flex-1 items-stretch overflow-hidden rounded-md sm:rounded-l-md sm:rounded-r-none">
             <div className="flex items-center bg-white pr-2 pl-4 text-neutral-400">
               <SearchIcon />
@@ -51,6 +56,7 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
             <input
               type="search"
               name="q"
+              aria-label="Search vehicles by make, model, or keyword"
               placeholder="Search by make, model, or keyword…"
               className="w-full bg-white py-3.5 pr-3 pl-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
             />
