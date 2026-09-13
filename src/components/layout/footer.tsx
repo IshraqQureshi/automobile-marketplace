@@ -80,13 +80,13 @@ export function Footer({ navCatalog, socialLinks }: FooterProps) {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-white/50 sm:flex-row sm:px-6">
           <span>© {new Date().getFullYear()} HarakaGari by Arresa. All rights reserved.</span>
-          {/* "Showrooms" and "Sell your car" were deliberately removed from
-              here per direct request — both pages stay live, in sitemap.ts,
-              and reachable via direct URL/search (and /showrooms via the
-              showroom-detail breadcrumb, /register-showroom straight from
-              the header's own Profile menu) — they're just not linked from
-              this footer. Don't re-add them without checking that request. */}
+          {/* /register-showroom is public again per direct request — see
+              registerShowroomPublicAction — reversing an earlier decision
+              that had removed every nav link to it. */}
           <div className="flex gap-4">
+            <Link href="/register-showroom" className="hover:text-white/80">
+              Sell your car
+            </Link>
             <Link href="/privacy" className="hover:text-white/80">
               Privacy Policy
             </Link>

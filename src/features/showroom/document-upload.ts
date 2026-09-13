@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import type { createClient } from "@/lib/supabase/server";
+import { ALLOWED_DOCUMENT_MIME_TYPES, MAX_DOCUMENTS_PER_SUBMISSION, MAX_DOCUMENT_SIZE_BYTES } from "./schemas";
 
 // Plain module, deliberately not a "use server" file — every top-level
 // export of a "use server" file becomes a directly client-invokable Server
@@ -9,6 +10,23 @@ import type { createClient } from "@/lib/supabase/server";
 // normal internal function, not a second RPC entry point.
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+/** Pulls real, non-empty File entries out of a "documents" form field — shared by every showroom-document-collecting action. */
+export function readDocumentFiles(formData: FormData): File[] {
+  return formData.getAll("documents").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+}
+
+/** Shared validation for a set of uploaded showroom documents — count/type/size, same rules everywhere they're collected. */
+export function validateDocumentFiles(documents: File[]): string | null {
+  if (documents.length > MAX_DOCUMENTS_PER_SUBMISSION) return `Upload at most ${MAX_DOCUMENTS_PER_SUBMISSION} documents.`;
+  for (const file of documents) {
+    if (!ALLOWED_DOCUMENT_MIME_TYPES.includes(file.type as (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number])) {
+      return `"${file.name}" must be a PDF, JPG, or PNG file.`;
+    }
+    if (file.size > MAX_DOCUMENT_SIZE_BYTES) return `"${file.name}" is larger than 10MB.`;
+  }
+  return null;
+}
 
 /**
  * Uploads each file to the showroom-documents bucket and records a

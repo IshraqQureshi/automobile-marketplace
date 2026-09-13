@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { RegisterShowroomForm } from "@/components/showroom/register-showroom-form";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
@@ -11,26 +10,40 @@ export const metadata: Metadata = {
   alternates: { canonical: "/register-showroom" },
 };
 
+// Public, per direct request — a visitor no longer needs an existing
+// HarakaGari account to apply. A signed-in applicant still registers under
+// their own account exactly as before (RegisterShowroomForm branches on
+// `isSignedIn` to know which server action + fields apply); a signed-out
+// applicant's submission creates their account for them (see
+// registerShowroomPublicAction's own comment for why: an invite email,
+// not a plaintext password, same mechanism the admin panel's own
+// "invite a new owner" flow already uses).
 export default async function RegisterShowroomPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  let defaultEmail = "";
+  let defaultPhone = "";
+  let existingShowroomStatus: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED" | null = null;
 
-  const [{ data: profile, error: profileError }, { data: existingShowroom, error: showroomError }] = await Promise.all([
-    supabase.from("profiles").select("phone").eq("id", user.id).single(),
-    supabase.from("showrooms").select("status").eq("owner_user_id", user.id).in("status", ["PENDING", "APPROVED", "SUSPENDED"]).maybeSingle(),
-  ]);
+  if (user) {
+    defaultEmail = user.email ?? "";
+    const [{ data: profile, error: profileError }, { data: existingShowroom, error: showroomError }] = await Promise.all([
+      supabase.from("profiles").select("phone").eq("id", user.id).single(),
+      supabase.from("showrooms").select("status").eq("owner_user_id", user.id).in("status", ["PENDING", "APPROVED", "SUSPENDED"]).maybeSingle(),
+    ]);
 
-  if (profileError) {
-    logger.error("Failed to load profile for showroom registration", profileError, { userId: user.id });
-  }
-  if (showroomError) {
-    logger.error("Failed to check for an existing showroom", showroomError, { userId: user.id });
+    if (profileError) {
+      logger.error("Failed to load profile for showroom registration", profileError, { userId: user.id });
+    }
+    if (showroomError) {
+      logger.error("Failed to check for an existing showroom", showroomError, { userId: user.id });
+    }
+
+    defaultPhone = profile?.phone ?? "";
+    existingShowroomStatus = existingShowroom?.status ?? null;
   }
 
   return (
@@ -41,14 +54,14 @@ export default async function RegisterShowroomPage() {
         <p className="mt-2 text-sm text-neutral-500">List your vehicles in front of thousands of buyers across Kenya.</p>
 
         <div className="mt-8">
-          {existingShowroom ? (
-            <ExistingShowroomStatus status={existingShowroom.status} />
+          {existingShowroomStatus ? (
+            <ExistingShowroomStatus status={existingShowroomStatus} />
           ) : (
-            <RegisterShowroomForm defaultEmail={user.email ?? ""} defaultPhone={profile?.phone ?? ""} />
+            <RegisterShowroomForm isSignedIn={user != null} defaultEmail={defaultEmail} defaultPhone={defaultPhone} />
           )}
         </div>
 
-        {!existingShowroom && (
+        {!existingShowroomStatus && (
           <p className="mt-6 text-xs text-neutral-400">Your information is verified securely. We&apos;ll contact you within 1–2 business days.</p>
         )}
       </div>

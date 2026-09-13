@@ -30,6 +30,20 @@ export const registerShowroomSchema = registerShowroomBaseSchema;
 
 export type RegisterShowroomInput = z.infer<typeof registerShowroomSchema>;
 
+// Public (signed-out) registration collects one extra field the
+// authenticated flow doesn't need — an owner name to invite the new account
+// under — since there's no existing profile to read it from.
+const ownerFullNameSchema = z.string().trim().min(2, "Full name is required").max(150, "Full name is too long");
+
+const publicRegisterShowroomBaseSchema = registerShowroomBaseSchema.extend({
+  ownerFullName: ownerFullNameSchema,
+});
+
+export const publicRegisterShowroomFieldSchemas = publicRegisterShowroomBaseSchema.shape;
+export const publicRegisterShowroomSchema = publicRegisterShowroomBaseSchema;
+
+export type PublicRegisterShowroomInput = z.infer<typeof publicRegisterShowroomSchema>;
+
 export interface RegisterShowroomActionState {
   status: "idle" | "error" | "success";
   message?: string;
