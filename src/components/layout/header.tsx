@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useDropdown } from "@/components/ui/use-dropdown";
 import { signOutAction } from "@/features/auth/actions";
 import {
   buildBrandCatalogLinks,
@@ -32,32 +33,6 @@ interface HeaderProps {
 }
 
 type DropdownLinkItem = CatalogLinkItem;
-
-/** Click-outside-to-close (+ Escape-to-close) state, shared by the Profile menu and each nav dropdown. */
-function useDropdown() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onClickOutside);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  return { open, setOpen, ref };
-}
 
 export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

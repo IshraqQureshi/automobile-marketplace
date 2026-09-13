@@ -189,13 +189,50 @@ test("clicking a vehicle card opens its /{brand}/{slug} detail page with real sp
   await expect(page.getByText("Financing details not provided for this listing")).toBeVisible();
 });
 
-test("the Share button copies the real vehicle URL to the clipboard", async ({ page, context }) => {
+test("the Share button opens a popover with every direct-share option", async ({ page }) => {
+  const path = detailPath(expensiveVehicleId, "Beta");
+  await page.goto(path);
+
+  await page.getByRole("button", { name: "Share this listing" }).click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  for (const label of ["Facebook", "X", "LinkedIn", "Instagram", "Email", "Copy link"]) {
+    await expect(menu.getByRole("menuitem", { name: label })).toBeVisible();
+  }
+});
+
+test("the Share popover's Facebook option opens Facebook's real sharer with the correct vehicle URL", async ({ page, context }) => {
+  const path = detailPath(expensiveVehicleId, "Beta");
+  await page.goto(path);
+
+  await page.getByRole("button", { name: "Share this listing" }).click();
+  const [popup] = await Promise.all([context.waitForEvent("page"), page.getByRole("menuitem", { name: "Facebook" }).click()]);
+  await popup.waitForLoadState("domcontentloaded").catch(() => {});
+  expect(popup.url()).toContain("facebook.com/sharer/sharer.php");
+  expect(decodeURIComponent(popup.url())).toContain(path);
+  await popup.close();
+});
+
+test("the Share popover's Copy link option copies the real vehicle URL to the clipboard", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const path = detailPath(expensiveVehicleId, "Beta");
   await page.goto(path);
 
   await page.getByRole("button", { name: "Share this listing" }).click();
+  await page.getByRole("menuitem", { name: "Copy link" }).click();
   await expect(page.getByText("Link copied!")).toBeVisible();
+  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  expect(clipboardText).toContain(path);
+});
+
+test("the Share popover's Instagram option copies the link too, since Instagram has no web share-intent for a link", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const path = detailPath(expensiveVehicleId, "Beta");
+  await page.goto(path);
+
+  await page.getByRole("button", { name: "Share this listing" }).click();
+  await page.getByRole("menuitem", { name: "Instagram" }).click();
+  await expect(page.getByText(/paste it in Instagram/)).toBeVisible();
   const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
   expect(clipboardText).toContain(path);
 });

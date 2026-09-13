@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FacebookIcon, InstagramIcon, XIcon } from "@/components/ui/social-icons";
 import { buildBrandCatalogLinks, buildModelCatalogLinks, buildTypeCatalogLinks, type NavCatalog } from "@/features/vehicle/nav-catalog-links";
 
 export interface FooterSocialLinks {
@@ -129,32 +130,6 @@ function FooterLinkColumn({ title, items }: { title: string; items: { id: string
         <p className="mt-4 text-sm text-white/40">Coming soon</p>
       )}
     </div>
-  );
-}
-
-function FacebookIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
-      <path d="M15 8.5h2V5.2c-.35-.05-1.54-.15-2.93-.15-2.91 0-4.9 1.78-4.9 5.04V13H6.5v3.7h3.17V23h3.7v-6.3h3.05l.48-3.7h-3.53v-2.5c0-1.07.29-1.8 1.83-1.8Z" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
-      <path d="M18.24 3h3.06l-6.69 7.64L22.5 21h-6.16l-4.83-6.32L5.98 21H2.92l7.16-8.18L2 3h6.32l4.37 5.78L18.24 3Zm-1.07 16.2h1.7L7.13 4.71H5.3L17.17 19.2Z" />
-    </svg>
-  );
-}
-
-function InstagramIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
   );
 }
 
