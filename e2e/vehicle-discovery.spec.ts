@@ -189,6 +189,17 @@ test("clicking a vehicle card opens its /{brand}/{slug} detail page with real sp
   await expect(page.getByText("Financing details not provided for this listing")).toBeVisible();
 });
 
+test("the Share button copies the real vehicle URL to the clipboard", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const path = detailPath(expensiveVehicleId, "Beta");
+  await page.goto(path);
+
+  await page.getByRole("button", { name: "Share this listing" }).click();
+  await expect(page.getByText("Link copied!")).toBeVisible();
+  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  expect(clipboardText).toContain(path);
+});
+
 async function readViewCount(page: import("@playwright/test").Page, path: string): Promise<number> {
   await page.goto(path);
   const text = await page.getByText(/\d+ views?/).textContent();

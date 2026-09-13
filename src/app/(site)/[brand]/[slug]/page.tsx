@@ -9,6 +9,7 @@ import { FinancingApplicationButton } from "@/components/vehicle/financing-appli
 import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
 import { ScheduleTestDriveButton } from "@/components/vehicle/schedule-test-drive-button";
 import { ScrollToSectionLink } from "@/components/vehicle/scroll-to-section-link";
+import { ShareButton } from "@/components/vehicle/share-button";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
 import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-button";
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -284,14 +285,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <FavoriteButton vehicleId={vehicle.id} initialFavorited={isFavorited} isSignedIn={userResult.user != null} />
-              <button
-                type="button"
-                disabled
-                title="Sharing — coming soon"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-500 disabled:cursor-not-allowed"
-              >
-                <ShareIcon />
-              </button>
+              <ShareButton title={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} url={`${publicEnv.NEXT_PUBLIC_SITE_URL}${canonicalPath}`} />
             </div>
           </div>
 
@@ -588,18 +582,6 @@ function EyeIcon() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
       <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <circle cx="18" cy="5" r="3" />
-      <circle cx="6" cy="12" r="3" />
-      <circle cx="18" cy="19" r="3" />
-      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
     </svg>
   );
 }
