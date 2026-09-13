@@ -29,7 +29,7 @@ async function getLatestInviteLink(email: string): Promise<string> {
 
 test("the footer links to the public showroom registration page", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Sell your car" }).click();
+  await page.getByRole("link", { name: "Register Showroom" }).click();
   await page.waitForURL(/\/register-showroom$/);
   await expect(page.getByRole("heading", { name: "Register as Showroom" })).toBeVisible();
 });
