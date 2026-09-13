@@ -26,6 +26,12 @@ let showroomId: string;
 let cheapVehicleId: string;
 let expensiveVehicleId: string;
 let draftVehicleId: string;
+// whatsapp_contact_number (system_settings) is a single global row, not a
+// per-fixture one — forced to "" here (with the pre-existing value saved
+// and restored in afterAll) so the WhatsApp-button assertion below doesn't
+// depend on whatever another spec (e.g. e2e/showroom-detail.spec.ts, which
+// exercises a real configured number) last left it as.
+let previousWhatsappNumber: string | null = null;
 
 test.beforeAll(async () => {
   const supabase = admin();
@@ -102,12 +108,17 @@ test.beforeAll(async () => {
     .single();
   if (draftError || !draft) throw draftError ?? new Error("draft vehicle not created");
   draftVehicleId = draft.id;
+
+  const { data: existingSetting } = await supabase.from("system_settings").select("value").eq("key", "whatsapp_contact_number").maybeSingle();
+  previousWhatsappNumber = typeof existingSetting?.value === "string" ? existingSetting.value : null;
+  await supabase.from("system_settings").update({ value: "" }).eq("key", "whatsapp_contact_number");
 });
 
 test.afterAll(async () => {
   const supabase = admin();
   await supabase.from("vehicles").delete().in("id", [cheapVehicleId, expensiveVehicleId, draftVehicleId]);
   await supabase.from("showrooms").delete().eq("id", showroomId);
+  await supabase.from("system_settings").update({ value: previousWhatsappNumber ?? "" }).eq("key", "whatsapp_contact_number");
 });
 
 function detailPath(id: string, model: string) {
@@ -163,9 +174,13 @@ test("clicking a vehicle card opens its /{brand}/{slug} detail page with real sp
   await expect(page.getByText(/\d+ views?/)).toBeVisible();
 
   // "Send Message" is a real, working inquiry form as of the vehicle-inquiry
-  // feature (see e2e/vehicle-inquiry.spec.ts for its own dedicated coverage)
-  // — only WhatsApp/Test Drive/Financing application remain real, visibly-
-  // disabled controls pending their own Day 4/5 dependencies.
+  // feature (see e2e/vehicle-inquiry.spec.ts for its own dedicated coverage).
+  // WhatsApp is also real now (a wa.me link to the admin-configured global
+  // number, see e2e/showroom-detail.spec.ts for that dedicated coverage) —
+  // it renders as a disabled placeholder here only because this fixture
+  // deliberately leaves whatsapp_contact_number unconfigured (see
+  // beforeAll above). Test Drive/Financing application remain real,
+  // visibly-disabled controls pending their own dependencies.
   await expect(page.getByRole("button", { name: "Send Message" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "WhatsApp" })).toBeDisabled();
 

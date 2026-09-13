@@ -1,21 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
+import { commissionFieldSchemas } from "./commission-schemas";
 
 export interface CommissionActionResult {
   error?: string;
 }
 
 const NOT_FOUND_ERROR = "Not found, or you don't have permission to do that.";
-
-const commissionFieldSchemas = {
-  amount: z.coerce.number().min(0, "Commission amount can't be negative").max(1_000_000_000, "Enter a realistic amount"),
-  status: z.enum(["PENDING", "PAID"], { message: "Choose a status" }),
-  notes: z.string().trim().max(500, "Notes must be under 500 characters").optional(),
-};
 
 /**
  * Records (or updates) the commission owed for one sold vehicle —

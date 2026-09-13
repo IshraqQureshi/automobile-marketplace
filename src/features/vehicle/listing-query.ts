@@ -34,6 +34,16 @@ export interface VehicleFilterOptions {
 const FALLBACK_MIN_PRICE_BOUND = 0;
 const FALLBACK_MAX_PRICE_BOUND = 20_000_000;
 
+// PostgREST's or() mini-grammar treats a bare `,`, `(`, or `)` in a filter
+// value as syntax (clause separator / grouping), so a raw user search term
+// containing one of those could inject an unintended extra filter clause
+// into the same or() list. Per PostgREST's own escaping convention,
+// wrapping the value in double quotes (doubling any literal quotes inside
+// it) makes it opaque to that grammar without changing what ilike matches.
+function escapeForOrFilter(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
 function uniqueSorted(values: (string | null | undefined)[] | undefined): string[] {
   return [...new Set((values ?? []).filter((v): v is string => Boolean(v)))].sort((a, b) => a.localeCompare(b));
 }
@@ -77,7 +87,8 @@ export async function buildVehicleQuery(supabase: SupabaseServerClient, filters:
     // top-level `or` with a parse error), so showroom-name matching is a
     // separate lookup: find matching showroom ids first, then fold them
     // into the same OR list as `showroom_id.in.(...)`.
-    const orParts = [`title.ilike.%${filters.q}%`, `make.ilike.%${filters.q}%`, `model.ilike.%${filters.q}%`];
+    const escapedQ = escapeForOrFilter(`%${filters.q}%`);
+    const orParts = [`title.ilike.${escapedQ}`, `make.ilike.${escapedQ}`, `model.ilike.${escapedQ}`];
     if (/^\d{4}$/.test(filters.q)) orParts.push(`year.eq.${filters.q}`);
 
     const { data: matchingShowrooms } = await supabase.from("showrooms").select("id").ilike("business_name", `%${filters.q}%`);

@@ -1,24 +1,23 @@
 "use client";
 
+import { toCsv } from "@/features/analytics/csv";
+
 export interface CsvColumn<T> {
   label: string;
   value: (row: T) => string | number | null | undefined;
 }
 
-// RFC 4180-ish: only quote a field when it actually needs it, always escape
-// embedded quotes by doubling them. Good enough for Excel/Sheets/every
-// other real consumer of an admin CSV export — no library needed for this.
-function escapeCsvField(value: string): string {
-  if (/[",\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
+// Column-def shape (label + typed value getter per row) is more convenient
+// here than the analytics export's plain headers/rows arrays — these admin
+// lists already hold typed row objects, not pre-flattened arrays. The
+// actual CSV serialization/escaping is NOT duplicated though: this defers
+// to the same toCsv() every other export in the app uses, so there's a
+// single place that knows how to escape a field (including the
+// formula-injection guard) rather than two copies to keep in sync.
 export function buildCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
-  const header = columns.map((c) => escapeCsvField(c.label)).join(",");
-  const lines = rows.map((row) => columns.map((c) => escapeCsvField(String(c.value(row) ?? ""))).join(","));
-  return [header, ...lines].join("\r\n");
+  const headers = columns.map((c) => c.label);
+  const cells = rows.map((row) => columns.map((c) => c.value(row) ?? ""));
+  return toCsv(headers, cells);
 }
 
 interface ExportCsvButtonProps<T> {
@@ -37,7 +36,10 @@ interface ExportCsvButtonProps<T> {
 export function ExportCsvButton<T>({ data, columns, filename }: ExportCsvButtonProps<T>) {
   function handleExport() {
     const csv = buildCsv(data, columns);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    // A UTF-8 BOM so Excel (which otherwise guesses the wrong encoding for
+    // non-ASCII characters) opens this correctly — same fix already applied
+    // in the analytics export button.
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;

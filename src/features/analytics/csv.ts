@@ -4,8 +4,18 @@
 // logic (RFC 4180: quote a field if it contains a comma, quote, or
 // newline; a literal quote inside becomes two quotes).
 
+// A leading =, +, -, or @ makes Excel/Sheets read the field as a formula on
+// open (CSV/formula injection, CWE-1236) — a real risk here since some
+// exported fields (a showroom's business name, a vehicle's admin notes) are
+// user-entered and not otherwise restricted. Prefixing with a plain quote
+// forces text interpretation in every spreadsheet app without changing the
+// visible value.
+function neutralizeFormulaPrefix(str: string): string {
+  return /^[=+\-@]/.test(str) ? `'${str}` : str;
+}
+
 function escapeCsvField(value: string | number): string {
-  const str = String(value);
+  const str = neutralizeFormulaPrefix(String(value));
   if (/[",\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }
