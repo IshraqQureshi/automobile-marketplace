@@ -80,6 +80,16 @@ export async function getShowroomAppointments(supabase: SupabaseServerClient, sh
   return ((data as AppointmentRow[] | null) ?? []).map(rowToListItem);
 }
 
+/** One customer's own appointments, across every showroom — customer dashboard (AUTH-004). */
+export async function getCustomerAppointments(supabase: SupabaseServerClient, customerId: string): Promise<AppointmentListItem[]> {
+  const { data } = await supabase
+    .from("appointments")
+    .select(APPOINTMENT_SELECT_COLUMNS)
+    .eq("customer_id", customerId)
+    .order("appointment_date", { ascending: false });
+  return ((data as AppointmentRow[] | null) ?? []).map(rowToListItem);
+}
+
 export async function getPendingAppointmentCount(supabase: SupabaseServerClient, showroomId?: string): Promise<number> {
   let query = supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "PENDING");
   if (showroomId) query = query.eq("showroom_id", showroomId);
