@@ -35,7 +35,6 @@ const selectClassName =
   "rounded-md border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand";
 
 interface VehicleFormState {
-  title: string;
   status: VehicleStatus;
   brandId: string;
   make: string;
@@ -69,7 +68,6 @@ interface VehicleFormState {
 
 function emptyForm(): VehicleFormState {
   return {
-    title: "",
     status: "DRAFT",
     brandId: "",
     make: "",
@@ -89,7 +87,11 @@ function emptyForm(): VehicleFormState {
     seats: "",
     countryOfOrigin: "",
     installmentEnabled: false,
-    bankFinanceEnabled: false,
+    // Bank finance is no longer a showroom-controlled toggle (per direct
+    // request) — available by default on every new listing, admin-only to
+    // change. No checkbox renders for it below; this default is the only
+    // place it's actually set for a newly created vehicle.
+    bankFinanceEnabled: true,
     financingDownPaymentType: "PERCENT",
     financingDownPaymentPercent: "",
     financingDownPaymentAmount: "",
@@ -112,7 +114,6 @@ function formFromVehicle(vehicle: VehicleListItem, brands: CatalogOption[]): Veh
   // a real brand, exactly like bodyType already behaves.
   const matchedBrand = brands.find((b) => b.name === vehicle.make);
   return {
-    title: vehicle.title,
     status: vehicle.status,
     brandId: matchedBrand?.id ?? "",
     make: vehicle.make,
@@ -146,7 +147,6 @@ function formFromVehicle(vehicle: VehicleListItem, brands: CatalogOption[]): Veh
 }
 
 const VALIDATED_FIELDS = [
-  "title",
   "make",
   "model",
   "year",
@@ -246,7 +246,11 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
     if (hasError) return;
 
     const formData = new FormData();
-    formData.set("title", form.title);
+    // No user-editable title field anymore (per direct request) — always
+    // generated from year/make/model, same "{year} {make} {model}" shape
+    // the rest of the app already uses for a vehicle's display name (email
+    // templates, detail page <h1>, structured data).
+    formData.set("title", `${form.year} ${form.make} ${form.model}`.trim());
     formData.set("make", form.make);
     formData.set("model", form.model);
     formData.set("variant", form.variant);
@@ -326,21 +330,6 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
       <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="font-display text-lg font-semibold text-neutral-900">Basic information</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="vehicle-title">Title</FieldLabel>
-            <Input
-              id="vehicle-title"
-              value={form.title}
-              onChange={(e) => setField("title", e.target.value)}
-              onBlur={(e) => validate("title", e.target.value)}
-              placeholder="e.g. 2019 Toyota Camry SE"
-              autoFocus
-              required
-              error={!!errorFor("title")}
-            />
-            {errorFor("title") && <p className="mt-1 text-sm text-red-600">{errorFor("title")}</p>}
-          </div>
-
           <div className="sm:col-span-2">
             <FieldLabel htmlFor="vehicle-status">Status</FieldLabel>
             <select
@@ -606,15 +595,6 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
               className="h-4 w-4 rounded border-neutral-300 text-brand focus:ring-brand"
             />
             Available on installment (HP)
-          </label>
-          <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-            <input
-              type="checkbox"
-              checked={form.bankFinanceEnabled}
-              onChange={(e) => setField("bankFinanceEnabled", e.target.checked)}
-              className="h-4 w-4 rounded border-neutral-300 text-brand focus:ring-brand"
-            />
-            Available on bank finance
           </label>
         </div>
 

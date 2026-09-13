@@ -110,6 +110,7 @@ export function VehicleList({ vehicles }: VehicleListProps) {
                 <th className="px-5 py-3 font-semibold">Vehicle</th>
                 <th className="px-5 py-3 font-semibold">Price</th>
                 <th className="px-5 py-3 font-semibold">Status</th>
+                <th className="px-5 py-3 font-semibold">Views</th>
                 <th className="px-5 py-3 text-right font-semibold">Actions</th>
               </tr>
             </thead>
@@ -157,6 +158,7 @@ export function VehicleList({ vehicles }: VehicleListProps) {
                         </span>
                       )}
                     </td>
+                    <td className="px-5 py-3 text-neutral-600 tabular-nums">{vehicle.viewCount.toLocaleString("en-KE")}</td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-1">
                         <Link

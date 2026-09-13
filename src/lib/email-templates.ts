@@ -252,6 +252,35 @@ export function renderAppointmentNotificationEmail(data: AppointmentEmailData): 
   return { subject, html };
 }
 
+/**
+ * Sent to the customer the moment they submit a test drive request —
+ * distinct from renderAppointmentConfirmedEmail below, which only fires
+ * later once the showroom/admin actually confirms it. Without this one, a
+ * customer who just booked got no email at all until (and unless) the
+ * showroom acted on the request, matching the same "received" pattern
+ * renderFinancingApplicationReceivedEmail/renderInquiryThankYouEmail
+ * already use for their own submission flows.
+ */
+export function renderAppointmentReceivedEmail(data: AppointmentEmailData): { subject: string; html: string } {
+  const subject = `We've received your test drive request — ${data.bookingReference}`;
+  const html = renderEmailShell({
+    preheader: `${escapeHtml(data.showroomName)} will confirm your test drive on ${escapeHtml(data.appointmentDate)} shortly.`,
+    heading: "Test Drive Request Received",
+    bodyHtml: `
+      <p style="margin:0 0 12px 0;">Hi ${escapeHtml(data.contactName)},</p>
+      <p style="margin:0 0 16px 0;">Your test drive request with <strong>${escapeHtml(data.showroomName)}</strong> has been sent. They'll confirm your booking shortly — you'll get another email as soon as they do.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0; border:1px solid ${BORDER}; border-radius:8px;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Booking reference</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.bookingReference)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Requested date</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.appointmentDate)}</td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; color:${MUTED};">Requested time</td><td style="padding:12px 16px; border-bottom:1px solid ${BORDER}; font-size:13px; font-weight:600; text-align:right;">${escapeHtml(data.timeRange)}</td></tr>
+        <tr><td style="padding:12px 16px; font-size:13px; color:${MUTED};">Vehicles</td><td style="padding:12px 16px; font-size:13px; font-weight:600; text-align:right;">${vehicleListHtml(data.vehicleTitles)}</td></tr>
+      </table>
+    `,
+    footnote: "If you didn't request this appointment, you can safely ignore this email.",
+  });
+  return { subject, html };
+}
+
 /** Sent to the customer once the showroom/admin confirms their appointment. */
 export function renderAppointmentConfirmedEmail(data: AppointmentEmailData): { subject: string; html: string } {
   const subject = `Your test drive is confirmed — ${data.bookingReference}`;

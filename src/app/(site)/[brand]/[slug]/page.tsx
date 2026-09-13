@@ -12,10 +12,12 @@ import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-butto
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
 import { getVehicleBrandSlug, getVehicleDetailPath, parseVehicleIdFromSlug, slugify } from "@/features/vehicle/slug";
 import { getShowroomDetailPath } from "@/features/showroom/slug";
+import { buildWhatsAppLink } from "@/features/showroom/whatsapp";
 import { extractClientIp, hashClientIp } from "@/features/vehicle/view-tracking";
 import { buildBreadcrumbListJsonLd } from "@/lib/structured-data";
 import { createClient } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
+import { getSystemSettingString } from "@/lib/system-settings";
 
 const dateFormatter = new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" });
 const mileageFormatter = new Intl.NumberFormat("en-KE");
@@ -105,8 +107,14 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
   const clientIp = extractClientIp((name) => requestHeaders.get(name));
   const anonViewerIpHash = clientIp ? hashClientIp(clientIp) : undefined;
 
-  const [{ count: activeListingCount }, { data: similarRows }, { data: userResult }, { data: availabilityRows }, { data: otherShowroomVehicleRows }] =
-    await Promise.all([
+  const [
+    { count: activeListingCount },
+    { data: similarRows },
+    { data: userResult },
+    { data: availabilityRows },
+    { data: otherShowroomVehicleRows },
+    whatsappNumber,
+  ] = await Promise.all([
       supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("showroom_id", vehicle.showroomId).eq("status", "ACTIVE"),
       supabase
         .from("vehicles")
@@ -131,13 +139,20 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
         .eq("showroom_id", vehicle.showroomId)
         .eq("status", "ACTIVE")
         .neq("id", vehicle.id),
+      // Same global WhatsApp number the showroom detail page's own
+      // "Message" button already uses — one number for the whole platform,
+      // not per-showroom (see 20260907010000_add_showroom_youtube_and_whatsapp_setting.sql).
+      getSystemSettingString(supabase, "whatsapp_contact_number"),
       // Fire-and-forget from the page's perspective — renders with the
       // pre-increment count already loaded above; a genuinely new
-      // user/IP's +1 shows up on their *next* visit, not this one.
+      // user/IP's +1 shows up on their *next* visit, not this one. Last in
+      // the array (its result is never destructured) so it doesn't shift
+      // the positional destructuring above with every future addition.
       supabase.rpc("record_vehicle_view", { target_vehicle_id: vehicle.id, anon_viewer_ip_hash: anonViewerIpHash }),
     ]);
 
   const availableDaysOfWeek = [...new Set((availabilityRows ?? []).map((row) => row.day_of_week))];
+  const whatsappLink = buildWhatsAppLink(whatsappNumber, `Hi, I'm interested in the ${vehicle.year} ${vehicle.make} ${vehicle.model} on HarakaGari.`);
   const otherShowroomVehicles = (otherShowroomVehicleRows ?? []).map((row) => ({ id: row.id, title: `${row.make} ${row.model}` }));
 
   let inquiryInitialValues: { fullName: string; email: string; phone: string } | null = null;
@@ -296,7 +311,19 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                     vehicleTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                     initialValues={inquiryInitialValues}
                   />
-                  <DisabledCta label="WhatsApp" title="WhatsApp inquiry — coming soon" tone="whatsapp" icon={<WhatsAppIcon />} />
+                  {whatsappLink ? (
+                    <a
+                      href={whatsappLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex w-full items-center justify-center gap-2 rounded-[7px] border border-[#25D366] bg-white py-3 text-sm font-semibold text-[#25D366] hover:bg-[#25D366]/5"
+                    >
+                      <WhatsAppIcon />
+                      WhatsApp
+                    </a>
+                  ) : (
+                    <DisabledCta label="WhatsApp" title="WhatsApp contact number not configured yet" tone="whatsapp" icon={<WhatsAppIcon />} />
+                  )}
                   {availableDaysOfWeek.length > 0 ? (
                     <ScheduleTestDriveButton
                       vehicleId={vehicle.id}
@@ -315,16 +342,22 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                 {(vehicle.installmentEnabled || vehicle.bankFinanceEnabled) && (
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     {vehicle.installmentEnabled && (
-                      <span className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand">
+                      <a
+                        href="#financing-calculator"
+                        className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand hover:bg-[#e0f9f2]"
+                      >
                         <InstallmentIcon />
                         HP Installments
-                      </span>
+                      </a>
                     )}
                     {vehicle.bankFinanceEnabled && (
-                      <span className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand">
+                      <a
+                        href="#financing-calculator"
+                        className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand hover:bg-[#e0f9f2]"
+                      >
                         <BankIcon />
                         Bank Finance
-                      </span>
+                      </a>
                     )}
                   </div>
                 )}
@@ -346,24 +379,23 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                 <p className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">General</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2">
-                <SpecRow label="Body Type" value={vehicle.bodyType ?? "—"} borderRight />
-                <SpecRow label="Colour" value={vehicle.color ?? "—"} />
-                <SpecRow label="Interior" value={vehicle.interior ?? "—"} borderRight />
+                <SpecRow label="Colour" value={vehicle.color ?? "—"} borderRight />
                 <SpecRow label="Seats" value={vehicle.seats != null ? String(vehicle.seats) : "—"} />
-                <SpecRow label="Doors" value={vehicle.doors != null ? String(vehicle.doors) : "—"} borderRight last />
-                <SpecRow label="Country of Origin" value={vehicle.countryOfOrigin ?? "—"} last />
+                <SpecRow label="Doors" value={vehicle.doors != null ? String(vehicle.doors) : "—"} last />
               </div>
             </div>
           </section>
 
-          <section className="mb-10">
-            <h2 className="mb-5 text-lg font-bold tracking-tight text-neutral-900">Description</h2>
-            <div className="rounded-xl border border-neutral-200 bg-white p-5">
-              <p className="text-sm leading-relaxed whitespace-pre-line text-neutral-600">{vehicle.description || "No description provided."}</p>
-            </div>
-          </section>
+          {vehicle.description && (
+            <section className="mb-10">
+              <h2 className="mb-5 text-lg font-bold tracking-tight text-neutral-900">Description</h2>
+              <div className="rounded-xl border border-neutral-200 bg-white p-5">
+                <p className="text-sm leading-relaxed whitespace-pre-line text-neutral-600">{vehicle.description}</p>
+              </div>
+            </section>
+          )}
 
-          <section className="mb-10">
+          <section id="financing-calculator" className="mb-10 scroll-mt-20">
             <h2 className="mb-5 text-lg font-bold tracking-tight text-neutral-900">Financing Calculator</h2>
             {hasRealFinancing ? (
               <FinancingCalculator

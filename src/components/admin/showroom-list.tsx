@@ -23,10 +23,18 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { ExportCsvButton, type CsvColumn } from "@/components/admin/export-csv-button";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
 import { validateLogoFile } from "@/features/admin/logo-upload";
-import { approveShowroomAction, getShowroomDocumentUrlAction, rejectShowroomAction, type ShowroomOwnerCandidate } from "@/features/admin/showroom-actions";
-import { adminShowroomSchema, newOwnerFieldSchemas, newOwnerSchema, showroomFieldSchemas } from "@/features/admin/showroom-schemas";
+import {
+  approveShowroomAction,
+  getShowroomDocumentUrlAction,
+  reactivateShowroomAction,
+  rejectShowroomAction,
+  suspendShowroomAction,
+  type ShowroomOwnerCandidate,
+} from "@/features/admin/showroom-actions";
+import { adminShowroomSchema, newOwnerFieldSchemas, newOwnerSchema, showroomFieldSchemas, youtubePlaylistUrlSchema } from "@/features/admin/showroom-schemas";
 import { stripKenyaPrefix } from "@/lib/validation/kenya-phone";
 
 export interface ShowroomDocumentItem {
@@ -46,12 +54,21 @@ export interface ShowroomListItem {
   address: string | null;
   description: string | null;
   openingHours: string | null;
-  youtubeChannelUrl: string | null;
+  youtubePlaylistUrl: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
   createdAt: string;
   documents: ShowroomDocumentItem[];
   logoUrl: string | null;
 }
+
+const SHOWROOM_CSV_COLUMNS: CsvColumn<ShowroomListItem>[] = [
+  { label: "Business Name", value: (s) => s.businessName },
+  { label: "Email", value: (s) => s.email },
+  { label: "Phone", value: (s) => s.phone },
+  { label: "City", value: (s) => s.city },
+  { label: "Status", value: (s) => s.status },
+  { label: "Submitted", value: (s) => s.createdAt },
+];
 
 interface ShowroomListProps {
   items: ShowroomListItem[];
@@ -98,7 +115,7 @@ interface ShowroomFormState {
   address: string;
   description: string;
   openingHours: string;
-  youtubeChannelUrl: string;
+  youtubePlaylistUrl: string;
 }
 
 const BLANK_FORM: ShowroomFormState = {
@@ -109,7 +126,7 @@ const BLANK_FORM: ShowroomFormState = {
   address: "",
   description: "",
   openingHours: "",
-  youtubeChannelUrl: "",
+  youtubePlaylistUrl: "",
 };
 
 interface NewOwnerFormState {
@@ -164,6 +181,26 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
   const [previewingDocument, setPreviewingDocument] = useState<PreviewingDocument | null>(null);
   const [reviewPending, startReviewTransition] = useTransition();
 
+  // Row-level activate/deactivate — independent of the Review dialog's own
+  // approve/reject flow (that's for the initial PENDING decision; this is a
+  // quick reversible toggle for an already-approved showroom, no dialog
+  // needed).
+  const [statusTogglePendingId, setStatusTogglePendingId] = useState<string | null>(null);
+  const [, startStatusToggleTransition] = useTransition();
+  function handleStatusToggle(item: ShowroomListItem) {
+    setStatusTogglePendingId(item.id);
+    startStatusToggleTransition(async () => {
+      const action = item.status === "SUSPENDED" ? reactivateShowroomAction : suspendShowroomAction;
+      const result = await action(item.id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(item.status === "SUSPENDED" ? "Showroom reactivated." : "Showroom deactivated.");
+      }
+      setStatusTogglePendingId(null);
+    });
+  }
+
   // Real, application-level (zod) validation, not just native HTML5
   // attributes — mirrors register-showroom-form.tsx's use of the same
   // hook against the same schemas: on-blur inline errors here, plus an
@@ -181,6 +218,15 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     errorFor: errorForOwnerField,
     reset: resetOwnerFieldValidation,
   } = useFieldValidation(newOwnerFieldSchemas);
+  // Separate from showroomFieldSchemas above — youtubePlaylistUrl is
+  // admin-only (see youtubePlaylistUrlSchema's own comment) and isn't part
+  // of that shared schema, which updateShowroomProfile also validates
+  // against for the showroom owner's own (non-admin) profile save.
+  const {
+    validate: validatePlaylistField,
+    errorFor: errorForPlaylistField,
+    reset: resetPlaylistFieldValidation,
+  } = useFieldValidation({ youtubePlaylistUrl: youtubePlaylistUrlSchema });
 
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editingItem, setEditingItem] = useState<ShowroomListItem | null>(null);
@@ -272,6 +318,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     setLogoInputKey((k) => k + 1);
     setFormError(null);
     resetFieldValidation();
+    resetPlaylistFieldValidation();
     resetOwnerFieldValidation();
   }
 
@@ -286,7 +333,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       address: item.address ?? "",
       description: item.description ?? "",
       openingHours: item.openingHours ?? "",
-      youtubeChannelUrl: item.youtubeChannelUrl ?? "",
+      youtubePlaylistUrl: item.youtubePlaylistUrl ?? "",
     });
     setOwnerMode("existing");
     setSelectedOwner(null);
@@ -300,6 +347,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
     setLogoInputKey((k) => k + 1);
     setFormError(null);
     resetFieldValidation();
+    resetPlaylistFieldValidation();
     resetOwnerFieldValidation();
   }
 
@@ -347,14 +395,15 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       address: form.address,
       description: form.description,
       openingHours: form.openingHours,
-      youtubeChannelUrl: form.youtubeChannelUrl,
     });
-    if (!businessParsed.success) {
+    const playlistParsed = youtubePlaylistUrlSchema.safeParse(form.youtubePlaylistUrl);
+    if (!businessParsed.success || !playlistParsed.success) {
       // Only the inline per-field errors below each input — not also the
       // top banner, which would show the exact same message twice.
       for (const field of Object.keys(showroomFieldSchemas) as (keyof typeof showroomFieldSchemas)[]) {
         validateField(field, form[field as keyof ShowroomFormState] ?? "");
       }
+      validatePlaylistField("youtubePlaylistUrl", form.youtubePlaylistUrl);
       return;
     }
 
@@ -393,7 +442,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       formData.set("address", form.address);
       formData.set("description", form.description);
       formData.set("openingHours", form.openingHours);
-      formData.set("youtubeChannelUrl", form.youtubeChannelUrl);
+      formData.set("youtubePlaylistUrl", form.youtubePlaylistUrl);
       if (logo) formData.set("logo", logo);
       if (editingItem) {
         formData.set("id", editingItem.id);
@@ -459,6 +508,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
               </option>
             ))}
           </select>
+          <ExportCsvButton data={filteredItems} filename="showrooms" columns={SHOWROOM_CSV_COLUMNS} />
         </FilterBar>
       )}
 
@@ -506,6 +556,20 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
                       >
                         Review
                       </button>
+                      {(item.status === "APPROVED" || item.status === "SUSPENDED") && (
+                        <button
+                          type="button"
+                          onClick={() => handleStatusToggle(item)}
+                          disabled={statusTogglePendingId === item.id}
+                          className={`rounded-md border px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60 ${
+                            item.status === "SUSPENDED"
+                              ? "border-brand text-brand hover:bg-brand/5"
+                              : "border-red-300 text-red-600 hover:bg-red-50"
+                          }`}
+                        >
+                          {statusTogglePendingId === item.id ? "…" : item.status === "SUSPENDED" ? "Activate" : "Deactivate"}
+                        </button>
+                      )}
                       <RowIconButton label="Edit" onClick={() => openEdit(item)}>
                         <PencilIcon />
                       </RowIconButton>
@@ -971,18 +1035,20 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
           </div>
 
           <div>
-            <FieldLabel htmlFor="showroom-youtube-channel">YouTube channel URL (optional)</FieldLabel>
+            <FieldLabel htmlFor="showroom-youtube-playlist">YouTube playlist URL (optional)</FieldLabel>
             <Input
-              id="showroom-youtube-channel"
-              value={form.youtubeChannelUrl}
-              onChange={(e) => setForm((f) => ({ ...f, youtubeChannelUrl: e.target.value }))}
-              onBlur={(e) => validateField("youtubeChannelUrl", e.target.value)}
-              placeholder="https://www.youtube.com/@channel"
-              error={!!errorForField("youtubeChannelUrl")}
+              id="showroom-youtube-playlist"
+              value={form.youtubePlaylistUrl}
+              onChange={(e) => setForm((f) => ({ ...f, youtubePlaylistUrl: e.target.value }))}
+              onBlur={(e) => validatePlaylistField("youtubePlaylistUrl", e.target.value)}
+              placeholder="https://www.youtube.com/playlist?list=..."
+              error={!!errorForPlaylistField("youtubePlaylistUrl")}
             />
-            {errorForField("youtubeChannelUrl") && <p className="mt-1 text-sm text-red-600">{errorForField("youtubeChannelUrl")}</p>}
+            {errorForPlaylistField("youtubePlaylistUrl") && (
+              <p className="mt-1 text-sm text-red-600">{errorForPlaylistField("youtubePlaylistUrl")}</p>
+            )}
             <p className="mt-1 text-xs text-neutral-400">
-              Individual featured videos are managed by the showroom owner from their own dashboard, not here.
+              A playlist from the real HarakaGari YouTube channel, embedded on this showroom&apos;s public page. Not owner-editable.
             </p>
           </div>
 

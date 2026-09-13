@@ -33,22 +33,28 @@ export const showroomFieldSchemas = {
     .max(100, "Opening hours must be under 100 characters")
     .optional()
     .transform((value) => value || undefined),
-  // The showroom's own YouTube channel link ("View Channel" button on the
-  // detail page) — distinct from its individual featured videos, which are
-  // a proper one-to-many list (src/features/showroom/video-schemas.ts,
-  // `showroom_videos` table), and distinct from the homepage's admin-wide
-  // TikTok/YouTube highlights (homepage-highlights-schemas.ts), which are a
-  // platform-level feature, not per-showroom.
-  youtubeChannelUrl: z
-    .string()
-    .trim()
-    .url("Enter a valid URL")
-    .or(z.literal(""))
-    .transform((value) => value || undefined),
 };
 
 export const adminShowroomSchema = z.object(showroomFieldSchemas);
 export type AdminShowroomInput = z.infer<typeof adminShowroomSchema>;
+
+// Deliberately NOT part of showroomFieldSchemas/adminShowroomSchema above —
+// those are shared with updateShowroomProfile (src/features/showroom/profile.ts),
+// which is also called from the showroom owner's own profile save. This
+// field is admin-only (per direct request — showroom owners no longer
+// manage their own YouTube content at all): a playlist URL from the real
+// HarakaGari YouTube channel, embedded directly on this showroom's public
+// detail page. Distinct from the homepage's own admin-wide TikTok/YouTube
+// highlights (homepage-highlights-schemas.ts), which are a platform-level
+// feature, not per-showroom. Enforced server-side too
+// (prevent_showroom_youtube_playlist_self_edit trigger) — this schema
+// alone isn't the real boundary, RLS/the trigger is.
+export const youtubePlaylistUrlSchema = z
+  .string()
+  .trim()
+  .url("Enter a valid URL")
+  .or(z.literal(""))
+  .transform((value) => value || undefined);
 
 export const ownerUserIdSchema = z.string().uuid("Choose an owner for this showroom.");
 

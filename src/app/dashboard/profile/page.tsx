@@ -24,17 +24,13 @@ export default async function DashboardProfilePage() {
   const showroom = await getOwnerShowroom(user.id);
   if (!showroom) redirect("/ready-to-sell");
 
-  const [{ data: full }, { data: videoRows }] = await Promise.all([
-    supabase
-      .from("showrooms")
-      .select("business_name, city, phone, email, address, description, logo_storage_path, opening_hours, youtube_channel_url")
-      .eq("id", showroom.id)
-      .single(),
-    supabase.from("showroom_videos").select("id, title, video_url").eq("showroom_id", showroom.id).order("sort_order", { ascending: true }),
-  ]);
+  const { data: full } = await supabase
+    .from("showrooms")
+    .select("business_name, city, phone, email, address, description, logo_storage_path, opening_hours")
+    .eq("id", showroom.id)
+    .single();
 
   const logoUrl = full?.logo_storage_path ? supabase.storage.from("showroom-logos").getPublicUrl(full.logo_storage_path).data.publicUrl : null;
-  const videos = (videoRows ?? []).map((row) => ({ id: row.id, title: row.title, videoUrl: row.video_url }));
 
   return (
     <div className="mx-auto max-w-2xl p-7">
@@ -43,7 +39,6 @@ export default async function DashboardProfilePage() {
       </Link>
       <h1 className="mt-2 mb-6 font-display text-xl font-semibold text-neutral-900">Showroom profile</h1>
       <ShowroomProfileForm
-        showroomId={showroom.id}
         initialValues={{
           businessName: full?.business_name ?? "",
           location: full?.city ?? "",
@@ -52,10 +47,8 @@ export default async function DashboardProfilePage() {
           address: full?.address ?? "",
           description: full?.description ?? "",
           openingHours: typeof full?.opening_hours === "string" ? full.opening_hours : "",
-          youtubeChannelUrl: full?.youtube_channel_url ?? "",
           logoUrl,
         }}
-        videos={videos}
       />
     </div>
   );

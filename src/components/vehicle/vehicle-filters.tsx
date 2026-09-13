@@ -1,5 +1,6 @@
 import type { VehicleFilterOptions } from "@/features/vehicle/listing-query";
 import type { VehicleSearchFilters } from "@/features/vehicle/search";
+import { PriceRangeSlider } from "./price-range-slider";
 
 interface VehicleFiltersProps {
   filters: VehicleSearchFilters;
@@ -46,32 +47,7 @@ export function VehicleFilters({ filters, options, action = "/listing" }: Vehicl
       <FilterSelect label="Body Type" name="bodyType" value={filters.bodyType} options={options.bodyTypes} />
       <FilterSelect label="Fuel Type" name="fuelType" value={filters.fuelType} options={options.fuelTypes} />
 
-      <div>
-        <label htmlFor="vehicle-min-price" className="mb-1.5 block text-xs font-semibold text-neutral-600">
-          Min Price (KSh)
-        </label>
-        <input
-          id="vehicle-min-price"
-          type="number"
-          name="minPrice"
-          min={0}
-          defaultValue={filters.minPrice ?? ""}
-          className={selectClassName}
-        />
-      </div>
-      <div>
-        <label htmlFor="vehicle-max-price" className="mb-1.5 block text-xs font-semibold text-neutral-600">
-          Max Price (KSh)
-        </label>
-        <input
-          id="vehicle-max-price"
-          type="number"
-          name="maxPrice"
-          min={0}
-          defaultValue={filters.maxPrice ?? ""}
-          className={selectClassName}
-        />
-      </div>
+      <PriceRangeSlider min={options.minPriceBound} max={options.maxPriceBound} defaultMinPrice={filters.minPrice} defaultMaxPrice={filters.maxPrice} />
       <div>
         <label htmlFor="vehicle-min-year" className="mb-1.5 block text-xs font-semibold text-neutral-600">
           Min Year

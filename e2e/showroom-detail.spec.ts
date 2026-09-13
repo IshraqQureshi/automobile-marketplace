@@ -22,6 +22,12 @@ function admin() {
 
 const SHOWROOM_NAME = `E2E Showroom Detail ${unique}`;
 let showroomId: string;
+// Every navigation to this fixture showroom's own page below uses
+// { waitUntil: "domcontentloaded" } rather than the Playwright default
+// "load" — its YouTube playlist embed's cross-origin request to
+// youtube.com never resolves in this sandboxed test environment
+// (confirmed live: "load" timed out waiting on it), so the fixture always
+// has a real iframe on it once youtube_playlist_url is seeded below.
 let showroomPath: string;
 let pendingShowroomId: string;
 let vehicleAId: string;
@@ -63,19 +69,17 @@ test.beforeAll(async () => {
       status: "APPROVED",
       verified: true,
       opening_hours: "Mon–Sat, 8am–6pm",
-      youtube_channel_url: "https://www.youtube.com/@e2eshowroom",
+      // Admin-only field now (see 20260913020000_showroom_youtube_playlist.sql)
+      // — inserting via the service-role client bypasses
+      // prevent_showroom_youtube_playlist_self_edit (that trigger only
+      // blocks a non-admin UPDATE, not this fixture's own INSERT).
+      youtube_playlist_url: "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
     })
     .select("id")
     .single();
   if (showroomError || !showroom) throw showroomError ?? new Error("showroom not created");
   showroomId = showroom.id;
   showroomPath = `/showrooms/e2e-showroom-detail-${unique}-${showroomId}`;
-
-  const { error: videosError } = await supabase.from("showroom_videos").insert([
-    { showroom_id: showroomId, title: "Showroom Tour", video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", sort_order: 0 },
-    { showroom_id: showroomId, title: "Customer Reviews", video_url: "https://www.youtube.com/watch?v=oHg5SJYRHA0", sort_order: 1 },
-  ]);
-  if (videosError) throw videosError;
 
   const { data: pendingShowroom, error: pendingError } = await supabase
     .from("showrooms")
@@ -161,7 +165,7 @@ test.afterAll(async () => {
 });
 
 test("a showroom's public detail page shows its real info and vehicles", async ({ page }) => {
-  await page.goto(showroomPath);
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: SHOWROOM_NAME, exact: true })).toBeVisible();
   await expect(page.getByText("Verified Dealer")).toBeVisible();
@@ -169,17 +173,28 @@ test("a showroom's public detail page shows its real info and vehicles", async (
   await expect(page.getByText("Mon–Sat, 8am–6pm")).toBeVisible();
   await expect(page.getByText(/Member since/)).toBeVisible();
 
-  await expect(page.getByText(new RegExp(`E2Esdetaila${unique}`))).toBeVisible();
-  await expect(page.getByText(new RegExp(`E2Esdetailb${unique}`))).toBeVisible();
+  // VehicleCard renders make/model separately (not the raw `title` field),
+  // and the vehicle's own make (e.g. "E2Esdetaila...") now also appears as
+  // a Brand-filter pill button (showroom-vehicle-browser.tsx) — matching
+  // model instead avoids both the mismatch and the strict-mode ambiguity.
+  await expect(page.getByText("Alpha", { exact: true })).toBeVisible();
+  await expect(page.getByText("Beta", { exact: true })).toBeVisible();
   await expect(page.getByText("Available Cars(2)")).toBeVisible();
 });
 
-test("type-filter pills and sort narrow/reorder the real vehicle list", async ({ page }) => {
-  await page.goto(showroomPath);
+test("brand-filter pills and sort narrow/reorder the real vehicle list", async ({ page }) => {
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
 
-  await page.getByRole("button", { name: "SUV" }).click();
-  await expect(page.getByText(new RegExp(`E2Esdetaila${unique}`))).toBeVisible();
-  await expect(page.getByText(new RegExp(`E2Esdetailb${unique}`))).toHaveCount(0);
+  // Pills are real Brand (vehicles.make) values now, not body/fuel type —
+  // each fixture vehicle has its own unique make, so filtering by vehicle
+  // A's make isolates it exactly like the old body-type pill used to. The
+  // pill buttons themselves stay rendered regardless of which is active
+  // (only the vehicle grid below is filtered), so asserting on the grid's
+  // own model text (not the make/pill text) is what actually proves the
+  // filter took effect.
+  await page.getByRole("button", { name: `E2Esdetaila${unique}`, exact: true }).click();
+  await expect(page.getByText("Alpha", { exact: true })).toBeVisible();
+  await expect(page.getByText("Beta", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "All" }).click();
   await page.getByLabel("Sort listings").selectOption("price-asc");
@@ -187,28 +202,17 @@ test("type-filter pills and sort narrow/reorder the real vehicle list", async ({
   await expect(firstCardPrice).toHaveText("Ksh 1,000,000");
 });
 
-test("the YouTube section shows the real channel link and every real video, each opening its own modal", async ({ page }) => {
-  await page.goto(showroomPath);
+test("the YouTube section embeds the admin-set playlist", async ({ page }) => {
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("ON YOUTUBE")).toBeVisible();
-  await expect(page.getByRole("link", { name: "View Channel" })).toHaveAttribute("href", "https://www.youtube.com/@e2eshowroom");
-
-  // Both seeded videos render as their own grid card (a showroom can have
-  // multiple, unlike the single-video field this replaced).
-  const firstCard = page.getByRole("button", { name: "Showroom Tour" });
-  const secondCard = page.getByRole("button", { name: "Customer Reviews" });
-  await expect(firstCard).toBeVisible();
-  await expect(secondCard).toBeVisible();
-
-  await firstCard.click();
-  await expect(page.locator("iframe")).toHaveAttribute("src", /embed\/dQw4w9WgXcQ/);
-  await page.getByRole("button", { name: "Close" }).click();
-
-  await secondCard.click();
-  await expect(page.locator("iframe")).toHaveAttribute("src", /embed\/oHg5SJYRHA0/);
+  await expect(page.locator("iframe")).toHaveAttribute(
+    "src",
+    "https://www.youtube.com/embed/videoseries?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+  );
 });
 
-test("the showroom owner can add and remove a video from their dashboard, reflected on the public page", async ({ page }) => {
+test("the showroom owner's own profile page has no YouTube/video management UI — admin-only now", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Email address").fill(OWNER_EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
@@ -220,36 +224,41 @@ test("the showroom owner can add and remove a video from their dashboard, reflec
   // event at all (confirmed against /dashboard/vehicles too, unrelated to
   // this feature) — same precedent as this file's own stale-slug test below.
   await page.goto("/dashboard/profile", { waitUntil: "domcontentloaded" });
-  const newTitle = `E2E Added Video ${unique}`;
-  await page.getByLabel("Title").fill(newTitle);
-  await page.getByLabel("Video URL").fill("https://www.youtube.com/watch?v=9bZkp7q19f0");
-  await page.getByRole("button", { name: "Add video" }).click();
-  await expect(page.getByText("Video added.")).toBeVisible();
-  await expect(page.getByText(newTitle)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Showroom profile", level: 1 })).toBeVisible();
+  await expect(page.getByText("YouTube", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Featured videos")).toHaveCount(0);
+  await expect(page.getByLabel(/Channel URL/)).toHaveCount(0);
+});
+
+test("admin can set a showroom's YouTube playlist URL, reflected on the public page", async ({ page }) => {
+  await page.goto("/admin/login");
+  await page.getByLabel("Email address").fill(ADMIN_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to admin" }).click();
+  await page.waitForURL(/\/admin$/);
+
+  await page.goto("/admin/showrooms");
+  await page.getByRole("row", { name: new RegExp(SHOWROOM_NAME) }).getByRole("button", { name: "Edit" }).click();
+  const newPlaylistUrl = "https://www.youtube.com/playlist?list=PLnewplaylistid1234567890abcdef";
+  const playlistInput = page.getByLabel(/YouTube playlist URL/);
+  await playlistInput.fill(newPlaylistUrl);
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Showroom updated.")).toBeVisible();
 
   await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("button", { name: newTitle })).toBeVisible();
-
-  await page.goto("/dashboard/profile", { waitUntil: "domcontentloaded" });
-  const row = page.locator("li", { hasText: newTitle });
-  await row.getByTitle("Remove video").click();
-  await expect(page.getByText("Video removed.")).toBeVisible();
-  await expect(page.getByText(newTitle)).toHaveCount(0);
-
-  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("button", { name: newTitle })).toHaveCount(0);
+  await expect(page.locator("iframe")).toHaveAttribute("src", "https://www.youtube.com/embed/videoseries?list=PLnewplaylistid1234567890abcdef");
 });
 
 test("the Message button opens WhatsApp to the admin-configured global number, and is disabled when unset", async ({ page }) => {
   const supabase = admin();
 
   await supabase.from("system_settings").update({ value: "254799888777" }).eq("key", "whatsapp_contact_number");
-  await page.goto(showroomPath);
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
   const messageLink = page.getByRole("link", { name: "Message" });
   await expect(messageLink).toHaveAttribute("href", new RegExp(`^https://wa\\.me/254799888777\\?text=`));
 
   await supabase.from("system_settings").update({ value: "" }).eq("key", "whatsapp_contact_number");
-  await page.goto(showroomPath);
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("button", { name: "Message" })).toBeDisabled();
 });
 

@@ -3,9 +3,8 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { ToastProvider } from "@/components/ui/toast";
 import { getPendingAppointmentCount } from "@/features/appointment/queries";
-import { getUnreadFinancingCount } from "@/features/financing/queries";
-import { getUnreadInquiryCount } from "@/features/inquiry/queries";
 import { getOwnerShowroom } from "@/features/showroom/my-showroom";
+import { getCurrentSubscriptionStatus, getMyShowroomPayments } from "@/features/showroom/payment-queries";
 import { createClient } from "@/lib/supabase/server";
 
 interface DashboardLayoutProps {
@@ -50,24 +49,21 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     redirect("/ready-to-sell");
   }
 
-  const [unreadInquiryCount, unreadFinancingCount, pendingAppointmentCount] =
-    showroom.status === "APPROVED"
-      ? await Promise.all([
-          getUnreadInquiryCount(supabase, showroom.id),
-          getUnreadFinancingCount(supabase, showroom.id),
-          getPendingAppointmentCount(supabase, showroom.id),
-        ])
-      : [0, 0, 0];
+  const pendingAppointmentCount = showroom.status === "APPROVED" ? await getPendingAppointmentCount(supabase, showroom.id) : 0;
+
+  // Same badge convention as pendingAppointmentCount above (NavEntry.count),
+  // but here it's a due/not-due flag rather than a literal count — a
+  // showroom only ever has one *current* subscription period.
+  let paymentDueCount = 0;
+  if (showroom.status === "APPROVED") {
+    const payments = await getMyShowroomPayments(supabase, showroom.id);
+    const current = getCurrentSubscriptionStatus(payments);
+    paymentDueCount = current && current.urgency !== "ACTIVE" ? 1 : 0;
+  }
 
   return (
     <ToastProvider>
-      <DashboardShell
-        email={user.email ?? ""}
-        showroom={showroom}
-        unreadInquiryCount={unreadInquiryCount}
-        unreadFinancingCount={unreadFinancingCount}
-        pendingAppointmentCount={pendingAppointmentCount}
-      >
+      <DashboardShell email={user.email ?? ""} showroom={showroom} pendingAppointmentCount={pendingAppointmentCount} paymentDueCount={paymentDueCount}>
         {children}
       </DashboardShell>
     </ToastProvider>

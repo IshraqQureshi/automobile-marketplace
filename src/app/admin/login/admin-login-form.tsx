@@ -39,7 +39,6 @@ export function AdminLoginForm() {
           id="admin-email"
           name="email"
           type="email"
-          placeholder="admin@harakagari.local"
           autoComplete="email"
           required
           error={!!emailError}

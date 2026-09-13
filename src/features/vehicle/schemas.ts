@@ -105,7 +105,7 @@ export const vehicleTracker2YearPriceSchema = optionalNonNegativeAmount("2-year 
 
 export const DOWN_PAYMENT_TYPES = ["PERCENT", "FIXED"] as const;
 export type DownPaymentType = (typeof DOWN_PAYMENT_TYPES)[number];
-export const LOAN_TENURE_OPTIONS_MONTHS = [12, 24, 36, 48, 60, 72] as const;
+export const LOAN_TENURE_OPTIONS_MONTHS = [12, 24, 36] as const;
 
 // Shape object for useFieldValidation (Record<string, ZodType>) — same
 // convention as catalogFieldSchemas/showroomFieldSchemas. Fuel type,

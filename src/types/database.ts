@@ -734,7 +734,7 @@ export type Database = {
           status: Database["public"]["Enums"]["showroom_status"]
           updated_at: string
           verified: boolean
-          youtube_channel_url: string | null
+          youtube_playlist_url: string | null
         }
         Insert: {
           address?: string | null
@@ -755,7 +755,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["showroom_status"]
           updated_at?: string
           verified?: boolean
-          youtube_channel_url?: string | null
+          youtube_playlist_url?: string | null
         }
         Update: {
           address?: string | null
@@ -776,7 +776,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["showroom_status"]
           updated_at?: string
           verified?: boolean
-          youtube_channel_url?: string | null
+          youtube_playlist_url?: string | null
         }
         Relationships: [
           {
@@ -834,6 +834,54 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_commissions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          recorded_by: string
+          status: Database["public"]["Enums"]["commission_status"]
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          recorded_by: string
+          status?: Database["public"]["Enums"]["commission_status"]
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          recorded_by?: string
+          status?: Database["public"]["Enums"]["commission_status"]
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_commissions_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_commissions_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: true
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]
@@ -1195,6 +1243,7 @@ export type Database = {
         | "DECLINED"
         | "CANCELLED"
         | "COMPLETED"
+      commission_status: "PENDING" | "PAID"
       financing_application_status: "NEW" | "VIEWED"
       homepage_highlight_platform: "TIKTOK" | "YOUTUBE"
       manual_payment_status: "RECORDED" | "VOIDED"
@@ -1363,6 +1412,7 @@ export const Constants = {
         "CANCELLED",
         "COMPLETED",
       ],
+      commission_status: ["PENDING", "PAID"],
       financing_application_status: ["NEW", "VIEWED"],
       homepage_highlight_platform: ["TIKTOK", "YOUTUBE"],
       manual_payment_status: ["RECORDED", "VOIDED"],

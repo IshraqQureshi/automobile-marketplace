@@ -21,7 +21,6 @@ export interface ShowroomProfileFormFields {
   address: FormDataEntryValue | null;
   description: FormDataEntryValue | null;
   openingHours: FormDataEntryValue | null;
-  youtubeChannelUrl: FormDataEntryValue | null;
 }
 
 export function readShowroomProfileFormFields(formData: FormData): ShowroomProfileFormFields {
@@ -33,7 +32,6 @@ export function readShowroomProfileFormFields(formData: FormData): ShowroomProfi
     address: formData.get("address"),
     description: formData.get("description"),
     openingHours: formData.get("openingHours"),
-    youtubeChannelUrl: formData.get("youtubeChannelUrl"),
   };
 }
 
@@ -73,7 +71,12 @@ export async function updateShowroomProfile(
       address: parsed.address ?? null,
       description: parsed.description ?? null,
       opening_hours: parsed.openingHours ?? null,
-      youtube_channel_url: parsed.youtubeChannelUrl ?? null,
+      // youtube_playlist_url is deliberately NOT written here — it's
+      // admin-only (prevent_showroom_youtube_playlist_self_edit), and this
+      // function is shared with the showroom owner's own profile save. An
+      // owner's unrelated edit must never even attempt to touch that
+      // column, or the trigger would reject their whole update. Admin sets
+      // it via its own dedicated write in showroom-actions.ts.
       ...(removeLogo && !logoFile ? { logo_storage_path: null } : {}),
     })
     .eq("id", showroomId)
