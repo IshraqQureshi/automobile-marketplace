@@ -8,6 +8,7 @@ import { FavoriteButton } from "@/components/vehicle/favorite-button";
 import { FinancingApplicationButton } from "@/components/vehicle/financing-application-button";
 import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
 import { ScheduleTestDriveButton } from "@/components/vehicle/schedule-test-drive-button";
+import { ScrollToSectionLink } from "@/components/vehicle/scroll-to-section-link";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
 import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-button";
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -341,22 +342,22 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                 {(vehicle.installmentEnabled || vehicle.bankFinanceEnabled) && (
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     {vehicle.installmentEnabled && (
-                      <a
-                        href="#financing-calculator"
+                      <ScrollToSectionLink
+                        targetId="financing-calculator"
                         className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand hover:bg-[#e0f9f2]"
                       >
                         <InstallmentIcon />
                         HP Installments
-                      </a>
+                      </ScrollToSectionLink>
                     )}
                     {vehicle.bankFinanceEnabled && (
-                      <a
-                        href="#financing-calculator"
+                      <ScrollToSectionLink
+                        targetId="financing-calculator"
                         className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand hover:bg-[#e0f9f2]"
                       >
                         <BankIcon />
                         Bank Finance
-                      </a>
+                      </ScrollToSectionLink>
                     )}
                   </div>
                 )}
