@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { VehicleCard } from "@/components/vehicle/vehicle-card";
+import { FavoriteButton } from "@/components/vehicle/favorite-button";
 import { FinancingApplicationButton } from "@/components/vehicle/financing-application-button";
 import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
 import { ScheduleTestDriveButton } from "@/components/vehicle/schedule-test-drive-button";
@@ -156,13 +157,18 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
   const otherShowroomVehicles = (otherShowroomVehicleRows ?? []).map((row) => ({ id: row.id, title: `${row.make} ${row.model}` }));
 
   let inquiryInitialValues: { fullName: string; email: string; phone: string } | null = null;
+  let isFavorited = false;
   if (userResult.user) {
-    const { data: profile } = await supabase.from("profiles").select("full_name, phone").eq("id", userResult.user.id).maybeSingle();
+    const [{ data: profile }, { data: favoriteRow }] = await Promise.all([
+      supabase.from("profiles").select("full_name, phone").eq("id", userResult.user.id).maybeSingle(),
+      supabase.from("favorites").select("id").eq("customer_id", userResult.user.id).eq("vehicle_id", vehicle.id).maybeSingle(),
+    ]);
     inquiryInitialValues = {
       fullName: profile?.full_name ?? "",
       email: userResult.user.email ?? "",
       phone: profile?.phone ?? "",
     };
+    isFavorited = favoriteRow != null;
   }
 
   const getPhotoUrl = (storagePath: string) => supabase.storage.from("vehicle-media").getPublicUrl(storagePath).data.publicUrl;
@@ -276,14 +282,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                disabled
-                title="Favorites — coming soon"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-400 disabled:cursor-not-allowed"
-              >
-                <HeartIcon />
-              </button>
+              <FavoriteButton vehicleId={vehicle.id} initialFavorited={isFavorited} isSignedIn={userResult.user != null} />
               <button
                 type="button"
                 disabled
@@ -588,14 +587,6 @@ function EyeIcon() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
       <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
 }
