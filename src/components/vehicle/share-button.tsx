@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useDropdown } from "@/components/ui/use-dropdown";
+import { CopyLinkIcon, EmailIcon, FacebookIcon, InstagramIcon, LinkedInIcon, XIcon } from "@/components/ui/social-icons";
 
 interface ShareButtonProps {
   title: string;
@@ -8,53 +10,124 @@ interface ShareButtonProps {
 }
 
 /**
- * Uses the native Web Share API where available (mobile browsers, most
- * desktop browsers now too) so sharing goes through whatever apps the
- * device already offers — falls back to copying the link to the clipboard
- * (with a small inline confirmation) everywhere else. No toast here — same
- * reasoning as FavoriteButton: the public (site) route tree has no
- * ToastProvider, only /dashboard and /admin do.
+ * A popover of direct-share options, per direct request — not the Web
+ * Share API's own OS-level sheet, which only some browsers/platforms
+ * support and can't be scoped to a specific fixed set of platforms. Each
+ * item opens that platform's own real share-intent URL in a small popup
+ * window, prefilled with this listing's title/link, except:
+ *  - Email, which navigates to a real mailto: link (no popup — the OS/
+ *    browser handles it, same as clicking any other mailto link).
+ *  - Instagram, which has no web share-intent for an arbitrary link at all
+ *    (unlike Facebook/X/LinkedIn, its platform doesn't support this) — the
+ *    honest thing this button can do is copy the link, same as "Copy
+ *    link" itself, not fake a "direct share screen" that doesn't exist.
  */
 export function ShareButton({ title, url }: ShareButtonProps) {
-  const [copied, setCopied] = useState(false);
+  const { open, setOpen, ref } = useDropdown();
+  const [feedback, setFeedback] = useState<string | null>(null);
 
-  async function handleClick() {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title, url });
-      } catch {
-        // The user closed the native share sheet without picking anything
-        // (or the browser blocked it) — not a real error to surface.
-      }
-      return;
-    }
+  function showFeedback(message: string) {
+    setFeedback(message);
+    setTimeout(() => setFeedback(null), 2000);
+  }
 
+  async function copyLink(successMessage = "Link copied!") {
+    setOpen(false);
     try {
       await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      showFeedback(successMessage);
     } catch {
       // Clipboard access unavailable/denied — nothing more to do silently;
       // the link itself is still visible in the address bar to copy by hand.
     }
   }
 
+  function openShareWindow(shareUrl: string) {
+    setOpen(false);
+    window.open(shareUrl, "_blank", "noopener,noreferrer,width=600,height=600");
+  }
+
+  const encodedUrl = encodeURIComponent(url);
+  const encodedTitle = encodeURIComponent(title);
+
+  const options: { key: string; label: string; icon: React.ReactNode; onClick: () => void }[] = [
+    {
+      key: "facebook",
+      label: "Facebook",
+      icon: <FacebookIcon />,
+      onClick: () => openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`),
+    },
+    {
+      key: "x",
+      label: "X",
+      icon: <XIcon />,
+      onClick: () => openShareWindow(`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`),
+    },
+    {
+      key: "linkedin",
+      label: "LinkedIn",
+      icon: <LinkedInIcon />,
+      onClick: () => openShareWindow(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`),
+    },
+    {
+      key: "instagram",
+      label: "Instagram",
+      icon: <InstagramIcon />,
+      onClick: () => copyLink("Link copied — paste it in Instagram"),
+    },
+    {
+      key: "email",
+      label: "Email",
+      icon: <EmailIcon />,
+      onClick: () => {
+        setOpen(false);
+        window.location.href = `mailto:?subject=${encodedTitle}&body=${encodedUrl}`;
+      },
+    },
+    {
+      key: "copy",
+      label: "Copy link",
+      icon: <CopyLinkIcon />,
+      onClick: () => copyLink(),
+    },
+  ];
+
   return (
-    <div className="relative">
+    <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={handleClick}
+        onClick={() => setOpen((o) => !o)}
         title="Share this listing"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-500 hover:bg-neutral-50"
       >
         <ShareIcon />
       </button>
-      {copied && (
+
+      {open && (
+        <div role="menu" className="absolute top-full right-0 z-20 mt-2 w-48 rounded-lg border border-neutral-200 bg-white py-1.5 shadow-lg">
+          {options.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              role="menuitem"
+              onClick={option.onClick}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              {option.icon}
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {feedback && (
         <span
           role="status"
-          className="absolute top-full right-0 z-10 mt-1 w-max rounded-md bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white"
+          className="absolute top-full right-0 z-20 mt-1 w-max max-w-52 rounded-md bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white"
         >
-          Link copied!
+          {feedback}
         </span>
       )}
     </div>
