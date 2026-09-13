@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Fraunces } from "next/font/google";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { resolveLoggedInHomePath } from "@/features/auth/actions";
@@ -12,27 +11,11 @@ export const metadata: Metadata = {
   alternates: { canonical: "/login" },
 };
 
-// Self-hosted via next/font (no runtime Google Fonts request) — used only
-// for the hero stats figures per design instruction, not the site-wide
-// display font (see --font-display in globals.css for that).
-const fraunces = Fraunces({ subsets: ["latin"], weight: ["600"] });
-
 const HOW_IT_WORKS = [
   { step: "01", title: "Find a Car", description: ["Explore cars from showrooms and dealers on our platform."] },
   { step: "02", title: "Book a Visit", description: ["Book an appointment directly with your selected showroom."] },
   { step: "03", title: "Buy & Lock", description: ["Purchase your selected vehicle and register your transaction with us."] },
   { step: "04", title: "Reward", description: ["First Service FREE", "Get KSh 5,000 worth of petrol FREE"] },
-] as const;
-
-// Matches design/login-page.png and design/signup-page.png exactly.
-// NOTE (2026-09-05): these are the design mockup's own illustrative
-// figures, not numbers backed by real platform data — logged explicitly
-// in MVP_PROGRESS.md rather than silently treated as real metrics. Added
-// back per explicit instruction after being deliberately omitted earlier.
-const STATS = [
-  { value: "12,400+", label: "Cars listed" },
-  { value: "800+", label: "Verified dealers" },
-  { value: "47 cities", label: "Across Kenya" },
 ] as const;
 
 export default async function LoginPage() {
@@ -98,15 +81,6 @@ export default async function LoginPage() {
                 </li>
               ))}
             </ol>
-          </div>
-
-          <div className="flex gap-8 border-t border-white/10 pt-6">
-            {STATS.map(({ value, label }) => (
-              <div key={label}>
-                <p className={`${fraunces.className} text-2xl font-semibold`}>{value}</p>
-                <p className="text-sm text-white/60">{label}</p>
-              </div>
-            ))}
           </div>
         </div>
       </aside>
