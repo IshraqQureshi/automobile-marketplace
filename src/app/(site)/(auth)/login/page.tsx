@@ -15,8 +15,9 @@ const HOW_IT_WORKS = [
   { step: "01", title: "Find a Car", description: ["Explore cars from showrooms and dealers on our platform."] },
   { step: "02", title: "Book a Visit", description: ["Book an appointment directly with your selected showroom."] },
   { step: "03", title: "Buy & Lock", description: ["Purchase your selected vehicle and register your transaction with us."] },
-  { step: "04", title: "Reward", description: ["First Service FREE", "Get KSh 5,000 worth of petrol FREE"] },
 ] as const;
+
+const REWARD_LINES = ["First Service FREE", "Get KSh 5,000 worth of petrol FREE"] as const;
 
 export default async function LoginPage() {
   const supabase = await createClient();
@@ -81,6 +82,15 @@ export default async function LoginPage() {
                 </li>
               ))}
             </ol>
+          </div>
+
+          <div>
+            <h3 className="font-display text-xl font-semibold">Reward</h3>
+            {REWARD_LINES.map((line) => (
+              <p key={line} className="mt-1 text-sm text-white/70">
+                {line}
+              </p>
+            ))}
           </div>
         </div>
       </aside>
