@@ -181,7 +181,7 @@ test("admin can set Facebook/X/Instagram links, and the footer's Follow Us icons
   await expect(footer.getByRole("link", { name: "X (Twitter)" })).toHaveAttribute("href", xUrl);
   await expect(footer.getByRole("link", { name: "Instagram" })).toHaveAttribute("href", instagramUrl);
   await expect(footer.getByRole("link", { name: "Showrooms" })).toHaveCount(0);
-  await expect(footer.getByRole("link", { name: "Sell your car" })).toHaveCount(0);
+  await expect(footer.getByRole("link", { name: "Register Showroom" })).toHaveCount(0);
 });
 
 test("the footer's Brands/Model/Type columns link to real SEO listing pages", async ({ page }) => {

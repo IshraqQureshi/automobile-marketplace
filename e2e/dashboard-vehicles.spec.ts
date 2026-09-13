@@ -149,7 +149,7 @@ test("visiting /dashboard while signed out redirects to /login", async ({ page }
 test("the dashboard layout has no site header or footer", async ({ page }) => {
   await loginAsFixtureOwner(page);
   await expect(page.locator("header")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Sell your car" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Register Showroom" })).toHaveCount(0);
 });
 
 test("a pending showroom sees a review-status message and cannot reach vehicle management", async ({ page }) => {

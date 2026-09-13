@@ -99,18 +99,22 @@ test("the homepage hero search shows the empty state for a term with no matches"
   await expect(page.getByText("No vehicles match your search")).toBeVisible();
 });
 
+// Scoped to <header> specifically — the footer legitimately has its own
+// "Register Showroom" link now (see e2e/register-showroom-public.spec.ts),
+// visible to a signed-out visitor by direct request, so a page-wide locator
+// would now find that one too.
 test("Register Showroom is absent from the header when signed out", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Register Showroom" })).toHaveCount(0);
+  await expect(page.locator("header").getByRole("link", { name: "Register Showroom" })).toHaveCount(0);
 });
 
 // Previously shown in the logged-in Profile menu (PR #69) — removed per
 // direct request after both showroom owners and customers reported seeing
-// it there. Combined with the earlier removal of the header/footer's own
-// "Showrooms"/"Sell your car" links, /register-showroom now has no in-app
-// nav entry point at all — a deliberate, repeatedly-confirmed choice
-// (showroom onboarding goes through the admin panel's own "New Showroom"
-// flow now, not self-service), not an oversight.
+// it there. The header nav itself has never linked to it either. The
+// footer's own "Register Showroom" link (re-added later, see
+// e2e/register-showroom-public.spec.ts) is deliberately hidden once signed
+// in (any role) — so /register-showroom has no in-app nav entry point at
+// all for an already-signed-in user, only for a signed-out visitor.
 test("Register Showroom does not appear in the Profile menu once signed in either", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Email address").fill(CUSTOMER_EMAIL);
@@ -120,4 +124,15 @@ test("Register Showroom does not appear in the Profile menu once signed in eithe
 
   await page.getByRole("button", { name: "Profile" }).click();
   await expect(page.getByRole("menuitem", { name: "Register Showroom" })).toHaveCount(0);
+});
+
+test("the footer's Register Showroom link is hidden once signed in", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(CUSTOMER_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(CUSTOMER_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await page.waitForURL(/\/account$/);
+
+  await page.goto("/");
+  await expect(page.locator("footer").getByRole("link", { name: "Register Showroom" })).toHaveCount(0);
 });

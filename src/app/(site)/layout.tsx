@@ -90,7 +90,7 @@ export default async function SiteLayout({ children }: SiteLayoutProps) {
     <div className="flex min-h-screen flex-col">
       <Header user={headerUser} navCatalog={navCatalog} />
       <div className="flex-1">{children}</div>
-      <Footer navCatalog={navCatalog} socialLinks={socialLinks} />
+      <Footer navCatalog={navCatalog} socialLinks={socialLinks} isSignedIn={headerUser != null} />
     </div>
   );
 }

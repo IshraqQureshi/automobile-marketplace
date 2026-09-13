@@ -12,6 +12,7 @@ export interface FooterSocialLinks {
 interface FooterProps {
   navCatalog: NavCatalog;
   socialLinks: FooterSocialLinks;
+  isSignedIn: boolean;
 }
 
 const FOOTER_COLUMN_TITLES = { brands: "Brands", models: "Model", types: "Type" } as const;
@@ -32,7 +33,7 @@ const SOCIAL_PLATFORMS = [
   { key: "tiktokUrl", label: "TikTok", icon: TikTokIcon },
 ] as const;
 
-export function Footer({ navCatalog, socialLinks }: FooterProps) {
+export function Footer({ navCatalog, socialLinks, isSignedIn }: FooterProps) {
   // Real SEO-friendly links now (previously static inert text) — same
   // brand/model/type catalog + href-building logic the header's own nav
   // dropdowns use, so the two can't silently resolve differently.
@@ -82,11 +83,16 @@ export function Footer({ navCatalog, socialLinks }: FooterProps) {
           <span>© {new Date().getFullYear()} HarakaGari by Arresa. All rights reserved.</span>
           {/* /register-showroom is public again per direct request — see
               registerShowroomPublicAction — reversing an earlier decision
-              that had removed every nav link to it. */}
+              that had removed every nav link to it. Hidden once signed in
+              (any role) per direct follow-up request — a signed-in user
+              either already owns a showroom or isn't the audience for this
+              link. */}
           <div className="flex gap-4">
-            <Link href="/register-showroom" className="hover:text-white/80">
-              Sell your car
-            </Link>
+            {!isSignedIn && (
+              <Link href="/register-showroom" className="hover:text-white/80">
+                Register Showroom
+              </Link>
+            )}
             <Link href="/privacy" className="hover:text-white/80">
               Privacy Policy
             </Link>
