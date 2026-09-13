@@ -240,15 +240,17 @@ otp_expiry = 3600
 
 # Local/staging dev mailer — Mailtrap sandbox inbox (nothing sent to real
 # addresses, just captured for inspection). Credentials come from
-# .env.local (gitignored — see .env.example), never committed. Production
-# will use real Google Workspace SMTP once the client supplies credentials
-# (see MVP_PROGRESS.md blocker for this — swap the values below then).
+# .env.local (gitignored — see .env.example), never committed. When pushing
+# this config to the production project, host/port/admin_email below are
+# temporarily swapped to the real SMTP provider's values for that one push
+# (see MVP_PROGRESS.md), then reverted here so local dev keeps using
+# Mailtrap — SMTP_USER/SMTP_PASS stay the same var names either way.
 [auth.email.smtp]
 enabled = true
 host = "sandbox.smtp.mailtrap.io"
 port = 2525
-user = "env(MAILTRAP_SMTP_USER)"
-pass = "env(MAILTRAP_SMTP_PASS)"
+user = "env(SMTP_USER)"
+pass = "env(SMTP_PASS)"
 admin_email = "noreply@harakagari.local"
 sender_name = "HarakaGari"
 
