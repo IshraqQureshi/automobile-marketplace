@@ -4,18 +4,23 @@
 // block — this module is for emails the *application* decides to send
 // (e.g. a vehicle inquiry notification), which needs its own transport.
 //
-// Reuses the exact same Mailtrap sandbox credentials already configured for
-// local/staging dev (MAILTRAP_SMTP_USER/PASS in .env.local) rather than
-// introducing a second, differently-named set of env vars for the same
-// inbox. Host/port aren't secrets — hardcoded here the same way
-// config.toml hardcodes its own host/port, overridable via env for a real
-// production SMTP provider later (see B-007).
+// SMTP_USER/SMTP_PASS hold local Mailtrap sandbox credentials in dev (see
+// .env.local) and the real production SMTP provider's credentials in
+// production (set directly in Vercel, never committed) — same var names
+// either way, just a different value per environment. Host/port default to
+// the Mailtrap sandbox but are overridable via env for production.
 import nodemailer from "nodemailer";
 import { logger } from "@/lib/logger";
 
 const SMTP_HOST = process.env.SMTP_HOST || "sandbox.smtp.mailtrap.io";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 2525);
-const FROM_EMAIL = "noreply@harakagari.local";
+// Must match (or be a verified alias of) the authenticated SMTP_USER account
+// for most real providers (Gmail in particular silently rewrites or bounces
+// a From address that doesn't match the authenticated sender) — a fixed
+// placeholder like "noreply@harakagari.local" only worked against Mailtrap's
+// sandbox, which never actually delivers/validates it. Falls back to that
+// same placeholder so local dev against Mailtrap is unaffected.
+const FROM_EMAIL = process.env.SMTP_FROM_EMAIL || "noreply@harakagari.local";
 const FROM_NAME = "HarakaGari";
 
 export interface SendEmailInput {
@@ -32,8 +37,8 @@ export interface SendEmailInput {
  * treating it as a hard failure.
  */
 export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<boolean> {
-  const user = process.env.MAILTRAP_SMTP_USER;
-  const pass = process.env.MAILTRAP_SMTP_PASS;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
   if (!user || !pass) {
     logger.warn("Skipping email send — SMTP credentials not configured", { to, subject });
     return false;
