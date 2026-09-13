@@ -128,6 +128,31 @@ test("a vehicle with real showroom-configured financing renders a working calcul
   expect(parseCurrency(monthlyPaymentText ?? "")).toBe(expected.monthlyPayment);
 });
 
+test("the HP Installments button scrolls smoothly down to the Financing Calculator section", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await expect(page.getByRole("heading", { name: "Financing Calculator" })).toBeVisible();
+
+  const before = await page.evaluate(() => window.scrollY);
+  expect(before).toBe(0);
+
+  await page.getByRole("link", { name: "HP Installments", exact: true }).click();
+
+  // A plain hash-link jumps instantly (scrollY would already be at its
+  // final value on the very next tick) — sampling shortly after the click
+  // and before the animation would have finished proves this one actually
+  // animates rather than jumping, without asserting on exact timing/easing.
+  await page.waitForTimeout(100);
+  const midScroll = await page.evaluate(() => window.scrollY);
+  expect(midScroll).toBeGreaterThan(0);
+
+  await expect(async () => {
+    const finalScroll = await page.evaluate(() => window.scrollY);
+    expect(finalScroll).toBeGreaterThan(midScroll);
+  }).toPass({ timeout: 2000 });
+
+  await expect(page.getByRole("heading", { name: "Financing Calculator" })).toBeInViewport();
+});
+
 test("changing loan term and tracker duration recalculates the estimate instantly, matching the real formula", async ({ page }) => {
   await page.goto(vehiclePath);
   await expect(page.getByRole("heading", { name: "Financing Calculator" })).toBeVisible();
