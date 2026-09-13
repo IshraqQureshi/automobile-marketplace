@@ -53,5 +53,6 @@ export async function recordVehicleCommissionAction(formData: FormData): Promise
   }
 
   revalidatePath("/admin/vehicles");
+  revalidatePath("/admin/payments");
   return {};
 }
