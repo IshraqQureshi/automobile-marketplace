@@ -104,7 +104,14 @@ test("Register Showroom is absent from the header when signed out", async ({ pag
   await expect(page.getByRole("link", { name: "Register Showroom" })).toHaveCount(0);
 });
 
-test("Register Showroom appears in the Profile menu once signed in", async ({ page }) => {
+// Previously shown in the logged-in Profile menu (PR #69) — removed per
+// direct request after both showroom owners and customers reported seeing
+// it there. Combined with the earlier removal of the header/footer's own
+// "Showrooms"/"Sell your car" links, /register-showroom now has no in-app
+// nav entry point at all — a deliberate, repeatedly-confirmed choice
+// (showroom onboarding goes through the admin panel's own "New Showroom"
+// flow now, not self-service), not an oversight.
+test("Register Showroom does not appear in the Profile menu once signed in either", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Email address").fill(CUSTOMER_EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(CUSTOMER_PASSWORD);
@@ -112,7 +119,5 @@ test("Register Showroom appears in the Profile menu once signed in", async ({ pa
   await page.waitForURL(/\/account$/);
 
   await page.getByRole("button", { name: "Profile" }).click();
-  const registerLink = page.getByRole("menuitem", { name: "Register Showroom" });
-  await expect(registerLink).toBeVisible();
-  await expect(registerLink).toHaveAttribute("href", "/register-showroom");
+  await expect(page.getByRole("menuitem", { name: "Register Showroom" })).toHaveCount(0);
 });

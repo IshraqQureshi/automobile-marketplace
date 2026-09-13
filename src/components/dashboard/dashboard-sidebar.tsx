@@ -18,38 +18,37 @@ interface NavEntry {
 interface DashboardSidebarProps {
   email: string;
   showroom: OwnerShowroom;
-  unreadInquiryCount?: number;
-  unreadFinancingCount?: number;
   pendingAppointmentCount?: number;
+  // 1 when this showroom's current subscription is expiring soon or
+  // overdue, 0 otherwise — a due/not-due flag reusing the same NavEntry
+  // `count` badge convention as Appointments above, not a literal count of
+  // multiple due payments (a showroom only ever has one *current* period).
+  paymentDueCount?: number;
   // Fired on any real nav Link click — DashboardShell uses this to close the
   // mobile off-canvas drawer after navigating, so it isn't left open over
   // the new page. Optional/unused on desktop, where the sidebar is static.
   onNavigate?: () => void;
 }
 
-export function DashboardSidebar({
-  email,
-  showroom,
-  unreadInquiryCount = 0,
-  unreadFinancingCount = 0,
-  pendingAppointmentCount = 0,
-  onNavigate,
-}: DashboardSidebarProps) {
+export function DashboardSidebar({ email, showroom, pendingAppointmentCount = 0, paymentDueCount = 0, onNavigate }: DashboardSidebarProps) {
   const pathname = usePathname();
   const approved = showroom.status === "APPROVED";
 
   // Profile editing is allowed regardless of approval status (unlike
-  // Vehicles), so it's never gated behind `approved` here. Inquiries,
-  // Financing, and Appointments follow the same approval gate as Vehicles —
-  // a listing (and thus a real inquiry/financing application/test drive)
-  // can't exist for an unapproved showroom anyway.
+  // Vehicles), so it's never gated behind `approved` here. Appointments
+  // follows the same approval gate as Vehicles — a real test drive can't
+  // exist for an unapproved showroom anyway. Inquiries and Financing are
+  // deliberately NOT linked here per direct request — those now go to
+  // admin only (/admin/inquiries, /admin/financing); the showroom-scoped
+  // /dashboard/inquiries and /dashboard/financing pages themselves are
+  // untouched (still real, RLS-scoped to the caller's own data — this is a
+  // nav-visibility change, not an access change).
   const items: NavEntry[] = [
     { label: "Dashboard", href: "/dashboard", icon: DashboardIcon },
     { label: "Vehicles", href: approved ? "/dashboard/vehicles" : null, icon: () => <CarIcon /> },
-    { label: "Inquiries", href: approved ? "/dashboard/inquiries" : null, icon: InquiryIcon, count: unreadInquiryCount },
-    { label: "Financing", href: approved ? "/dashboard/financing" : null, icon: FinancingIcon, count: unreadFinancingCount },
     { label: "Appointments", href: approved ? "/dashboard/appointments" : null, icon: CalendarIcon, count: pendingAppointmentCount },
     { label: "Availability", href: approved ? "/dashboard/appointments/availability" : null, icon: AvailabilityIcon },
+    { label: "Payments", href: approved ? "/dashboard/payments" : null, icon: PaymentsIcon, count: paymentDueCount },
     { label: "Reports", href: approved ? "/dashboard/reports" : null, icon: ReportsIcon },
     { label: "Profile", href: "/dashboard/profile", icon: ProfileIcon },
     { label: "My Account", href: "/dashboard/account", icon: AccountIcon },
@@ -156,23 +155,6 @@ function AccountIcon() {
   );
 }
 
-function InquiryIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
-
-function FinancingIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
-      <line x1="12" y1="1" x2="12" y2="23" />
-      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-    </svg>
-  );
-}
-
 function CalendarIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
@@ -187,6 +169,16 @@ function ReportsIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
       <path d="M3 3v18h18" />
       <path d="M7 15l4-5 3 3 5-7" />
+    </svg>
+  );
+}
+
+function PaymentsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.25 w-4.25" aria-hidden="true">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M6 15h4" />
     </svg>
   );
 }

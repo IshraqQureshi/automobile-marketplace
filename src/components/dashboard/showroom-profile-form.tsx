@@ -3,16 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import {
-  DialogFormActions,
-  FieldLabel,
-  InitialAvatar,
-  UploadIcon,
-} from "@/components/admin/admin-ui";
-import {
-  ShowroomVideosManager,
-  type ShowroomVideoItem,
-} from "@/components/dashboard/showroom-videos-manager";
+import { DialogFormActions, FieldLabel, InitialAvatar, UploadIcon } from "@/components/admin/admin-ui";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
@@ -29,21 +20,14 @@ export interface ShowroomProfileInitialValues {
   address: string;
   description: string;
   openingHours: string;
-  youtubeChannelUrl: string;
   logoUrl: string | null;
 }
 
 interface ShowroomProfileFormProps {
-  showroomId: string;
   initialValues: ShowroomProfileInitialValues;
-  videos: ShowroomVideoItem[];
 }
 
-export function ShowroomProfileForm({
-  showroomId,
-  initialValues,
-  videos,
-}: ShowroomProfileFormProps) {
+export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps) {
   const router = useRouter();
   const toast = useToast();
   const { validate, errorFor } = useFieldValidation(showroomFieldSchemas);
@@ -55,7 +39,6 @@ export function ShowroomProfileForm({
     address: initialValues.address,
     description: initialValues.description,
     openingHours: initialValues.openingHours,
-    youtubeChannelUrl: initialValues.youtubeChannelUrl,
   });
   const [logo, setLogo] = useState<File | null>(null);
   const [logoInputKey, setLogoInputKey] = useState(0);
@@ -72,16 +55,7 @@ export function ShowroomProfileForm({
     setFormError(null);
 
     let hasError = false;
-    for (const field of [
-      "businessName",
-      "location",
-      "businessPhone",
-      "businessEmail",
-      "address",
-      "description",
-      "openingHours",
-      "youtubeChannelUrl",
-    ] as const) {
+    for (const field of ["businessName", "location", "businessPhone", "businessEmail", "address", "description", "openingHours"] as const) {
       if (!showroomFieldSchemas[field].safeParse(form[field]).success) {
         validate(field, form[field]);
         hasError = true;
@@ -97,7 +71,6 @@ export function ShowroomProfileForm({
     formData.set("address", form.address);
     formData.set("description", form.description);
     formData.set("openingHours", form.openingHours);
-    formData.set("youtubeChannelUrl", form.youtubeChannelUrl);
     if (logo) formData.set("logo", logo);
     if (removeLogo) formData.set("removeLogo", "true");
 
@@ -333,35 +306,6 @@ export function ShowroomProfileForm({
           </div>
         </section>
 
-        <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <h2 className="font-display text-lg font-semibold text-neutral-900">
-            YouTube
-          </h2>
-          <p className="mt-0.5 text-sm text-neutral-500">
-            Shown on your public showroom page. Leave the channel URL blank to
-            hide the &quot;View Channel&quot; button.
-          </p>
-
-          <div className="mt-4">
-            <FieldLabel htmlFor="showroom-youtube-channel">
-              Channel URL (optional)
-            </FieldLabel>
-            <Input
-              id="showroom-youtube-channel"
-              value={form.youtubeChannelUrl}
-              onChange={(e) => setField("youtubeChannelUrl", e.target.value)}
-              onBlur={(e) => validate("youtubeChannelUrl", e.target.value)}
-              placeholder="https://www.youtube.com/@yourchannel"
-              error={!!errorFor("youtubeChannelUrl")}
-            />
-            {errorFor("youtubeChannelUrl") && (
-              <p className="mt-1 text-sm text-red-600">
-                {errorFor("youtubeChannelUrl")}
-              </p>
-            )}
-          </div>
-        </section>
-
         <div className="border-t border-neutral-200 pt-4">
           <DialogFormActions
             pending={pending}
@@ -370,23 +314,6 @@ export function ShowroomProfileForm({
           />
         </div>
       </form>
-
-      {/* Outside the profile form on purpose — this section renders its own
-          <form> (ShowroomVideosManager's add-video form), and nesting a
-          <form> inside another <form> is invalid HTML that breaks
-          hydration (confirmed live: it hung the page instead of just
-          warning). Each video also saves immediately via its own action,
-          independent of the profile form's own single submit above. */}
-      <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h2 className="font-display text-lg font-semibold text-neutral-900">
-          Featured videos
-        </h2>
-        <p className="mt-0.5 mb-3 text-sm text-neutral-500">
-          Add any number of videos — each is shown as its own card on your
-          public page. Adding or removing a video saves immediately.
-        </p>
-        <ShowroomVideosManager showroomId={showroomId} videos={videos} />
-      </section>
     </div>
   );
 }

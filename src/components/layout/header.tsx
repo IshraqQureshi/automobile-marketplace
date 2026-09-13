@@ -117,14 +117,6 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
                   >
                     {user.profileLabel}
                   </Link>
-                  <Link
-                    href="/register-showroom"
-                    role="menuitem"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="block px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                  >
-                    Register Showroom
-                  </Link>
                   <form action={signOutAction}>
                     <button
                       type="submit"
@@ -175,12 +167,6 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
                 className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 {user.profileLabel}
-              </Link>
-              <Link
-                href="/register-showroom"
-                className="rounded-md px-2 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-              >
-                Register Showroom
               </Link>
               <form action={signOutAction}>
                 <button

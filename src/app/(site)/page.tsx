@@ -104,12 +104,12 @@ export default async function Home() {
         }))
       : [];
 
-  const brandTiles = (brandRows ?? []).map((row) => ({
+  const allBrandTiles = (brandRows ?? []).map((row) => ({
     id: row.id,
     name: row.name,
     logoUrl: row.logo_storage_path ? getBrandLogoUrl(row.logo_storage_path) : null,
   }));
-  const brandLogoByName = new Map(brandTiles.map((b) => [b.name.toLowerCase(), b]));
+  const brandLogoByName = new Map(allBrandTiles.map((b) => [b.name.toLowerCase(), b]));
 
   const vehicles: VehicleWithShowroom[] = (vehicleRows ?? []).map((row) => ({
     ...vehicleRowToListItem(row, (storagePath) => supabase.storage.from("vehicle-media").getPublicUrl(storagePath).data.publicUrl),
@@ -139,6 +139,14 @@ export default async function Home() {
       modelGroups.set(modelKey, { make: vehicle.make, model: vehicle.model, count: 1, photoUrl: primaryPhoto?.url ?? null });
     }
   }
+
+  // Browse by Brand only shows catalog brands that actually have at least
+  // one real ACTIVE listing (case-insensitive, since vehicles.make is
+  // plain free text, not FK'd to this catalog table) — matches by the same
+  // brandCounts sample already computed below for Popular Brands, rather
+  // than a curated brand list a customer could click into and find empty.
+  const brandNamesWithListings = new Set([...brandCounts.keys()].map((make) => make.toLowerCase()));
+  const brandTiles = allBrandTiles.filter((brand) => brandNamesWithListings.has(brand.name.toLowerCase()));
 
   const popularBrands = [...brandCounts.entries()]
     .sort((a, b) => b[1] - a[1])

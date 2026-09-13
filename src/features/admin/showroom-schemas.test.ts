@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminShowroomSchema } from "./showroom-schemas";
+import { adminShowroomSchema, youtubePlaylistUrlSchema } from "./showroom-schemas";
 
 const valid = {
   businessName: "AutoElite Motors",
@@ -9,10 +9,9 @@ const valid = {
   address: "",
   description: "",
   openingHours: "",
-  youtubeChannelUrl: "",
 };
 
-describe("adminShowroomSchema — opening hours / YouTube channel field", () => {
+describe("adminShowroomSchema — opening hours field", () => {
   it("accepts every optional field left blank", () => {
     expect(adminShowroomSchema.safeParse(valid).success).toBe(true);
   });
@@ -26,13 +25,22 @@ describe("adminShowroomSchema — opening hours / YouTube channel field", () => 
   it("rejects an opening-hours string over 100 characters", () => {
     expect(adminShowroomSchema.safeParse({ ...valid, openingHours: "a".repeat(101) }).success).toBe(false);
   });
+});
 
-  it("accepts a valid YouTube channel URL", () => {
-    const result = adminShowroomSchema.safeParse({ ...valid, youtubeChannelUrl: "https://www.youtube.com/@channel" });
+// Deliberately its own schema, not part of adminShowroomSchema above — see
+// youtubePlaylistUrlSchema's own comment (admin-only, not shared with
+// updateShowroomProfile's owner-facing validation).
+describe("youtubePlaylistUrlSchema", () => {
+  it("accepts an empty string (not configured yet)", () => {
+    expect(youtubePlaylistUrlSchema.safeParse("").success).toBe(true);
+  });
+
+  it("accepts a valid YouTube playlist URL", () => {
+    const result = youtubePlaylistUrlSchema.safeParse("https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
     expect(result.success).toBe(true);
   });
 
-  it("rejects a malformed YouTube channel URL", () => {
-    expect(adminShowroomSchema.safeParse({ ...valid, youtubeChannelUrl: "not-a-url" }).success).toBe(false);
+  it("rejects a malformed URL", () => {
+    expect(youtubePlaylistUrlSchema.safeParse("not-a-url").success).toBe(false);
   });
 });

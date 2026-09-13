@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { ShowroomVehicleBrowser } from "@/components/showroom/showroom-vehicle-browser";
-import { ShowroomVideoSection } from "@/components/showroom/showroom-video-section";
+import { ShowroomPlaylistSection } from "@/components/showroom/showroom-playlist-section";
 import { getShowroomDetailPath, parseShowroomIdFromSlug } from "@/features/showroom/slug";
 import { buildWhatsAppLink } from "@/features/showroom/whatsapp";
 import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -34,17 +34,16 @@ const getShowroomData = cache(async (id: string) => {
   const { data: showroom } = await supabase
     .from("showrooms")
     .select(
-      "id, business_name, city, address, phone, latitude, longitude, description, opening_hours, verified, created_at, logo_storage_path, youtube_channel_url",
+      "id, business_name, city, address, phone, latitude, longitude, description, opening_hours, verified, created_at, logo_storage_path, youtube_playlist_url",
     )
     .eq("id", id)
     .eq("status", "APPROVED")
     .maybeSingle();
   if (!showroom) return null;
 
-  const [{ data: vehicleRows }, whatsappNumber, { data: videoRows }] = await Promise.all([
+  const [{ data: vehicleRows }, whatsappNumber] = await Promise.all([
     supabase.from("vehicles").select(VEHICLE_SELECT_COLUMNS).eq("showroom_id", id).eq("status", "ACTIVE").order("created_at", { ascending: false }),
     getSystemSettingString(supabase, "whatsapp_contact_number"),
-    supabase.from("showroom_videos").select("id, title, video_url").eq("showroom_id", id).order("sort_order", { ascending: true }),
   ]);
 
   const getPhotoUrl = (storagePath: string) => supabase.storage.from("vehicle-media").getPublicUrl(storagePath).data.publicUrl;
@@ -54,11 +53,9 @@ const getShowroomData = cache(async (id: string) => {
     showroomName: showroom.business_name,
   }));
 
-  const videos = (videoRows ?? []).map((row) => ({ id: row.id, title: row.title, videoUrl: row.video_url }));
-
   const logoUrl = showroom.logo_storage_path ? supabase.storage.from("showroom-logos").getPublicUrl(showroom.logo_storage_path).data.publicUrl : null;
 
-  return { showroom, vehicles, whatsappNumber, logoUrl, videos };
+  return { showroom, vehicles, whatsappNumber, logoUrl };
 });
 
 export async function generateMetadata({ params }: ShowroomDetailPageProps): Promise<Metadata> {
@@ -91,7 +88,7 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
 
   const result = await getShowroomData(id);
   if (!result) notFound();
-  const { showroom, vehicles, whatsappNumber, logoUrl, videos } = result;
+  const { showroom, vehicles, whatsappNumber, logoUrl } = result;
 
   // Canonicalize: a stale/guessed name-slug (e.g. copied before a rename)
   // still resolves by id, but redirects to the real URL rather than serving
@@ -119,7 +116,6 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
     url: `${publicEnv.NEXT_PUBLIC_SITE_URL}${canonicalPath}`,
     ...(logoUrl ? { image: logoUrl } : {}),
     ...(showroom.description ? { description: showroom.description } : {}),
-    telephone: showroom.phone,
     ...(showroom.city || showroom.address
       ? {
           address: {
@@ -200,15 +196,6 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
                     {openingHours}
                   </span>
                 )}
-                {/* Real, structured contact info (not just the WhatsApp CTA
-                    below) — also referenced as `telephone` in this page's
-                    AutoDealer JSON-LD, so the schema actually reflects
-                    something a visitor can see, not just machine-readable
-                    data with no visible counterpart. */}
-                <a href={`tel:${showroom.phone}`} className="flex items-center gap-1 text-neutral-500 no-underline hover:text-neutral-700">
-                  <PhoneIcon />
-                  {showroom.phone}
-                </a>
                 <span className="flex items-center gap-1">
                   <CalendarIcon />
                   Member since {dateFormatter.format(new Date(showroom.created_at))}
@@ -249,7 +236,7 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
         </div>
       </section>
 
-      <ShowroomVideoSection businessName={showroom.business_name} channelUrl={showroom.youtube_channel_url} videos={videos} />
+      <ShowroomPlaylistSection businessName={showroom.business_name} playlistUrl={showroom.youtube_playlist_url} />
     </div>
   );
 }
@@ -276,14 +263,6 @@ function ClockIcon() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
       <path d="M12 8v4l3 3" />
-    </svg>
-  );
-}
-
-function PhoneIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
     </svg>
   );
 }

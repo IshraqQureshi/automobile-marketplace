@@ -3,11 +3,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { CarIcon, EyeIcon, FilterBar, SearchInput, SectionHeader, TableEmptyState, TableShell, filterSelectClassName } from "@/components/admin/admin-ui";
+import { CarIcon, EyeIcon, FieldLabel, FilterBar, SearchInput, SectionHeader, TableEmptyState, TableShell, filterSelectClassName } from "@/components/admin/admin-ui";
+import { ExportCsvButton, type CsvColumn } from "@/components/admin/export-csv-button";
+import { Dialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { recordVehicleCommissionAction } from "@/features/admin/commission-actions";
 import { updateVehicleStatusAsAdminAction } from "@/features/vehicle/actions";
 import { getVehicleDetailPath } from "@/features/vehicle/slug";
 import { currencyFormatter, STATUS_BADGE_CLASSES, STATUS_LABELS, type VehicleStatus, type VehicleWithShowroom } from "@/features/vehicle/types";
+
+export interface VehicleCommission {
+  amount: number;
+  status: "PENDING" | "PAID";
+  notes: string | null;
+}
 
 // ADM-004 (Vehicle Moderation). Deliberately its own component rather than
 // reusing the showroom-owner's VehicleList (src/components/dashboard/vehicle-list.tsx):
@@ -17,12 +27,30 @@ import { currencyFormatter, STATUS_BADGE_CLASSES, STATUS_LABELS, type VehicleSta
 // moderates existing listings, it doesn't author them.
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as VehicleStatus[];
 
+const VEHICLE_CSV_COLUMNS: CsvColumn<VehicleWithShowroom>[] = [
+  { label: "Title", value: (v) => v.title },
+  { label: "Make", value: (v) => v.make },
+  { label: "Model", value: (v) => v.model },
+  { label: "Year", value: (v) => v.year },
+  { label: "Price (KES)", value: (v) => v.price },
+  { label: "Mileage (km)", value: (v) => v.mileage },
+  { label: "Status", value: (v) => STATUS_LABELS[v.status] },
+  { label: "Showroom", value: (v) => v.showroomName },
+  { label: "Views", value: (v) => v.viewCount },
+];
+
 interface VehicleModerationListProps {
   vehicles: VehicleWithShowroom[];
+  // Keyed by vehicle id — only ever populated for SOLD vehicles in
+  // practice, but not restricted to that here (a vehicle status can be
+  // reverted from SOLD, and its commission record is deliberately left
+  // intact rather than orphaned/deleted when that happens).
+  commissions: Record<string, VehicleCommission>;
 }
 
-export function VehicleModerationList({ vehicles }: VehicleModerationListProps) {
+export function VehicleModerationList({ vehicles, commissions }: VehicleModerationListProps) {
   const toast = useToast();
+  const [commissionTarget, setCommissionTarget] = useState<VehicleWithShowroom | null>(null);
   const [, startTransition] = useTransition();
   const [statusPendingId, setStatusPendingId] = useState<string | null>(null);
 
@@ -80,6 +108,7 @@ export function VehicleModerationList({ vehicles }: VehicleModerationListProps) 
               </option>
             ))}
           </select>
+          <ExportCsvButton data={filteredVehicles} filename="vehicles" columns={VEHICLE_CSV_COLUMNS} />
         </FilterBar>
       )}
 
@@ -96,6 +125,7 @@ export function VehicleModerationList({ vehicles }: VehicleModerationListProps) 
                 <th className="px-5 py-3 font-semibold">Showroom</th>
                 <th className="px-5 py-3 font-semibold">Price</th>
                 <th className="px-5 py-3 font-semibold">Status</th>
+                <th className="px-5 py-3 font-semibold">Commission</th>
                 <th className="px-5 py-3 text-right font-semibold">Actions</th>
               </tr>
             </thead>
@@ -140,6 +170,32 @@ export function VehicleModerationList({ vehicles }: VehicleModerationListProps) 
                       </select>
                     </td>
                     <td className="px-5 py-3">
+                      {vehicle.status === "SOLD" ? (
+                        <button
+                          type="button"
+                          onClick={() => setCommissionTarget(vehicle)}
+                          className="flex items-center gap-1.5 text-left"
+                        >
+                          {commissions[vehicle.id] ? (
+                            <>
+                              <span className="font-medium text-neutral-800 tabular-nums">{currencyFormatter.format(commissions[vehicle.id]!.amount)}</span>
+                              <span
+                                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                                  commissions[vehicle.id]!.status === "PAID" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                {commissions[vehicle.id]!.status === "PAID" ? "Paid" : "Pending"}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs font-medium text-brand underline-offset-2 hover:underline">+ Add commission</span>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-neutral-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
                       <div className="flex justify-end gap-1">
                         {vehicle.status === "ACTIVE" && (
                           <Link
@@ -162,6 +218,88 @@ export function VehicleModerationList({ vehicles }: VehicleModerationListProps) 
           </table>
         )}
       </TableShell>
+
+      {commissionTarget && (
+        <CommissionDialog
+          vehicle={commissionTarget}
+          existing={commissions[commissionTarget.id] ?? null}
+          onClose={() => setCommissionTarget(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function CommissionDialog({ vehicle, existing, onClose }: { vehicle: VehicleWithShowroom; existing: VehicleCommission | null; onClose: () => void }) {
+  const toast = useToast();
+  const [amount, setAmount] = useState(existing ? String(existing.amount) : "");
+  const [status, setStatus] = useState<"PENDING" | "PAID">(existing?.status ?? "PENDING");
+  const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("vehicleId", vehicle.id);
+      formData.set("amount", amount);
+      formData.set("status", status);
+      formData.set("notes", notes);
+      const result = await recordVehicleCommissionAction(formData);
+      if (result.error) {
+        setFormError(result.error);
+        return;
+      }
+      toast.success("Commission saved.");
+      onClose();
+    });
+  }
+
+  return (
+    <Dialog open onClose={onClose} title="Commission" description={vehicle.title}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {formError && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
+        <div>
+          <FieldLabel htmlFor="commission-amount">Commission amount (KES)</FieldLabel>
+          <Input id="commission-amount" type="number" min={0} step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </div>
+        <div>
+          <FieldLabel htmlFor="commission-status">Payment status</FieldLabel>
+          <select
+            id="commission-status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as "PENDING" | "PAID")}
+            className="w-full rounded-md border border-neutral-300 px-3 py-2.5 text-sm text-neutral-700 outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+          >
+            <option value="PENDING">Pending</option>
+            <option value="PAID">Paid</option>
+          </select>
+        </div>
+        <div>
+          <FieldLabel htmlFor="commission-notes">Notes (optional)</FieldLabel>
+          <textarea
+            id="commission-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="w-full rounded-md border border-neutral-300 px-3 py-2.5 text-sm text-neutral-700 outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-md border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-md bg-brand px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

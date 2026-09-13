@@ -139,7 +139,8 @@ export function FinancingApplicationButton({
             </div>
             <p className="text-sm font-semibold text-neutral-900">Application submitted!</p>
             <p className="text-sm text-neutral-500">
-              The showroom has been notified and will contact you within 24 hours. We&apos;ve also sent a confirmation to your email.
+              We have received your application successfully. Our team will contact you within 24 hours. A confirmation email has also been sent to
+              you.
             </p>
             <button
               type="button"

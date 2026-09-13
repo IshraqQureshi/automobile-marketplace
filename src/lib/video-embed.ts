@@ -51,6 +51,31 @@ export function getYouTubeEmbedUrl(url: string, options: { autoplay?: boolean } 
   return `https://www.youtube.com/embed/${id}?autoplay=${autoplay ? 1 : 0}&rel=0`;
 }
 
+const YOUTUBE_PLAYLIST_ID_PATTERN = /^[A-Za-z0-9_-]{10,40}$/;
+
+/**
+ * Derives a playable YouTube playlist embed URL (the "videoseries" embed
+ * form) from an admin-pasted playlist URL — either the playlist's own page
+ * (youtube.com/playlist?list=ID) or a video-within-playlist URL
+ * (youtube.com/watch?v=...&list=ID), both of which carry the id in the
+ * same `list` query param. Returns null when it can't be confidently
+ * extracted, so the caller can fall back to a plain "watch on YouTube"
+ * link rather than rendering a broken iframe — same convention as
+ * getYouTubeEmbedUrl above.
+ */
+export function getYouTubePlaylistEmbedUrl(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+
+  if (!parsed.hostname.endsWith("youtube.com")) return null;
+  const id = parsed.searchParams.get("list");
+  return id && YOUTUBE_PLAYLIST_ID_PATTERN.test(id) ? `https://www.youtube.com/embed/videoseries?list=${id}` : null;
+}
+
 /**
  * A real, freely-hosted YouTube thumbnail image for the given video — no
  * Storage upload/admin curation step needed (unlike homepage_highlights'

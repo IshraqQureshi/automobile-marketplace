@@ -14,7 +14,7 @@ import {
   MAX_DOCUMENT_SIZE_BYTES,
 } from "@/features/showroom/schemas";
 import { uploadEntityLogo, validateLogoFile } from "./logo-upload";
-import { adminShowroomSchema, newOwnerSchema, ownerUserIdSchema } from "./showroom-schemas";
+import { adminShowroomSchema, newOwnerSchema, ownerUserIdSchema, youtubePlaylistUrlSchema } from "./showroom-schemas";
 
 export interface ShowroomActionResult {
   error?: string;
@@ -57,6 +57,36 @@ export async function rejectShowroomAction(id: string): Promise<ShowroomActionRe
   if (error) {
     logger.error("Failed to reject showroom", error, { id });
     return { error: "Failed to reject showroom." };
+  }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
+
+  revalidatePath("/admin/showrooms");
+  revalidatePath("/admin");
+  return {};
+}
+
+/** Deactivates a showroom (hides its listings/page from the public marketplace) without deleting it — reversible via reactivateShowroomAction. */
+export async function suspendShowroomAction(id: string): Promise<ShowroomActionResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("showrooms").update({ status: "SUSPENDED" }).eq("id", id).select("id");
+  if (error) {
+    logger.error("Failed to suspend showroom", error, { id });
+    return { error: "Failed to deactivate showroom." };
+  }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
+
+  revalidatePath("/admin/showrooms");
+  revalidatePath("/admin");
+  return {};
+}
+
+/** Reactivates a previously-suspended showroom back to APPROVED. */
+export async function reactivateShowroomAction(id: string): Promise<ShowroomActionResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("showrooms").update({ status: "APPROVED" }).eq("id", id).select("id");
+  if (error) {
+    logger.error("Failed to reactivate showroom", error, { id });
+    return { error: "Failed to reactivate showroom." };
   }
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
@@ -173,6 +203,8 @@ async function inviteNewShowroomOwner(formData: FormData): Promise<{ error?: str
 export async function createShowroomAction(formData: FormData): Promise<ShowroomActionResult> {
   const parsed = adminShowroomSchema.safeParse(readShowroomProfileFormFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid showroom details." };
+  const playlistParsed = youtubePlaylistUrlSchema.safeParse(formData.get("youtubePlaylistUrl"));
+  if (!playlistParsed.success) return { error: playlistParsed.error.issues[0]?.message ?? "Invalid YouTube playlist URL." };
 
   const documents = readDocumentFiles(formData);
   const documentsError = validateDocumentFiles(documents);
@@ -213,7 +245,7 @@ export async function createShowroomAction(formData: FormData): Promise<Showroom
       address: parsed.data.address ?? null,
       description: parsed.data.description ?? null,
       opening_hours: parsed.data.openingHours ?? null,
-      youtube_channel_url: parsed.data.youtubeChannelUrl ?? null,
+      youtube_playlist_url: playlistParsed.data ?? null,
     })
     .select("id")
     .single();
@@ -270,6 +302,8 @@ export async function updateShowroomAction(formData: FormData): Promise<Showroom
 
   const parsed = adminShowroomSchema.safeParse(readShowroomProfileFormFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid showroom details." };
+  const playlistParsed = youtubePlaylistUrlSchema.safeParse(formData.get("youtubePlaylistUrl"));
+  if (!playlistParsed.success) return { error: playlistParsed.error.issues[0]?.message ?? "Invalid YouTube playlist URL." };
 
   const logoEntry = formData.get("logo");
   const logoFile = logoEntry instanceof File && logoEntry.size > 0 ? logoEntry : null;
@@ -282,6 +316,14 @@ export async function updateShowroomAction(formData: FormData): Promise<Showroom
   const supabase = await createClient();
   const result = await updateShowroomProfile(supabase, id, parsed.data, logoFile, removeLogo);
   if (result.error) return result;
+
+  // Separate, dedicated write — see youtubePlaylistUrlSchema's own comment
+  // on why this can't be folded into updateShowroomProfile's shared update.
+  const { error: playlistError } = await supabase.from("showrooms").update({ youtube_playlist_url: playlistParsed.data ?? null }).eq("id", id);
+  if (playlistError) {
+    logger.error("Failed to update showroom YouTube playlist URL", playlistError, { id });
+    return { warning: "Showroom updated, but the YouTube playlist link failed to save." };
+  }
 
   revalidatePath("/admin/showrooms");
   revalidatePath("/admin");

@@ -31,31 +31,29 @@ interface ShowroomVehicleBrowserProps {
  */
 export function ShowroomVehicleBrowser({ vehicles }: ShowroomVehicleBrowserProps) {
   const [sort, setSort] = useState<SortOption>("newest");
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [brandFilter, setBrandFilter] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
 
-  // Real distinct types present in this showroom's own inventory — body
-  // type and fuel type together, matching the design's own mixed pill row
-  // (Sedan/SUV/Coupe alongside Electric/Hybrid) — never a fixed list that
-  // could show an always-empty pill for a type this showroom doesn't carry.
-  const availableTypes = useMemo(() => {
-    const types = new Set<string>();
+  // Real distinct brands (vehicles.make) present in this showroom's own
+  // inventory — never a fixed list that could show an always-empty pill for
+  // a brand this showroom doesn't carry.
+  const availableBrands = useMemo(() => {
+    const brands = new Set<string>();
     for (const v of vehicles) {
-      if (v.bodyType) types.add(v.bodyType);
-      if (v.fuelType) types.add(v.fuelType);
+      if (v.make) brands.add(v.make);
     }
-    return [...types].sort();
+    return [...brands].sort();
   }, [vehicles]);
 
   const filtered = useMemo(() => {
-    const base = typeFilter ? vehicles.filter((v) => v.bodyType === typeFilter || v.fuelType === typeFilter) : vehicles;
+    const base = brandFilter ? vehicles.filter((v) => v.make === brandFilter) : vehicles;
     return [...base].sort(SORTERS[sort]);
-  }, [vehicles, typeFilter, sort]);
+  }, [vehicles, brandFilter, sort]);
 
   const visible = filtered.slice(0, visibleCount);
 
-  function handleTypeChange(type: string | null) {
-    setTypeFilter(type);
+  function handleBrandChange(brand: string | null) {
+    setBrandFilter(brand);
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }
 
@@ -78,27 +76,27 @@ export function ShowroomVehicleBrowser({ vehicles }: ShowroomVehicleBrowserProps
         </select>
       </div>
 
-      {availableTypes.length > 0 && (
+      {availableBrands.length > 0 && (
         <div className="mb-7 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => handleTypeChange(null)}
+            onClick={() => handleBrandChange(null)}
             className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-all ${
-              typeFilter === null ? "border-brand bg-brand text-white" : "border-neutral-300 bg-white text-neutral-700"
+              brandFilter === null ? "border-brand bg-brand text-white" : "border-neutral-300 bg-white text-neutral-700"
             }`}
           >
             All
           </button>
-          {availableTypes.map((type) => (
+          {availableBrands.map((brand) => (
             <button
-              key={type}
+              key={brand}
               type="button"
-              onClick={() => handleTypeChange(type)}
+              onClick={() => handleBrandChange(brand)}
               className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-all ${
-                typeFilter === type ? "border-brand bg-brand text-white" : "border-neutral-300 bg-white text-neutral-700"
+                brandFilter === brand ? "border-brand bg-brand text-white" : "border-neutral-300 bg-white text-neutral-700"
               }`}
             >
-              {type}
+              {brand}
             </button>
           ))}
         </div>

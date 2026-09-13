@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTikTokEmbedUrl, getYouTubeEmbedUrl, getYouTubeThumbnailUrl, getYouTubeVideoId } from "./video-embed";
+import { getTikTokEmbedUrl, getYouTubeEmbedUrl, getYouTubePlaylistEmbedUrl, getYouTubeThumbnailUrl, getYouTubeVideoId } from "./video-embed";
 
 describe("getYouTubeEmbedUrl", () => {
   it("extracts the ID from a watch URL", () => {
@@ -74,6 +74,32 @@ describe("getYouTubeThumbnailUrl", () => {
 
   it("returns null for a non-YouTube URL", () => {
     expect(getYouTubeThumbnailUrl("https://vimeo.com/12345")).toBeNull();
+  });
+});
+
+describe("getYouTubePlaylistEmbedUrl", () => {
+  it("extracts the list id from a playlist page URL", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://www.youtube.com/playlist?list=PL1234567890abcdefghij")).toBe(
+      "https://www.youtube.com/embed/videoseries?list=PL1234567890abcdefghij",
+    );
+  });
+
+  it("extracts the list id from a watch URL that's within a playlist", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://www.youtube.com/watch?v=abc123&list=PL1234567890abcdefghij")).toBe(
+      "https://www.youtube.com/embed/videoseries?list=PL1234567890abcdefghij",
+    );
+  });
+
+  it("returns null when there's no list param", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://www.youtube.com/watch?v=abc123")).toBeNull();
+  });
+
+  it("returns null for a non-YouTube URL", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://example.com/playlist?list=PL1234567890abcdefghij")).toBeNull();
+  });
+
+  it("returns null for a malformed URL", () => {
+    expect(getYouTubePlaylistEmbedUrl("not a url")).toBeNull();
   });
 });
 

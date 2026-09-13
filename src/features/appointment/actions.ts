@@ -6,6 +6,7 @@ import {
   renderAppointmentConfirmedEmail,
   renderAppointmentDeclinedEmail,
   renderAppointmentNotificationEmail,
+  renderAppointmentReceivedEmail,
   renderAppointmentRescheduledEmail,
 } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
@@ -332,7 +333,11 @@ async function sendAppointmentNotificationEmails(input: {
   const recipientEmails = userResults.map((result) => result.data?.user?.email).filter((email): email is string => Boolean(email));
 
   const notification = renderAppointmentNotificationEmail(input.emailData);
-  const results = await Promise.all(recipientEmails.map((to) => sendEmail({ to, subject: notification.subject, html: notification.html })));
+  const received = renderAppointmentReceivedEmail(input.emailData);
+  const results = await Promise.all([
+    ...recipientEmails.map((to) => sendEmail({ to, subject: notification.subject, html: notification.html })),
+    sendEmail({ to: input.emailData.contactEmail, subject: received.subject, html: received.html }),
+  ]);
 
   if (results.some((sent) => !sent)) {
     logger.warn("One or more appointment notification emails failed to send", { showroomId: input.showroomId, recipientCount: recipientEmails.length });

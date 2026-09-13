@@ -18,10 +18,10 @@ export const metadata: Metadata = {
 const fraunces = Fraunces({ subsets: ["latin"], weight: ["600"] });
 
 const HOW_IT_WORKS = [
-  { step: "01", title: "Find a Car", description: "Explore cars from showrooms and dealers on our platform." },
-  { step: "02", title: "Book a Visit", description: "Book an appointment directly with your selected showroom." },
-  { step: "03", title: "Buy & Lock", description: "Purchase your selected vehicle and register your transaction with us." },
-  { step: "04", title: "Upload & Earn", description: "Buy through our platform. Submit your purchase. Get rewarded." },
+  { step: "01", title: "Find a Car", description: ["Explore cars from showrooms and dealers on our platform."] },
+  { step: "02", title: "Book a Visit", description: ["Book an appointment directly with your selected showroom."] },
+  { step: "03", title: "Buy & Lock", description: ["Purchase your selected vehicle and register your transaction with us."] },
+  { step: "04", title: "Reward", description: ["First Service FREE", "Get KSh 5,000 worth of petrol FREE"] },
 ] as const;
 
 // Matches design/login-page.png and design/signup-page.png exactly.
@@ -89,7 +89,11 @@ export default async function LoginPage() {
                   </span>
                   <div>
                     <p className="text-sm font-medium">{title}</p>
-                    <p className="text-sm text-white/60">{description}</p>
+                    {description.map((line) => (
+                      <p key={line} className="text-sm text-white/60">
+                        {line}
+                      </p>
+                    ))}
                   </div>
                 </li>
               ))}

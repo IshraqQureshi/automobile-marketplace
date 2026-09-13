@@ -23,6 +23,25 @@ export interface VehicleFilterOptions {
   models: string[];
   bodyTypes: string[];
   fuelTypes: string[];
+  // Real min/max price across the same (possibly brand-scoped) result set
+  // above — the price range slider's own bounds, so it reflects an actually
+  // achievable range rather than an arbitrary guessed ceiling. Falls back to
+  // a generous static range when there's no data at all yet (fresh install).
+  minPriceBound: number;
+  maxPriceBound: number;
+}
+
+const FALLBACK_MIN_PRICE_BOUND = 0;
+const FALLBACK_MAX_PRICE_BOUND = 20_000_000;
+
+// PostgREST's or() mini-grammar treats a bare `,`, `(`, or `)` in a filter
+// value as syntax (clause separator / grouping), so a raw user search term
+// containing one of those could inject an unintended extra filter clause
+// into the same or() list. Per PostgREST's own escaping convention,
+// wrapping the value in double quotes (doubling any literal quotes inside
+// it) makes it opaque to that grammar without changing what ilike matches.
+function escapeForOrFilter(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
 }
 
 function uniqueSorted(values: (string | null | undefined)[] | undefined): string[] {
@@ -30,32 +49,54 @@ function uniqueSorted(values: (string | null | undefined)[] | undefined): string
 }
 
 /**
- * `scopedToMake`, when given, narrows the option lists to that make's own
- * real model/bodyType/fuelType values (used by /listing/[brand], where
- * showing every OTHER brand's models in the "Model" dropdown would be
- * actively unhelpful) rather than the whole marketplace's.
+ * `scopedToMake`, when given, narrows the option lists (and price bounds) to
+ * that make's own real model/bodyType/fuelType/price values (used by
+ * /listing/[brand], where showing every OTHER brand's models in the "Model"
+ * dropdown — or its price range in the slider — would be actively
+ * unhelpful) rather than the whole marketplace's.
  */
 export async function fetchVehicleFilterOptions(supabase: SupabaseServerClient, scopedToMake?: string): Promise<VehicleFilterOptions> {
-  let query = supabase.from("vehicles").select("make, model, body_type, fuel_type").eq("status", "ACTIVE").limit(MAX_VEHICLES_FOR_FILTER_OPTIONS);
+  let query = supabase.from("vehicles").select("make, model, body_type, fuel_type, price").eq("status", "ACTIVE").limit(MAX_VEHICLES_FOR_FILTER_OPTIONS);
   if (scopedToMake) query = query.ilike("make", scopedToMake);
   const { data } = await query;
+
+  const prices = (data ?? []).map((r) => r.price).filter((p): p is number => typeof p === "number");
 
   return {
     makes: uniqueSorted(data?.map((r) => r.make)),
     models: uniqueSorted(data?.map((r) => r.model)),
     bodyTypes: uniqueSorted(data?.map((r) => r.body_type)),
     fuelTypes: uniqueSorted(data?.map((r) => r.fuel_type)),
+    minPriceBound: prices.length > 0 ? Math.min(...prices) : FALLBACK_MIN_PRICE_BOUND,
+    maxPriceBound: prices.length > 0 ? Math.max(...prices) : FALLBACK_MAX_PRICE_BOUND,
   };
 }
 
-export function buildVehicleQuery(supabase: SupabaseServerClient, filters: VehicleSearchFilters) {
+export async function buildVehicleQuery(supabase: SupabaseServerClient, filters: VehicleSearchFilters) {
   let query = supabase
     .from("vehicles")
     .select(`${VEHICLE_SELECT_COLUMNS}, showroom_id, showrooms(business_name)`, { count: "exact" })
     .eq("status", "ACTIVE");
 
   if (filters.q) {
-    query = query.or(`title.ilike.%${filters.q}%,make.ilike.%${filters.q}%,model.ilike.%${filters.q}%`);
+    // Free-text search previously only matched title/make/model — a search
+    // for a specific year (e.g. "2020") or a showroom's name found nothing,
+    // even though both are reasonable things a customer would type.
+    // PostgREST's `or()` can't reference an embedded table's column
+    // (confirmed live — it rejects `showrooms.business_name...` inside a
+    // top-level `or` with a parse error), so showroom-name matching is a
+    // separate lookup: find matching showroom ids first, then fold them
+    // into the same OR list as `showroom_id.in.(...)`.
+    const escapedQ = escapeForOrFilter(`%${filters.q}%`);
+    const orParts = [`title.ilike.${escapedQ}`, `make.ilike.${escapedQ}`, `model.ilike.${escapedQ}`];
+    if (/^\d{4}$/.test(filters.q)) orParts.push(`year.eq.${filters.q}`);
+
+    const { data: matchingShowrooms } = await supabase.from("showrooms").select("id").ilike("business_name", `%${filters.q}%`);
+    if (matchingShowrooms && matchingShowrooms.length > 0) {
+      orParts.push(`showroom_id.in.(${matchingShowrooms.map((s) => s.id).join(",")})`);
+    }
+
+    query = query.or(orParts.join(","));
   }
   if (filters.make) query = query.ilike("make", filters.make);
   if (filters.model) query = query.ilike("model", filters.model);

@@ -16,6 +16,19 @@
   --font-display: ui-serif, Georgia, Cambria, "Times New Roman", serif;
 }
 
+/* Tailwind v4's Preflight deliberately reset button { cursor: default },
+   reversing v3's default. That silently removed the pointer cursor from
+   every real <button> across the whole app (nav dropdowns, all CTAs, form
+   submits, etc.) with no code change of our own — restoring it as v3's
+   own default behaved, globally, rather than adding cursor-pointer to
+   every individual button one at a time. disabled:cursor-not-allowed
+   (used throughout) already overrides this correctly since it's a more
+   specific selector. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
 /* Entrance animation for toast notifications (src/components/ui/toast.tsx)
    — no animation plugin is installed, so this is a small hand-written
    keyframe rather than reaching for tailwindcss-animate. */
@@ -51,8 +64,58 @@
   animation: marquee 32s linear infinite;
 }
 
+/* :hover on an ancestor is true whenever the pointer is over any of its
+   descendants (standard CSS bubbling), so this pauses the whole track the
+   moment the pointer lands on any single showroom card — no per-card JS
+   needed. Without this, a card was sliding out from under the cursor
+   between hover and click, making the marquee feel unclickable even though
+   the <Link> underneath was always real. */
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee {
     animation-play-state: paused;
   }
+}
+
+/* Dual-handle price range slider (src/components/vehicle/price-range-slider.tsx)
+   — two full-width native <input type="range"> stacked on the same track.
+   The track itself is transparent and pointer-events:none here so clicks
+   pass through to whichever thumb is underneath; only the thumb re-enables
+   pointer-events, which is what makes two overlapping range inputs usable
+   as one dual-handle control without a library. */
+.price-range-thumb {
+  pointer-events: none;
+}
+
+.price-range-thumb::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.price-range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--color-brand);
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  margin-top: 0;
+}
+
+.price-range-thumb::-moz-range-track {
+  background: transparent;
+}
+.price-range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--color-brand);
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
 }
