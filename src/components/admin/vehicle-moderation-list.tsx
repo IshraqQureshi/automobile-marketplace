@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { CarIcon, EyeIcon, FilterBar, SearchInput, SectionHeader, TableEmptyState, TableShell, filterSelectClassName } from "@/components/admin/admin-ui";
-import { CommissionDialog, type VehicleCommission } from "@/components/admin/commission-dialog";
+import { CommissionDialog, COMMISSION_STATUS_BADGE_CLASSES, type VehicleCommission } from "@/components/admin/commission-dialog";
 import { ExportCsvButton, type CsvColumn } from "@/components/admin/export-csv-button";
 import { useToast } from "@/components/ui/toast";
 import { updateVehicleStatusAsAdminAction } from "@/features/vehicle/actions";
@@ -174,9 +174,7 @@ export function VehicleModerationList({ vehicles, commissions }: VehicleModerati
                             <>
                               <span className="font-medium text-neutral-800 tabular-nums">{currencyFormatter.format(commissions[vehicle.id]!.amount)}</span>
                               <span
-                                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                                  commissions[vehicle.id]!.status === "PAID" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                                }`}
+                                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${COMMISSION_STATUS_BADGE_CLASSES[commissions[vehicle.id]!.status]}`}
                               >
                                 {commissions[vehicle.id]!.status === "PAID" ? "Paid" : "Pending"}
                               </span>

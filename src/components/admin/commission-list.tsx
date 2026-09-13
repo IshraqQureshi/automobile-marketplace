@@ -2,18 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { FilterBar, RowIconButton, SearchInput, SectionHeader, TableEmptyState, TableShell, filterSelectClassName, PencilIcon } from "@/components/admin/admin-ui";
-import { CommissionDialog } from "@/components/admin/commission-dialog";
+import { CommissionDialog, COMMISSION_STATUS_BADGE_CLASSES } from "@/components/admin/commission-dialog";
 import type { SoldVehicleCommissionRow } from "@/features/admin/commission-queries";
 import { currencyFormatter } from "@/features/vehicle/types";
 
 interface CommissionListProps {
   rows: SoldVehicleCommissionRow[];
 }
-
-const STATUS_BADGE_CLASSES = {
-  PENDING: "bg-amber-50 text-amber-700",
-  PAID: "bg-emerald-50 text-emerald-700",
-} as const;
 
 /**
  * Commission entry surface for /admin/payments — every currently SOLD
@@ -90,7 +85,7 @@ export function CommissionList({ rows }: CommissionListProps) {
                   </td>
                   <td className="px-5 py-3">
                     {row.commission ? (
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE_CLASSES[row.commission.status]}`}>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${COMMISSION_STATUS_BADGE_CLASSES[row.commission.status]}`}>
                         {row.commission.status === "PAID" ? "Paid" : "Pending"}
                       </span>
                     ) : (

@@ -13,6 +13,14 @@ export interface VehicleCommission {
   notes: string | null;
 }
 
+// Shared with commission-list.tsx and vehicle-moderation-list.tsx, both of
+// which render a PENDING/PAID badge for the same commission concept — a
+// single source for this color mapping so the two lists can't drift apart.
+export const COMMISSION_STATUS_BADGE_CLASSES: Record<VehicleCommission["status"], string> = {
+  PENDING: "bg-amber-50 text-amber-700",
+  PAID: "bg-emerald-50 text-emerald-700",
+};
+
 // Minimal shape rather than the full VehicleWithShowroom — this dialog only
 // ever needs an id (to record against) and a title (to show in the dialog
 // description), so both its callers (the vehicle moderation list, and the
@@ -27,7 +35,6 @@ interface CommissionDialogProps {
   vehicle: CommissionDialogVehicle;
   existing: VehicleCommission | null;
   onClose: () => void;
-  onSaved?: () => void;
 }
 
 /**
@@ -37,7 +44,7 @@ interface CommissionDialogProps {
  * recordVehicleCommissionAction upsert either way, just reached from two
  * different entry points.
  */
-export function CommissionDialog({ vehicle, existing, onClose, onSaved }: CommissionDialogProps) {
+export function CommissionDialog({ vehicle, existing, onClose }: CommissionDialogProps) {
   const toast = useToast();
   const [amount, setAmount] = useState(existing ? String(existing.amount) : "");
   const [status, setStatus] = useState<"PENDING" | "PAID">(existing?.status ?? "PENDING");
@@ -60,7 +67,6 @@ export function CommissionDialog({ vehicle, existing, onClose, onSaved }: Commis
         return;
       }
       toast.success("Commission saved.");
-      onSaved?.();
       onClose();
     });
   }
