@@ -3,10 +3,13 @@ import { createClient } from "@supabase/supabase-js";
 
 // Public (signed-out) showroom self-registration — reversed an earlier
 // decision that made /register-showroom admin-only-reachable. Own
-// dedicated fixture data (per this repo's convention) so assertions are
-// deterministic regardless of other real/demo data.
-test.describe.configure({ mode: "serial" });
-
+// dedicated fixture data per test (each creates and cleans up its own —
+// no shared beforeAll/afterAll state), and deliberately NOT run in serial
+// mode: these tests are fully independent of each other, and forcing
+// serial execution would let one test's failure (e.g. the real-account
+// happy path, which depends on the shared local Mailtrap sandbox actually
+// having email quota left) silently skip every test after it, including
+// the unrelated duplicate-email rejection check.
 const MAILPIT_URL = "http://127.0.0.1:54324";
 
 function admin() {

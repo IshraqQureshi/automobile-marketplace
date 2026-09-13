@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger";
 import { fieldErrorsFrom } from "@/lib/validation/field-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { extractClientIp, hashClientIp } from "@/features/vehicle/view-tracking";
 import { readDocumentFiles, uploadShowroomDocuments, validateDocumentFiles } from "./document-upload";
 import {
   BUSINESS_REGISTRATION_DOCUMENT_TYPE,
@@ -16,6 +17,12 @@ import {
   registerShowroomSchema,
   type RegisterShowroomActionState,
 } from "./schemas";
+
+// Deliberately generous, not tight — this is an abuse guard, not a UX
+// throttle: a real showroom applicant should never plausibly hit either
+// limit, but a script trying to flood accounts/emails will.
+const MAX_REGISTRATION_ATTEMPTS_PER_IP_PER_HOUR = 3;
+const MAX_REGISTRATION_ATTEMPTS_PER_EMAIL_PER_DAY = 2;
 
 export async function registerShowroomAction(
   _prevState: RegisterShowroomActionState,
@@ -200,7 +207,41 @@ export async function registerShowroomPublicAction(
   }
 
   const admin = createAdminClient();
-  const origin = (await headers()).get("origin");
+  const requestHeaders = await headers();
+
+  // Rate limit: this is a fully public, unauthenticated write path that
+  // creates a real Supabase Auth account and sends a real email for every
+  // submission — unlike the admin panel's own equivalent (inviteNewShowroomOwner),
+  // there's no assertCallerIsAdmin() trust boundary in front of it. Checked
+  // (and logged) BEFORE the invite call so a scripted flood can't create
+  // unlimited accounts or email-bomb an arbitrary address by retrying.
+  const clientIp = extractClientIp((name) => requestHeaders.get(name));
+  const ipHash = clientIp ? hashClientIp(clientIp) : null;
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ count: ipAttempts }, { count: emailAttempts }] = await Promise.all([
+    ipHash
+      ? admin.from("showroom_registration_attempts").select("id", { count: "exact", head: true }).eq("ip_hash", ipHash).gte("created_at", oneHourAgo)
+      : Promise.resolve({ count: 0 }),
+    admin
+      .from("showroom_registration_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("email", parsed.data.businessEmail)
+      .gte("created_at", oneDayAgo),
+  ]);
+
+  // Every attempt is logged regardless of outcome — including this
+  // rejected one — so a retry loop still counts toward the limit instead
+  // of resetting it.
+  await admin.from("showroom_registration_attempts").insert({ ip_hash: ipHash, email: parsed.data.businessEmail });
+
+  if ((ipAttempts ?? 0) >= MAX_REGISTRATION_ATTEMPTS_PER_IP_PER_HOUR || (emailAttempts ?? 0) >= MAX_REGISTRATION_ATTEMPTS_PER_EMAIL_PER_DAY) {
+    logger.warn("Public showroom registration rate-limited", { ipHash, email: parsed.data.businessEmail });
+    return { status: "error", message: "Too many registration attempts. Please try again later, or contact support." };
+  }
+
+  const origin = requestHeaders.get("origin");
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.businessEmail, {
     data: { full_name: parsed.data.ownerFullName, phone: `+254${parsed.data.businessPhone}` },
     // Not /auth/callback — see src/app/auth/invite-callback/page.tsx's
