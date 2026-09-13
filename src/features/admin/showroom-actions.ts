@@ -5,14 +5,9 @@ import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { uploadShowroomDocuments } from "@/features/showroom/document-upload";
+import { readDocumentFiles, uploadShowroomDocuments, validateDocumentFiles } from "@/features/showroom/document-upload";
 import { readShowroomProfileFormFields, updateShowroomProfile } from "@/features/showroom/profile";
-import {
-  ALLOWED_DOCUMENT_MIME_TYPES,
-  BUSINESS_REGISTRATION_DOCUMENT_TYPE,
-  MAX_DOCUMENTS_PER_SUBMISSION,
-  MAX_DOCUMENT_SIZE_BYTES,
-} from "@/features/showroom/schemas";
+import { BUSINESS_REGISTRATION_DOCUMENT_TYPE } from "@/features/showroom/schemas";
 import { uploadEntityLogo, validateLogoFile } from "./logo-upload";
 import { adminShowroomSchema, newOwnerSchema, ownerUserIdSchema, youtubePlaylistUrlSchema } from "./showroom-schemas";
 
@@ -129,21 +124,6 @@ async function assertCallerIsAdmin(): Promise<boolean> {
   if (!caller) return false;
   const { data: callerProfile } = await supabase.from("profiles").select("role").eq("id", caller.id).maybeSingle();
   return callerProfile?.role === "ADMIN";
-}
-
-function readDocumentFiles(formData: FormData): File[] {
-  return formData.getAll("documents").filter((entry): entry is File => entry instanceof File && entry.size > 0);
-}
-
-function validateDocumentFiles(documents: File[]): string | null {
-  if (documents.length > MAX_DOCUMENTS_PER_SUBMISSION) return `Upload at most ${MAX_DOCUMENTS_PER_SUBMISSION} documents.`;
-  for (const file of documents) {
-    if (!ALLOWED_DOCUMENT_MIME_TYPES.includes(file.type as (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number])) {
-      return `"${file.name}" must be a PDF, JPG, or PNG file.`;
-    }
-    if (file.size > MAX_DOCUMENT_SIZE_BYTES) return `"${file.name}" is larger than 10MB.`;
-  }
-  return null;
 }
 
 // Creates a brand-new user account for a showroom being registered on their

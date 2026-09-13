@@ -679,6 +679,27 @@ export type Database = {
           },
         ]
       }
+      showroom_registration_attempts: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          ip_hash: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          ip_hash?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          ip_hash?: string | null
+        }
+        Relationships: []
+      }
       showrooms: {
         Row: {
           address: string | null

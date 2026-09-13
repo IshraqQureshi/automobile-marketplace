@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registerShowroomSchema } from "./schemas";
+import { publicRegisterShowroomSchema, registerShowroomSchema } from "./schemas";
 
 const valid = {
   businessName: "AutoElite Motors",
@@ -57,6 +57,42 @@ describe("registerShowroomSchema", () => {
 
   it("rejects a blank business email", () => {
     const result = registerShowroomSchema.safeParse({ ...valid, businessEmail: "" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("publicRegisterShowroomSchema", () => {
+  const validPublic = { ...valid, ownerFullName: "Jane Wanjiru" };
+
+  it("accepts valid input including the extra ownerFullName field", () => {
+    const result = publicRegisterShowroomSchema.safeParse(validPublic);
+    expect(result.success).toBe(true);
+  });
+
+  it("trims and rejects a blank owner full name", () => {
+    const result = publicRegisterShowroomSchema.safeParse({ ...validPublic, ownerFullName: "   " });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an owner full name under 2 characters", () => {
+    const result = publicRegisterShowroomSchema.safeParse({ ...validPublic, ownerFullName: "J" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an owner full name over 150 characters", () => {
+    const result = publicRegisterShowroomSchema.safeParse({ ...validPublic, ownerFullName: "A".repeat(151) });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a missing owner full name", () => {
+    const { ownerFullName, ...withoutOwnerName } = validPublic;
+    void ownerFullName;
+    const result = publicRegisterShowroomSchema.safeParse(withoutOwnerName);
+    expect(result.success).toBe(false);
+  });
+
+  it("still enforces every business-field rule the signed-in schema does", () => {
+    const result = publicRegisterShowroomSchema.safeParse({ ...validPublic, businessEmail: "not-an-email" });
     expect(result.success).toBe(false);
   });
 });

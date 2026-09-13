@@ -30,6 +30,24 @@ export const registerShowroomSchema = registerShowroomBaseSchema;
 
 export type RegisterShowroomInput = z.infer<typeof registerShowroomSchema>;
 
+// Public (signed-out) registration collects one extra field the
+// authenticated flow doesn't need — an owner name to invite the new account
+// under — since there's no existing profile to read it from. Exported: the
+// admin panel's own "invite a new owner" flow (newOwnerFieldSchemas in
+// src/features/admin/showroom-schemas.ts) needs the exact same rule for the
+// exact same reason (naming a brand-new invited account), so it reuses this
+// rather than keeping its own separate copy.
+export const ownerFullNameSchema = z.string().trim().min(2, "Full name is required").max(150, "Full name is too long");
+
+const publicRegisterShowroomBaseSchema = registerShowroomBaseSchema.extend({
+  ownerFullName: ownerFullNameSchema,
+});
+
+export const publicRegisterShowroomFieldSchemas = publicRegisterShowroomBaseSchema.shape;
+export const publicRegisterShowroomSchema = publicRegisterShowroomBaseSchema;
+
+export type PublicRegisterShowroomInput = z.infer<typeof publicRegisterShowroomSchema>;
+
 export interface RegisterShowroomActionState {
   status: "idle" | "error" | "success";
   message?: string;

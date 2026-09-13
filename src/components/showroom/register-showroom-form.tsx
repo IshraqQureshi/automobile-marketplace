@@ -4,20 +4,25 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { registerShowroomAction } from "@/features/showroom/actions";
+import { registerShowroomAction, registerShowroomPublicAction } from "@/features/showroom/actions";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
-import { initialRegisterShowroomState, registerShowroomFieldSchemas } from "@/features/showroom/schemas";
+import { initialRegisterShowroomState, publicRegisterShowroomFieldSchemas } from "@/features/showroom/schemas";
 import { stripKenyaPrefix } from "@/lib/validation/kenya-phone";
 
 interface RegisterShowroomFormProps {
+  isSignedIn: boolean;
   defaultEmail: string;
   defaultPhone: string;
 }
 
-export function RegisterShowroomForm({ defaultEmail, defaultPhone }: RegisterShowroomFormProps) {
-  const [state, formAction, pending] = useActionState(registerShowroomAction, initialRegisterShowroomState);
-  const { validate, errorFor } = useFieldValidation(registerShowroomFieldSchemas);
+export function RegisterShowroomForm({ isSignedIn, defaultEmail, defaultPhone }: RegisterShowroomFormProps) {
+  const [state, formAction, pending] = useActionState(isSignedIn ? registerShowroomAction : registerShowroomPublicAction, initialRegisterShowroomState);
+  // Always validated against the superset schema (adds ownerFullName, only
+  // ever rendered/submitted for a signed-out applicant) — the extra key is
+  // harmless to have registered when the field itself isn't shown.
+  const { validate, errorFor } = useFieldValidation(publicRegisterShowroomFieldSchemas);
 
+  const [ownerFullName, setOwnerFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [location, setLocation] = useState("");
   const [businessPhone, setBusinessPhone] = useState(stripKenyaPrefix(defaultPhone));
@@ -25,6 +30,7 @@ export function RegisterShowroomForm({ defaultEmail, defaultPhone }: RegisterSho
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
 
+  const ownerFullNameError = errorFor("ownerFullName", state.fieldErrors?.ownerFullName);
   const businessNameError = errorFor("businessName", state.fieldErrors?.businessName);
   const locationError = errorFor("location", state.fieldErrors?.location);
   const businessPhoneError = errorFor("businessPhone", state.fieldErrors?.businessPhone);
@@ -36,9 +42,14 @@ export function RegisterShowroomForm({ defaultEmail, defaultPhone }: RegisterSho
       <div className="rounded-xl border border-neutral-200 bg-white p-8 shadow-sm">
         <h2 className="font-display text-lg font-semibold text-neutral-900">Application submitted</h2>
         <p className="mt-2 text-sm text-neutral-500">{state.message}</p>
-        <Link href="/dashboard" className="mt-4 inline-block text-sm font-medium text-brand hover:text-brand-dark">
-          Go to your dashboard →
-        </Link>
+        {/* A signed-out applicant has no session yet (their account was
+            just created via an invite, not signed into) — there's no
+            dashboard to send them to until they've set their password. */}
+        {isSignedIn && (
+          <Link href="/dashboard" className="mt-4 inline-block text-sm font-medium text-brand hover:text-brand-dark">
+            Go to your dashboard →
+          </Link>
+        )}
       </div>
     );
   }
@@ -47,6 +58,25 @@ export function RegisterShowroomForm({ defaultEmail, defaultPhone }: RegisterSho
     <form action={formAction} className="rounded-xl border border-neutral-200 bg-white p-6 text-left shadow-sm">
       {state.status === "error" && state.message && (
         <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.message}</p>
+      )}
+
+      {!isSignedIn && (
+        <div className="mb-4">
+          <label htmlFor="ownerFullName" className="mb-1 block text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+            Your full name
+          </label>
+          <Input
+            id="ownerFullName"
+            name="ownerFullName"
+            placeholder="e.g. Jane Wanjiru"
+            required
+            error={!!ownerFullNameError}
+            value={ownerFullName}
+            onChange={(e) => setOwnerFullName(e.target.value)}
+            onBlur={(e) => validate("ownerFullName", e.target.value)}
+          />
+          {ownerFullNameError && <p className="mt-1 text-sm text-red-600">{ownerFullNameError}</p>}
+        </div>
       )}
 
       <div className="mb-4">
@@ -168,6 +198,7 @@ export function RegisterShowroomForm({ defaultEmail, defaultPhone }: RegisterSho
           onBlur={(e) => validate("businessEmail", e.target.value)}
         />
         {businessEmailError && <p className="mt-1 text-sm text-red-600">{businessEmailError}</p>}
+        {!isSignedIn && <p className="mt-1 text-xs text-neutral-400">We&apos;ll email you here to set up your account password.</p>}
       </div>
 
       <Button type="submit" disabled={pending} className="bg-brand hover:bg-brand-dark">

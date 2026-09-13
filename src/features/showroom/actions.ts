@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { after } from "next/server";
 import { renderShowroomRegistrationAdminNotificationEmail, renderShowroomRegistrationReceivedEmail } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
@@ -8,15 +9,20 @@ import { logger } from "@/lib/logger";
 import { fieldErrorsFrom } from "@/lib/validation/field-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { uploadShowroomDocuments } from "./document-upload";
+import { extractClientIp, hashClientIp } from "@/features/vehicle/view-tracking";
+import { readDocumentFiles, uploadShowroomDocuments, validateDocumentFiles } from "./document-upload";
 import {
-  ALLOWED_DOCUMENT_MIME_TYPES,
   BUSINESS_REGISTRATION_DOCUMENT_TYPE,
-  MAX_DOCUMENTS_PER_SUBMISSION,
-  MAX_DOCUMENT_SIZE_BYTES,
+  publicRegisterShowroomSchema,
   registerShowroomSchema,
   type RegisterShowroomActionState,
 } from "./schemas";
+
+// Deliberately generous, not tight — this is an abuse guard, not a UX
+// throttle: a real showroom applicant should never plausibly hit either
+// limit, but a script trying to flood accounts/emails will.
+const MAX_REGISTRATION_ATTEMPTS_PER_IP_PER_HOUR = 3;
+const MAX_REGISTRATION_ATTEMPTS_PER_EMAIL_PER_DAY = 2;
 
 export async function registerShowroomAction(
   _prevState: RegisterShowroomActionState,
@@ -44,20 +50,13 @@ export async function registerShowroomAction(
     return { status: "error", message: "Please fix the errors below.", fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
-  const documents = formData.getAll("documents").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  const documents = readDocumentFiles(formData);
   if (documents.length === 0) {
     return { status: "error", fieldErrors: { documents: "Upload at least one license/registration document." } };
   }
-  if (documents.length > MAX_DOCUMENTS_PER_SUBMISSION) {
-    return { status: "error", fieldErrors: { documents: `Upload at most ${MAX_DOCUMENTS_PER_SUBMISSION} documents.` } };
-  }
-  for (const file of documents) {
-    if (!ALLOWED_DOCUMENT_MIME_TYPES.includes(file.type as (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number])) {
-      return { status: "error", fieldErrors: { documents: `"${file.name}" must be a PDF, JPG, or PNG file.` } };
-    }
-    if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
-      return { status: "error", fieldErrors: { documents: `"${file.name}" is larger than 10MB.` } };
-    }
+  const documentsError = validateDocumentFiles(documents);
+  if (documentsError) {
+    return { status: "error", fieldErrors: { documents: documentsError } };
   }
 
   // One active (PENDING/APPROVED/SUSPENDED) showroom per owner — also
@@ -168,6 +167,171 @@ export async function registerShowroomAction(
   }
 
   return { status: "success", message: "Application submitted. We'll review your business information and documents within 1–2 business days." };
+}
+
+/**
+ * Public (signed-out) showroom registration — reachable directly from
+ * /register-showroom without an existing account, per direct request.
+ * Unlike registerShowroomAction (which registers a showroom under an
+ * already-authenticated user's own account), this creates the account
+ * itself: invites a new user via the business email through Supabase's
+ * real invite flow (the same mechanism the admin panel's own
+ * "invite a new owner" already uses — a branded email with a link to set
+ * their own password, supabase/templates/invite.html — never a generated
+ * plaintext password communicated out-of-band), then creates the showroom
+ * under that new account. Everything runs on the service-role client since
+ * there's no session yet for RLS to scope to.
+ */
+export async function registerShowroomPublicAction(
+  _prevState: RegisterShowroomActionState,
+  formData: FormData,
+): Promise<RegisterShowroomActionState> {
+  const parsed = publicRegisterShowroomSchema.safeParse({
+    businessName: formData.get("businessName"),
+    location: formData.get("location"),
+    businessPhone: formData.get("businessPhone"),
+    businessEmail: formData.get("businessEmail"),
+    ownerFullName: formData.get("ownerFullName"),
+  });
+  if (!parsed.success) {
+    return { status: "error", message: "Please fix the errors below.", fieldErrors: fieldErrorsFrom(parsed.error) };
+  }
+
+  const documents = readDocumentFiles(formData);
+  if (documents.length === 0) {
+    return { status: "error", fieldErrors: { documents: "Upload at least one license/registration document." } };
+  }
+  const documentsError = validateDocumentFiles(documents);
+  if (documentsError) {
+    return { status: "error", fieldErrors: { documents: documentsError } };
+  }
+
+  const admin = createAdminClient();
+  const requestHeaders = await headers();
+
+  // Rate limit: this is a fully public, unauthenticated write path that
+  // creates a real Supabase Auth account and sends a real email for every
+  // submission — unlike the admin panel's own equivalent (inviteNewShowroomOwner),
+  // there's no assertCallerIsAdmin() trust boundary in front of it. Checked
+  // (and logged) BEFORE the invite call so a scripted flood can't create
+  // unlimited accounts or email-bomb an arbitrary address by retrying.
+  const clientIp = extractClientIp((name) => requestHeaders.get(name));
+  const ipHash = clientIp ? hashClientIp(clientIp) : null;
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ count: ipAttempts }, { count: emailAttempts }] = await Promise.all([
+    ipHash
+      ? admin.from("showroom_registration_attempts").select("id", { count: "exact", head: true }).eq("ip_hash", ipHash).gte("created_at", oneHourAgo)
+      : Promise.resolve({ count: 0 }),
+    admin
+      .from("showroom_registration_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("email", parsed.data.businessEmail)
+      .gte("created_at", oneDayAgo),
+  ]);
+
+  // Every attempt is logged regardless of outcome — including this
+  // rejected one — so a retry loop still counts toward the limit instead
+  // of resetting it.
+  await admin.from("showroom_registration_attempts").insert({ ip_hash: ipHash, email: parsed.data.businessEmail });
+
+  if ((ipAttempts ?? 0) >= MAX_REGISTRATION_ATTEMPTS_PER_IP_PER_HOUR || (emailAttempts ?? 0) >= MAX_REGISTRATION_ATTEMPTS_PER_EMAIL_PER_DAY) {
+    logger.warn("Public showroom registration rate-limited", { ipHash, email: parsed.data.businessEmail });
+    return { status: "error", message: "Too many registration attempts. Please try again later, or contact support." };
+  }
+
+  const origin = requestHeaders.get("origin");
+  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.businessEmail, {
+    data: { full_name: parsed.data.ownerFullName, phone: `+254${parsed.data.businessPhone}` },
+    // Not /auth/callback — see src/app/auth/invite-callback/page.tsx's
+    // header comment for why an invite link can't use the same PKCE
+    // `?code=` handling every other auth email link in this app uses.
+    redirectTo: `${origin}/auth/invite-callback`,
+  });
+  if (inviteError || !invited.user) {
+    logger.error("Failed to invite a new showroom owner (public registration)", inviteError);
+    return {
+      status: "error",
+      message:
+        inviteError?.code === "email_exists"
+          ? "An account with this email already exists. Please log in and register your showroom from your account instead."
+          : "Failed to submit your application. Please try again.",
+    };
+  }
+  const ownerId = invited.user.id;
+
+  const { data: showroom, error: showroomError } = await admin
+    .from("showrooms")
+    .insert({
+      owner_user_id: ownerId,
+      business_name: parsed.data.businessName,
+      city: parsed.data.location,
+      phone: `+254${parsed.data.businessPhone}`,
+      email: parsed.data.businessEmail,
+    })
+    .select("id")
+    .single();
+  if (showroomError || !showroom) {
+    logger.error("Failed to create showroom (public registration)", showroomError, { ownerId });
+    // Don't leave a dead-end, showroom-less account behind — the invite
+    // email has already been sent and can't be un-sent, but there's no
+    // reason to keep the account around with nothing for it to do (same
+    // reasoning as createShowroomAction's own invited-owner rollback).
+    const { error: rollbackError } = await admin.auth.admin.deleteUser(ownerId);
+    if (rollbackError) {
+      logger.error("Failed to roll back invited owner after showroom creation failed", rollbackError, { ownerId });
+    }
+    return { status: "error", message: "Failed to submit your application. Please try again." };
+  }
+
+  const { failedUploads } = await uploadShowroomDocuments(admin, showroom.id, ownerId, documents, BUSINESS_REGISTRATION_DOCUMENT_TYPE);
+
+  if (failedUploads.length === documents.length) {
+    logger.error("Public showroom registration failed: every document upload failed, rolling back", undefined, {
+      showroomId: showroom.id,
+      failedUploads,
+    });
+    const { error: showroomRollbackError } = await admin.from("showrooms").delete().eq("id", showroom.id);
+    if (showroomRollbackError) {
+      logger.error("Failed to roll back showroom after total upload failure", showroomRollbackError, { showroomId: showroom.id });
+    }
+    const { error: userRollbackError } = await admin.auth.admin.deleteUser(ownerId);
+    if (userRollbackError) {
+      logger.error("Failed to roll back invited owner after total upload failure", userRollbackError, { ownerId });
+    }
+    return { status: "error", message: "Failed to upload your documents. Please try again." };
+  }
+
+  // Same after()-over-fire-and-forget reasoning as registerShowroomAction
+  // above — a notification email must never block or delay the real
+  // outcome it's reporting on, and Vercel can freeze the function the
+  // instant the response is sent.
+  after(async () => {
+    await sendRegistrationEmails({
+      showroomId: showroom.id,
+      businessName: parsed.data.businessName,
+      ownerFullName: parsed.data.ownerFullName,
+      ownerEmail: parsed.data.businessEmail,
+    });
+  });
+
+  const setupNote = `Check your email at ${parsed.data.businessEmail} to set your password and access your account.`;
+  if (failedUploads.length > 0) {
+    logger.warn("Public showroom registration submitted with partial document upload failure", {
+      showroomId: showroom.id,
+      failedUploads,
+    });
+    return {
+      status: "success",
+      message: `Application submitted, but ${failedUploads.length} document(s) failed to upload (${failedUploads.join(", ")}). Our team will follow up about re-submitting them. ${setupNote}`,
+    };
+  }
+
+  return {
+    status: "success",
+    message: `Application submitted. We'll review your business information and documents within 1–2 business days. ${setupNote}`,
+  };
 }
 
 /** Sent once a showroom application row genuinely exists — never on the total-upload-failure rollback path above, since that showroom no longer exists. */
