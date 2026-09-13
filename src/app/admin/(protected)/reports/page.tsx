@@ -52,7 +52,7 @@ export default async function AdminReportsPage({ searchParams }: AdminReportsPag
             <DateRangeForm action="/admin/reports" preset={preset} start={range.start} end={range.end} />
           </div>
 
-          <section className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+          <section className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
             <StatCard label="Showrooms" value={String(totalShowrooms)} hint="All statuses" />
             <StatCard
               label="Appointments"
@@ -69,6 +69,11 @@ export default async function AdminReportsPage({ searchParams }: AdminReportsPag
               label="Subscription revenue"
               value={currencyFormatter.format(data.subscriptionRevenue.total)}
               hint="Recorded manual payments"
+            />
+            <StatCard
+              label="Commission"
+              value={currencyFormatter.format(data.commissionRevenue.total)}
+              hint="Recorded this range, pending + paid"
             />
           </section>
 
@@ -89,6 +94,17 @@ export default async function AdminReportsPage({ searchParams }: AdminReportsPag
                 <TimeSeriesChart data={data.showroomSignupsOverTime} granularity={granularity} seriesLabel="New showrooms" />
               ) : (
                 <ReportEmptyState message="No showrooms in this date range." />
+              )}
+            </ReportSection>
+
+            <ReportSection title="Commission status breakdown" description="Recorded commissions in this range — pending vs. paid">
+              {data.commissionStatusBreakdown.length > 0 ? (
+                <StatusPieChart
+                  data={data.commissionStatusBreakdown}
+                  labelMap={Object.fromEntries(data.commissionStatusBreakdown.map((g) => [g.group, titleCase(g.group)]))}
+                />
+              ) : (
+                <ReportEmptyState message="No commissions recorded in this date range." />
               )}
             </ReportSection>
 

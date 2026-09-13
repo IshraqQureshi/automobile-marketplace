@@ -28,6 +28,8 @@ export interface AdminReportData {
   topShowrooms: RankedItem[]; // by totalEngagement, for the bar chart
   showroomScorecards: ShowroomScorecardRow[]; // the full per-showroom breakdown table ("how is each showroom working")
   subscriptionRevenue: { total: number; currency: string };
+  commissionRevenue: { total: number };
+  commissionStatusBreakdown: GroupCount[];
 }
 
 /**
@@ -43,7 +45,7 @@ export async function getAdminReportData(supabase: SupabaseServerClient, range: 
   const rangeStartIso = `${range.start}T00:00:00`;
   const rangeEndIso = `${range.end}T23:59:59.999`;
 
-  const [showroomsRes, profilesRes, appointmentsRes, inquiriesRes, financingRes, vehiclesRes, paymentsRes] = await Promise.all([
+  const [showroomsRes, profilesRes, appointmentsRes, inquiriesRes, financingRes, vehiclesRes, paymentsRes, commissionsRes] = await Promise.all([
     supabase.from("showrooms").select("id, business_name, status, created_at"),
     supabase.from("profiles").select("id, created_at"),
     supabase.from("appointments").select("id, created_at, showroom_id").gte("created_at", rangeStartIso).lte("created_at", rangeEndIso),
@@ -57,6 +59,7 @@ export async function getAdminReportData(supabase: SupabaseServerClient, range: 
       .eq("status", "RECORDED")
       .gte("created_at", rangeStartIso)
       .lte("created_at", rangeEndIso),
+    supabase.from("vehicle_commissions").select("amount, status").gte("created_at", rangeStartIso).lte("created_at", rangeEndIso),
   ]);
 
   const showrooms = showroomsRes.data ?? [];
@@ -66,6 +69,7 @@ export async function getAdminReportData(supabase: SupabaseServerClient, range: 
   const financingRows = financingRes.data ?? [];
   const vehicles = vehiclesRes.data ?? [];
   const payments = paymentsRes.data ?? [];
+  const commissions = commissionsRes.data ?? [];
 
   // vehicle_views has NO client-facing SELECT policy at all, by deliberate
   // design (only record_vehicle_view(), a security-definer function,
@@ -138,6 +142,11 @@ export async function getAdminReportData(supabase: SupabaseServerClient, range: 
   const currency = payments[0]?.currency ?? "KES";
   const subscriptionRevenue = { total: payments.reduce((sum, p) => sum + Number(p.amount), 0), currency };
 
+  // No currency column on vehicle_commissions — KES only, same as a
+  // vehicle's own price field elsewhere in this codebase.
+  const commissionRevenue = { total: commissions.reduce((sum, c) => sum + Number(c.amount), 0) };
+  const commissionStatusBreakdown = countsByGroup(commissions, (c) => c.status);
+
   return {
     showroomStatusBreakdown,
     showroomSignupsOverTime,
@@ -149,5 +158,7 @@ export async function getAdminReportData(supabase: SupabaseServerClient, range: 
     topShowrooms,
     showroomScorecards,
     subscriptionRevenue,
+    commissionRevenue,
+    commissionStatusBreakdown,
   };
 }
