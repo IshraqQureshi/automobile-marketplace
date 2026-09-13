@@ -8,7 +8,17 @@ interface FavoriteVehicleRow {
   vehicles: (Parameters<typeof vehicleRowToListItem>[0] & { showroom_id: string; showrooms: { business_name: string } | null }) | null;
 }
 
-/** A customer's own favorited vehicles, most recently favorited first — customer dashboard (AUTH-004/AUTH-005). */
+/**
+ * A customer's own favorited vehicles, most recently favorited first —
+ * customer dashboard (AUTH-004/AUTH-005). Filtered to ACTIVE the same way
+ * every other vehicle-facing query in this codebase is (listing-query.ts,
+ * the vehicle detail page's own getVehicle) — a vehicle a customer
+ * favorited while ACTIVE that a showroom later marks SOLD/DRAFT/INACTIVE
+ * shouldn't keep showing up as a live, purchasable listing (AUTH-005's own
+ * "deleted/unavailable vehicles are handled safely" acceptance criterion).
+ * A fully deleted vehicle is handled by the favorites table's own
+ * `on delete cascade`, so no filtering is needed for that case.
+ */
 export async function getCustomerFavorites(supabase: SupabaseServerClient, customerId: string): Promise<VehicleWithShowroom[]> {
   const { data } = await supabase
     .from("favorites")
@@ -20,16 +30,10 @@ export async function getCustomerFavorites(supabase: SupabaseServerClient, custo
 
   return ((data as FavoriteVehicleRow[] | null) ?? [])
     .map((row) => row.vehicles)
-    .filter((v): v is NonNullable<FavoriteVehicleRow["vehicles"]> => v != null)
+    .filter((v): v is NonNullable<FavoriteVehicleRow["vehicles"]> => v != null && v.status === "ACTIVE")
     .map((v) => ({
       ...vehicleRowToListItem(v, getPhotoUrl),
       showroomId: v.showroom_id,
       showroomName: v.showrooms?.business_name ?? "Unknown showroom",
     }));
-}
-
-/** Every vehicle id a customer has favorited — used to render an already-favorited heart state on other pages (e.g. a vehicle's own detail page). */
-export async function getFavoritedVehicleIds(supabase: SupabaseServerClient, customerId: string): Promise<Set<string>> {
-  const { data } = await supabase.from("favorites").select("vehicle_id").eq("customer_id", customerId);
-  return new Set((data ?? []).map((row) => row.vehicle_id));
 }

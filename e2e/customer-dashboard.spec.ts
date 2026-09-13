@@ -149,6 +149,20 @@ test("a signed-in customer can remove a favorite from the vehicle detail page", 
   await expect(page.getByText("No favorites yet.")).toBeVisible();
 });
 
+test("a favorited vehicle that's no longer ACTIVE does not show up as a live listing on the dashboard", async ({ page }) => {
+  const supabase = admin();
+  await supabase.from("favorites").upsert({ customer_id: customerId, vehicle_id: vehicleId }, { onConflict: "customer_id,vehicle_id" });
+  await supabase.from("vehicles").update({ status: "SOLD" }).eq("id", vehicleId);
+
+  await signInAsCustomer(page);
+  await page.goto("/account");
+  await expect(page.getByText("No favorites yet.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Alpha" })).toHaveCount(0);
+
+  await supabase.from("vehicles").update({ status: "ACTIVE" }).eq("id", vehicleId);
+  await supabase.from("favorites").delete().eq("customer_id", customerId).eq("vehicle_id", vehicleId);
+});
+
 test("a signed-in customer's own appointment shows on their dashboard", async ({ page }) => {
   const supabase = admin();
   const { data: appointment, error } = await supabase
