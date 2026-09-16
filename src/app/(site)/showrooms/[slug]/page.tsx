@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { ShowroomVehicleBrowser } from "@/components/showroom/showroom-vehicle-browser";
 import { ShowroomPlaylistSection } from "@/components/showroom/showroom-playlist-section";
-import { ShowroomTikTokHighlights } from "@/components/showroom/showroom-tiktok-highlights";
+import { resolveShowroomTikTokHighlights, ShowroomTikTokHighlights } from "@/components/showroom/showroom-tiktok-highlights";
 import { getShowroomDetailPath, parseShowroomIdFromSlug } from "@/features/showroom/slug";
 import { buildWhatsAppLink } from "@/features/showroom/whatsapp";
 import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -137,6 +137,15 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
     { name: showroom.business_name, path: canonicalPath },
   ]);
 
+  // Resolved here (not inside ShowroomTikTokHighlights) so the REAL
+  // resolved count — not just whether video URLs are configured — can
+  // decide whether ShowroomPlaylistSection's own "Follow on TikTok"
+  // button is redundant. Using presence-of-URLs for that decision was a
+  // real bug: if every configured video fails to resolve (deleted/
+  // private/a TikTok API hiccup), both sections would disappear, leaving
+  // no way to reach a showroom's TikTok at all despite a valid tiktok_url.
+  const tiktokHighlightItems = await resolveShowroomTikTokHighlights(showroom.tiktok_video_urls);
+
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(autoDealerJsonLd) }} />
@@ -241,9 +250,9 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
         businessName={showroom.business_name}
         playlistUrl={showroom.youtube_playlist_url}
         tiktokUrl={showroom.tiktok_url}
-        hasVideoHighlights={(showroom.tiktok_video_urls?.length ?? 0) > 0}
+        hasVideoHighlights={tiktokHighlightItems.length > 0}
       />
-      <ShowroomTikTokHighlights businessName={showroom.business_name} tiktokUrl={showroom.tiktok_url} videoUrls={showroom.tiktok_video_urls} />
+      <ShowroomTikTokHighlights businessName={showroom.business_name} tiktokUrl={showroom.tiktok_url} items={tiktokHighlightItems} />
     </div>
   );
 }

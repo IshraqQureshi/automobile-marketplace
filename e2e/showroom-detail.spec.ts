@@ -271,8 +271,10 @@ test("a showroom owner can paste TikTok video links on their own profile, shown 
   // Same "On TikTok" thumbnail-grid + click-to-play-modal layout as the
   // homepage's own HighlightSection (ShowroomTikTokHighlights reuses that
   // exact component) — this section also owns the "Follow on TikTok" CTA
-  // once any video is configured, so ShowroomPlaylistSection's own copy of
-  // that button is suppressed (see hasVideoHighlights).
+  // once at least one video actually resolves, so ShowroomPlaylistSection's
+  // own copy of that button is suppressed (see hasVideoHighlights, derived
+  // from the real resolved count — not just whether any URLs are
+  // configured, which was a real bug: see the next test).
   await expect(page.getByText("On TikTok", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Follow on TikTok" })).toHaveAttribute("href", `https://www.tiktok.com/@e2e-showroom-detail-${unique}`);
 
@@ -288,6 +290,42 @@ test("a showroom owner can paste TikTok video links on their own profile, shown 
   await cards.first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.locator("iframe")).toHaveAttribute("src", REAL_TIKTOK_EMBED_URL);
+});
+
+test("the Follow on TikTok button still shows even when every configured video URL fails to resolve", async ({ page }) => {
+  // Regression coverage for a bug found in code review: whether
+  // ShowroomPlaylistSection's own follow button is suppressed used to be
+  // decided by whether tiktok_video_urls was merely *configured*, not by
+  // whether ShowroomTikTokHighlights actually resolved any of them. If
+  // every video failed to resolve (all deleted/private, or a TikTok API
+  // hiccup), both the highlights section AND the fallback follow button
+  // would disappear — leaving no way to reach the showroom's TikTok at
+  // all despite a valid tiktok_url. hasVideoHighlights is now derived from
+  // the real resolved item count (see resolveShowroomTikTokHighlights in
+  // src/app/(site)/showrooms/[slug]/page.tsx), not URL presence.
+  const supabase = admin();
+  await supabase
+    .from("showrooms")
+    .update({
+      tiktok_url: `https://www.tiktok.com/@e2e-showroom-detail-fallback-${unique}`,
+      // Both entries are unresolvable: a nonsense numeric ID (no real
+      // video exists at this URL, so oEmbed 400s) and a short link (no ID
+      // in the URL at all).
+      tiktok_video_urls: [
+        `https://www.tiktok.com/@e2e-showroom-detail-fallback-${unique}/video/1000000000000000001`,
+        "https://vm.tiktok.com/ZMabcdefg/",
+      ],
+    })
+    .eq("id", showroomId);
+
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("On TikTok", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Follow on TikTok" })).toHaveAttribute(
+    "href",
+    `https://www.tiktok.com/@e2e-showroom-detail-fallback-${unique}`,
+  );
+
+  await supabase.from("showrooms").update({ tiktok_url: null, tiktok_video_urls: null }).eq("id", showroomId);
 });
 
 test("admin can set a showroom's YouTube playlist URL, reflected on the public page", async ({ page }) => {
