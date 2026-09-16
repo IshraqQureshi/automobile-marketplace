@@ -1,3 +1,5 @@
+import { RouteLoadingIndicator } from "@/components/ui/route-loading-indicator";
+
 // Shown instantly while a page under /admin is loading — the sidebar
 // (rendered by (protected)/layout.tsx, a sibling of {children}) stays
 // mounted and interactive, only the content column shows this. Same gap
@@ -6,8 +8,8 @@
 // destination page's data fetch finished.
 export default function AdminLoading() {
   return (
-    <div className="flex flex-1 items-center justify-center" role="status" aria-label="Loading">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-brand" />
+    <div className="flex flex-1 items-center justify-center">
+      <RouteLoadingIndicator />
     </div>
   );
 }
