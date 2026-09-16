@@ -119,7 +119,19 @@ export function ShareButton({ title, url }: ShareButtonProps) {
       </button>
 
       {open && (
-        <div role="menu" className="absolute top-full right-0 z-20 mt-2 w-48 rounded-lg border border-neutral-200 bg-white py-1.5 shadow-lg">
+        // The button's own on-screen position flips between mobile and
+        // desktop (the vehicle detail page's action row is a stacked
+        // column on mobile, putting this button near the LEFT edge of the
+        // viewport, vs. a right-aligned row on desktop) — a popover
+        // anchored `right-0` unconditionally assumes the desktop position
+        // and overflows off the left edge of the screen on mobile
+        // (confirmed live via a real phone screenshot). `left-0` on
+        // mobile opens it rightward from the button instead, which stays
+        // on screen at every real viewport width this app supports.
+        <div
+          role="menu"
+          className="absolute top-full left-0 z-20 mt-2 w-48 rounded-lg border border-neutral-200 bg-white py-1.5 shadow-lg md:left-auto md:right-0"
+        >
           {options.map((option) => (
             <button
               key={option.key}
@@ -138,7 +150,7 @@ export function ShareButton({ title, url }: ShareButtonProps) {
       {feedback && (
         <span
           role="status"
-          className="absolute top-full right-0 z-20 mt-1 w-max max-w-52 rounded-md bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white"
+          className="absolute top-full left-0 z-20 mt-1 w-max max-w-52 rounded-md bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white md:left-auto md:right-0"
         >
           {feedback}
         </span>

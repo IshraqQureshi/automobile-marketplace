@@ -214,6 +214,27 @@ test("the Share button opens a popover with every direct-share option", async ({
   }
 });
 
+test("the Share popover stays fully on-screen on mobile, where the button sits near the left edge", async ({ page }) => {
+  // The vehicle detail page's action row is a stacked column on mobile
+  // (the button ends up near the LEFT edge of the viewport) but a
+  // right-aligned row on desktop (button near the right edge) — a
+  // popover anchored unconditionally `right-0` assumed the desktop
+  // position and overflowed off the left edge of real phone screens
+  // (client-reported, confirmed via a real screenshot). This asserts the
+  // popover's own bounding box never extends past x=0.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const path = detailPath(expensiveVehicleId, "Beta");
+  await page.goto(path);
+
+  await page.getByRole("button", { name: "Share this listing" }).click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  const box = await menu.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+});
+
 test("the Share popover's Facebook option opens Facebook's real sharer with the correct vehicle URL", async ({ page, context }) => {
   const path = detailPath(expensiveVehicleId, "Beta");
   await page.goto(path);
