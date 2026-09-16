@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { ShowroomVehicleBrowser } from "@/components/showroom/showroom-vehicle-browser";
 import { ShowroomPlaylistSection } from "@/components/showroom/showroom-playlist-section";
+import { ShowroomTikTokHighlights } from "@/components/showroom/showroom-tiktok-highlights";
 import { getShowroomDetailPath, parseShowroomIdFromSlug } from "@/features/showroom/slug";
 import { buildWhatsAppLink } from "@/features/showroom/whatsapp";
 import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -240,8 +241,9 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
         businessName={showroom.business_name}
         playlistUrl={showroom.youtube_playlist_url}
         tiktokUrl={showroom.tiktok_url}
-        tiktokVideoUrls={showroom.tiktok_video_urls}
+        hasVideoHighlights={(showroom.tiktok_video_urls?.length ?? 0) > 0}
       />
+      <ShowroomTikTokHighlights businessName={showroom.business_name} tiktokUrl={showroom.tiktok_url} videoUrls={showroom.tiktok_video_urls} />
     </div>
   );
 }

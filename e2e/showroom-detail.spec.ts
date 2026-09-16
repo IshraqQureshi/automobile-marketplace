@@ -230,7 +230,24 @@ test("the showroom owner's own profile page has no YouTube/video management UI �
   await expect(page.getByLabel(/Channel URL/)).toHaveCount(0);
 });
 
-test("a showroom owner can paste TikTok video links on their own profile, embedded on the public page", async ({ page }) => {
+// A real, long-standing public TikTok video (not this project's own
+// account) — ShowroomTikTokHighlights fetches real title/thumbnail data
+// from TikTok's own oEmbed endpoint (src/lib/tiktok-oembed.ts) server-side
+// to render the homepage-style thumbnail-card grid, unlike the homepage's
+// own admin-curated highlights (which use an admin-typed title/uploaded
+// thumbnail, no live network dependency at all). There is no way to test
+// "does a real thumbnail/title render" without a genuinely resolvable
+// video, so this accepts the small external-dependency risk of that one
+// video someday being deleted/made private — same tradeoff already
+// accepted by src/lib/tiktok-oembed.test.ts's own unit tests, which mock
+// the fetch instead and don't cover the "does a real request succeed"
+// question at all.
+const REAL_TIKTOK_VIDEO_URL = "https://www.tiktok.com/@scout2015/video/6718335390845095173";
+const REAL_TIKTOK_EMBED_URL = "https://www.tiktok.com/embed/v2/6718335390845095173";
+
+test("a showroom owner can paste TikTok video links on their own profile, shown as a real thumbnail-card grid on the public page", async ({
+  page,
+}) => {
   // Unlike youtube_playlist_url (admin-only), TikTok is owner-editable —
   // the owner sets both the follow link and up to 4 individual video
   // links themselves, no admin step needed.
@@ -242,29 +259,35 @@ test("a showroom owner can paste TikTok video links on their own profile, embedd
 
   await page.goto("/dashboard/profile", { waitUntil: "domcontentloaded" });
   await page.locator("#showroom-tiktok-url").fill(`https://www.tiktok.com/@e2e-showroom-detail-${unique}`);
-  // A numeric path segment so getTikTokEmbedUrl (src/lib/video-embed.ts)
-  // can derive a real `embed/v2/{id}` URL from it — same convention
-  // e2e/homepage-highlights.spec.ts already uses; this test asserts the
-  // iframe's own src attribute (matching the YouTube playlist test's
-  // style above), not that a real video plays.
-  await page.locator("#showroom-tiktok-video-1").fill(`https://www.tiktok.com/@e2e-showroom-detail-${unique}/video/7000000000000000001`);
-  await page.locator("#showroom-tiktok-video-2").fill(`https://www.tiktok.com/@e2e-showroom-detail-${unique}/video/7000000000000000002`);
-  // A short/shared link carries no numeric video ID in the URL itself
-  // (getTikTokEmbedUrl returns null for these — see its own test in
-  // video-embed.test.ts) — this one must be silently dropped from the
-  // rendered grid, not rendered as a broken iframe.
-  await page.locator("#showroom-tiktok-video-3").fill("https://vm.tiktok.com/ZMabcdefg/");
+  await page.locator("#showroom-tiktok-video-1").fill(REAL_TIKTOK_VIDEO_URL);
+  // A short/shared link carries no numeric video ID in the URL itself, so
+  // TikTok's own oEmbed lookup for it fails too — this one must be
+  // silently dropped from the rendered grid, not shown as a broken card.
+  await page.locator("#showroom-tiktok-video-2").fill("https://vm.tiktok.com/ZMabcdefg/");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Showroom profile updated.")).toBeVisible();
 
   await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
+  // Same "On TikTok" thumbnail-grid + click-to-play-modal layout as the
+  // homepage's own HighlightSection (ShowroomTikTokHighlights reuses that
+  // exact component) — this section also owns the "Follow on TikTok" CTA
+  // once any video is configured, so ShowroomPlaylistSection's own copy of
+  // that button is suppressed (see hasVideoHighlights).
+  await expect(page.getByText("On TikTok", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Follow on TikTok" })).toHaveAttribute("href", `https://www.tiktok.com/@e2e-showroom-detail-${unique}`);
-  const videoIframes = page.locator('iframe[src*="tiktok.com/embed"]');
-  // Exactly 2, not 3 — proves the unresolvable short link was dropped,
-  // not just that the two resolvable ones happen to be present.
-  await expect(videoIframes).toHaveCount(2);
-  await expect(videoIframes.nth(0)).toHaveAttribute("src", "https://www.tiktok.com/embed/v2/7000000000000000001");
-  await expect(videoIframes.nth(1)).toHaveAttribute("src", "https://www.tiktok.com/embed/v2/7000000000000000002");
+
+  // Exactly one card — the resolvable video became a real thumbnail card;
+  // the short link's failed oEmbed lookup dropped it entirely, not a
+  // broken second card. Scoped to the highlight section itself (not
+  // page-wide) since a card's accessible name is the real oEmbed video
+  // title, unpredictable content this test can't match on directly.
+  const highlightSection = page.locator("section", { has: page.getByText("On TikTok", { exact: true }) });
+  const cards = highlightSection.getByRole("button");
+  await expect(cards).toHaveCount(1);
+
+  await cards.first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator("iframe")).toHaveAttribute("src", REAL_TIKTOK_EMBED_URL);
 });
 
 test("admin can set a showroom's YouTube playlist URL, reflected on the public page", async ({ page }) => {
@@ -282,18 +305,21 @@ test("admin can set a showroom's YouTube playlist URL, reflected on the public p
   // TikTok video links are owner-editable, but admin can manage them too
   // (same convention as tiktok_url itself) — set one here alongside the
   // playlist to confirm the admin panel's own copy of these fields works.
-  await page.locator("#showroom-tiktok-video-1").fill(`https://www.tiktok.com/@${SHOWROOM_NAME.toLowerCase().replace(/\s+/g, "-")}/video/7000000000000000003`);
+  // Asserting the value persists (re-opening the edit dialog), not that it
+  // renders live — that end-to-end "real video resolves to a real
+  // thumbnail card" path is already covered by the owner test above, no
+  // need for a second network-dependent assertion of the same thing here.
+  const newVideoUrl = `https://www.tiktok.com/@${SHOWROOM_NAME.toLowerCase().replace(/\s+/g, "-")}/video/7000000000000000003`;
+  await page.locator("#showroom-tiktok-video-1").fill(newVideoUrl);
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Showroom updated.")).toBeVisible();
 
   await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
   await expect(page.locator("iframe").first()).toHaveAttribute("src", "https://www.youtube.com/embed/videoseries?list=PLnewplaylistid1234567890abcdef");
-  // The prior owner test left video 2 already set on this same fixture
-  // showroom (this edit dialog pre-fills existing values, and only video 1
-  // was changed here) — asserting on the first (fixed-slot-1) TikTok
-  // iframe specifically is what actually proves this admin edit took
-  // effect, regardless of how many video slots are populated overall.
-  await expect(page.locator('iframe[src*="tiktok.com/embed"]').first()).toHaveAttribute("src", "https://www.tiktok.com/embed/v2/7000000000000000003");
+
+  await page.goto("/admin/showrooms");
+  await page.getByRole("row", { name: new RegExp(SHOWROOM_NAME) }).getByRole("button", { name: "Edit" }).click();
+  await expect(page.locator("#showroom-tiktok-video-1")).toHaveValue(newVideoUrl);
 });
 
 test("the Message button opens WhatsApp to the admin-configured global number, and is disabled when unset", async ({ page }) => {
