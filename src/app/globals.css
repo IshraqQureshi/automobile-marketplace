@@ -80,6 +80,30 @@ button:not(:disabled),
   }
 }
 
+/* Fixed top progress bar shown during route navigation
+   (src/components/ui/route-loading-indicator.tsx) — an indeterminate sweep
+   since a real percentage isn't knowable (App Router gives no
+   navigation-progress event), same "communicate motion, not a fake
+   number" approach as most top-loading-bar UIs. */
+@keyframes route-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+.animate-route-progress {
+  animation: route-progress 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-route-progress {
+    animation-play-state: paused;
+  }
+}
+
 /* Dual-handle price range slider (src/components/vehicle/price-range-slider.tsx)
    — two full-width native <input type="range"> stacked on the same track.
    The track itself is transparent and pointer-events:none here so clicks

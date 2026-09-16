@@ -1,3 +1,5 @@
+import { RouteLoadingIndicator } from "@/components/ui/route-loading-indicator";
+
 // Next.js shows this instantly on any navigation between pages under the
 // (site) route group (Header/Footer stay mounted — this only replaces the
 // page content slot in between them) while the destination page's own data
@@ -9,8 +11,8 @@
 // in this app, just scoped to this route group.
 export default function SiteLoading() {
   return (
-    <main className="flex min-h-[60vh] items-center justify-center" role="status" aria-label="Loading">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-brand" />
+    <main className="flex min-h-[60vh] items-center justify-center">
+      <RouteLoadingIndicator />
     </main>
   );
 }
