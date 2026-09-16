@@ -69,14 +69,21 @@ describe("probeImageDimensions", () => {
     expect(await probeImageDimensions("https://example.com/photo.png")).toBeNull();
   });
 
-  it("returns null (not a full-file read) when a proxy ignores Range and returns 200 with the whole file", async () => {
-    // Deliberately doesn't provide arrayBuffer() — if the 206-only check
-    // were accidentally weakened back to `response.ok`, this test would
-    // fail with a real error (arrayBuffer is not a function) rather than
-    // silently passing, since reading the "whole file" here isn't even a
-    // valid path this function should ever take.
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+  it("returns null and never reads the body when a proxy ignores Range and returns 200 with the whole file", async () => {
+    // arrayBuffer() is a real, callable spy returning a valid image (the
+    // same PNG used above) — if the 206-only check were weakened back to
+    // `!response.ok` (which is already true for a 200), the function would
+    // happily read this "whole file" and return real {width, height}
+    // instead of null, and arrayBufferSpy would show a call. Asserting
+    // both the return value AND that the spy was never invoked is what
+    // makes this test actually fail on that regression, rather than
+    // passing either way because of a swallowed TypeError.
+    const buffer = Uint8Array.from(Buffer.from(TINY_PNG_BASE64, "base64"));
+    const arrayBufferSpy = vi.fn().mockResolvedValue(buffer.buffer);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, arrayBuffer: arrayBufferSpy }));
+
     expect(await probeImageDimensions("https://example.com/photo.png")).toBeNull();
+    expect(arrayBufferSpy).not.toHaveBeenCalled();
   });
 
   it("returns null (not a guessed value) when the bytes aren't a parseable image", async () => {
