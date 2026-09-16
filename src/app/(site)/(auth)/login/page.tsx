@@ -31,7 +31,19 @@ export default async function LoginPage() {
 
   return (
     <div className="grid lg:grid-cols-2">
-      <main className="flex items-center justify-center px-6 py-16">
+      <main className="flex flex-col items-center justify-center px-6 py-16">
+        {/* The Reward callout on the right is a desktop-only decorative
+            panel (`hidden lg:block` below) — without this, a mobile visitor
+            never sees it at all. lg:hidden here so it's never duplicated
+            once the full panel takes over at the lg breakpoint. */}
+        <div className="mb-5 w-full max-w-sm rounded-lg border border-brand/30 bg-brand/5 px-4 py-3 text-center lg:hidden">
+          <p className="text-xs font-semibold tracking-wide text-brand uppercase">Reward</p>
+          {REWARD_LINES.map((line) => (
+            <p key={line} className="mt-0.5 text-sm text-neutral-700">
+              {line}
+            </p>
+          ))}
+        </div>
         <AuthCard />
       </main>
 

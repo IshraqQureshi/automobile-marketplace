@@ -239,6 +239,7 @@ export function AppointmentList({ items, showShowroomColumn = false }: Appointme
                 <p className="rounded-md bg-neutral-50 p-3 text-sm whitespace-pre-line text-neutral-700">{selected.customerNotes}</p>
               </div>
             )}
+            {actionError && <p className="text-sm text-red-600">{actionError}</p>}
             {RESCHEDULABLE_STATUSES.includes(selected.status) && (
               <div className="flex flex-wrap gap-2 border-t border-neutral-200 pt-4">
                 {FINALIZABLE_STATUSES.includes(selected.status) && (

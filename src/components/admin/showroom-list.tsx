@@ -55,6 +55,7 @@ export interface ShowroomListItem {
   description: string | null;
   openingHours: string | null;
   youtubePlaylistUrl: string | null;
+  tiktokUrl: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
   createdAt: string;
   documents: ShowroomDocumentItem[];
@@ -116,6 +117,7 @@ interface ShowroomFormState {
   description: string;
   openingHours: string;
   youtubePlaylistUrl: string;
+  tiktokUrl: string;
 }
 
 const BLANK_FORM: ShowroomFormState = {
@@ -127,6 +129,7 @@ const BLANK_FORM: ShowroomFormState = {
   description: "",
   openingHours: "",
   youtubePlaylistUrl: "",
+  tiktokUrl: "",
 };
 
 interface NewOwnerFormState {
@@ -334,6 +337,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       description: item.description ?? "",
       openingHours: item.openingHours ?? "",
       youtubePlaylistUrl: item.youtubePlaylistUrl ?? "",
+      tiktokUrl: item.tiktokUrl ?? "",
     });
     setOwnerMode("existing");
     setSelectedOwner(null);
@@ -395,6 +399,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       address: form.address,
       description: form.description,
       openingHours: form.openingHours,
+      tiktokUrl: form.tiktokUrl,
     });
     const playlistParsed = youtubePlaylistUrlSchema.safeParse(form.youtubePlaylistUrl);
     if (!businessParsed.success || !playlistParsed.success) {
@@ -442,6 +447,7 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       formData.set("address", form.address);
       formData.set("description", form.description);
       formData.set("openingHours", form.openingHours);
+      formData.set("tiktokUrl", form.tiktokUrl);
       formData.set("youtubePlaylistUrl", form.youtubePlaylistUrl);
       if (logo) formData.set("logo", logo);
       if (editingItem) {
@@ -1050,6 +1056,20 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
             <p className="mt-1 text-xs text-neutral-400">
               A playlist from the real HarakaGari YouTube channel, embedded on this showroom&apos;s public page. Not owner-editable.
             </p>
+          </div>
+
+          <div>
+            <FieldLabel htmlFor="showroom-tiktok-url">TikTok (optional)</FieldLabel>
+            <Input
+              id="showroom-tiktok-url"
+              value={form.tiktokUrl}
+              onChange={(e) => setForm((f) => ({ ...f, tiktokUrl: e.target.value }))}
+              onBlur={(e) => validateField("tiktokUrl", e.target.value)}
+              placeholder="https://www.tiktok.com/@yourshowroom"
+              error={!!errorForField("tiktokUrl")}
+            />
+            {errorForField("tiktokUrl") && <p className="mt-1 text-sm text-red-600">{errorForField("tiktokUrl")}</p>}
+            <p className="mt-1 text-xs text-neutral-400">The showroom&apos;s own TikTok account.</p>
           </div>
 
           <DialogFormActions pending={crudPending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />

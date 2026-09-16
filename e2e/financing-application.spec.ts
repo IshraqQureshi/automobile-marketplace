@@ -93,6 +93,10 @@ test.beforeAll(async () => {
       financing_down_payment_percent: 10,
       financing_interest_rate: 13,
       financing_tenure_options_months: [12, 24, 36],
+      financing_tracker_options: [
+        { duration: "1 Year", price: 15_000 },
+        { duration: "2 Years", price: 25_000 },
+      ],
     })
     .select("id")
     .single();
@@ -118,8 +122,8 @@ async function fillFinancingForm(page: import("@playwright/test").Page, override
   await page.getByLabel("National ID / Passport No.").fill(overrides.nationalId ?? "12345678");
   await page.getByLabel("Employment Status").selectOption(overrides.employmentStatus ?? "EMPLOYED");
   await page.getByLabel("Monthly Income (KES)").fill(overrides.monthlyIncome ?? "80000");
-  if (overrides.desiredDownPayment !== undefined) {
-    await page.getByLabel("Desired Down Payment (KES)").fill(overrides.desiredDownPayment);
+  if (overrides.desiredDownPaymentPercent !== undefined) {
+    await page.getByLabel("Desired Down Payment (%)").fill(overrides.desiredDownPaymentPercent);
   }
   await page.getByLabel("Desired Loan Term").selectOption(overrides.desiredTenureMonths ?? "24");
 }
@@ -128,6 +132,11 @@ test("an anonymous visitor can submit a real financing application, stored with 
   await page.goto(vehiclePath);
   await page.getByRole("button", { name: "Apply for Financing" }).click();
 
+  // The fixture vehicle is financing_down_payment_type PERCENT with
+  // financing_down_payment_percent 10 — the field defaults to that percent,
+  // not a KES amount (client feedback: "Down payment change it to
+  // percentage").
+  await expect(page.getByLabel("Desired Down Payment (%)")).toHaveValue("10");
   await fillFinancingForm(page);
   await page.getByRole("button", { name: "Submit Application" }).click();
 
@@ -135,7 +144,7 @@ test("an anonymous visitor can submit a real financing application, stored with 
 
   const { data } = await admin()
     .from("financing_applications")
-    .select("customer_id, contact_name, contact_phone, status, employment_status, desired_tenure_months")
+    .select("customer_id, contact_name, contact_phone, status, employment_status, desired_tenure_months, desired_down_payment")
     .eq("vehicle_id", vehicleId)
     .single();
   expect(data?.customer_id).toBeNull();
@@ -144,6 +153,61 @@ test("an anonymous visitor can submit a real financing application, stored with 
   expect(data?.status).toBe("NEW");
   expect(data?.employment_status).toBe("EMPLOYED");
   expect(data?.desired_tenure_months).toBe(24);
+  // 10% of the fixture vehicle's 2,000,000 price, converted before submit.
+  expect(data?.desired_down_payment).toBe(200_000);
+});
+
+test("a custom desired down payment percent converts to the equivalent KES amount on submit", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await page.getByRole("button", { name: "Apply for Financing" }).click();
+
+  await fillFinancingForm(page, { desiredDownPaymentPercent: "25", email: `custom-percent-${unique}@example.com` });
+  await page.getByRole("button", { name: "Submit Application" }).click();
+
+  await expect(page.getByText("Application submitted!")).toBeVisible({ timeout: 10000 });
+
+  const { data } = await admin()
+    .from("financing_applications")
+    .select("desired_down_payment")
+    .eq("contact_email", `custom-percent-${unique}@example.com`)
+    .single();
+  // 25% of 2,000,000.
+  expect(data?.desired_down_payment).toBe(500_000);
+});
+
+test("the desired tracker option (matching the calculator's own options) can be selected and is stored", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await page.getByRole("button", { name: "Apply for Financing" }).click();
+
+  await page.getByLabel("Desired Tracker").selectOption({ label: "2 Years — Ksh 25,000" });
+  await fillFinancingForm(page, { email: `tracker-choice-${unique}@example.com` });
+  await page.getByRole("button", { name: "Submit Application" }).click();
+
+  await expect(page.getByText("Application submitted!")).toBeVisible({ timeout: 10000 });
+
+  const { data } = await admin()
+    .from("financing_applications")
+    .select("desired_tracker_duration")
+    .eq("contact_email", `tracker-choice-${unique}@example.com`)
+    .single();
+  expect(data?.desired_tracker_duration).toBe("2 Years");
+});
+
+test("a blank desired down payment percent is rejected, not silently treated as 0%", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await page.getByRole("button", { name: "Apply for Financing" }).click();
+
+  await page.getByLabel("Desired Down Payment (%)").fill("");
+  await fillFinancingForm(page, { email: `blank-percent-${unique}@example.com` });
+  await page.getByRole("button", { name: "Submit Application" }).click();
+
+  await expect(page.getByText("Enter a valid down payment percentage")).toBeVisible();
+
+  const { count } = await admin()
+    .from("financing_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("contact_email", `blank-percent-${unique}@example.com`);
+  expect(count).toBe(0);
 });
 
 test("the form validates required fields before submitting", async ({ page }) => {

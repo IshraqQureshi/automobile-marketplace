@@ -79,17 +79,35 @@ export async function buildVehicleQuery(supabase: SupabaseServerClient, filters:
     .eq("status", "ACTIVE");
 
   if (filters.q) {
-    // Free-text search previously only matched title/make/model — a search
-    // for a specific year (e.g. "2020") or a showroom's name found nothing,
-    // even though both are reasonable things a customer would type.
+    // Split into words and require EVERY word to match *something* (title,
+    // make, model, or year) — previously the whole multi-word string was
+    // tested as one contiguous ilike pattern against each field, so a
+    // search like "2020 Toyota" only matched if a vehicle's title happened
+    // to contain that literal two-word substring in that exact order,
+    // which real listing titles (e.g. "Toyota Corolla 2020 XLI") almost
+    // never do — a search combining a year with a brand/model effectively
+    // always returned zero results. Each word gets its own OR-group across
+    // fields; multiple such groups AND together (word1 matches something
+    // AND word2 matches something AND ...), same semantics as a real
+    // multi-word search engine, not a single-substring match.
+    //
     // PostgREST's `or()` can't reference an embedded table's column
     // (confirmed live — it rejects `showrooms.business_name...` inside a
-    // top-level `or` with a parse error), so showroom-name matching is a
-    // separate lookup: find matching showroom ids first, then fold them
-    // into the same OR list as `showroom_id.in.(...)`.
-    const escapedQ = escapeForOrFilter(`%${filters.q}%`);
-    const orParts = [`title.ilike.${escapedQ}`, `make.ilike.${escapedQ}`, `model.ilike.${escapedQ}`];
-    if (/^\d{4}$/.test(filters.q)) orParts.push(`year.eq.${filters.q}`);
+    // top-level `or` with a parse error), so a showroom-name match is a
+    // separate lookup on the *whole* query string (not per-word — a
+    // showroom name like "Rift Valley Motors" should match as a phrase),
+    // folded in as an independent alternative: the vehicle either matches
+    // every word itself, OR it belongs to a showroom whose name matches
+    // the full search phrase.
+    const words = filters.q.trim().split(/\s+/).filter(Boolean);
+    const wordGroups = words.map((word) => {
+      const escapedWord = escapeForOrFilter(`%${word}%`);
+      const fieldMatches = [`title.ilike.${escapedWord}`, `make.ilike.${escapedWord}`, `model.ilike.${escapedWord}`];
+      if (/^\d{4}$/.test(word)) fieldMatches.push(`year.eq.${word}`);
+      return `or(${fieldMatches.join(",")})`;
+    });
+
+    const orParts = [`and(${wordGroups.join(",")})`];
 
     const { data: matchingShowrooms } = await supabase.from("showrooms").select("id").ilike("business_name", `%${filters.q}%`);
     if (matchingShowrooms && matchingShowrooms.length > 0) {

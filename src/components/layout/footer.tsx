@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FacebookIcon, InstagramIcon, XIcon } from "@/components/ui/social-icons";
+import { FacebookIcon, InstagramIcon, TikTokIcon, XIcon } from "@/components/ui/social-icons";
 import { buildBrandCatalogLinks, buildModelCatalogLinks, buildTypeCatalogLinks, type NavCatalog } from "@/features/vehicle/nav-catalog-links";
 
 export interface FooterSocialLinks {
@@ -141,10 +141,3 @@ function YouTubeIcon() {
   );
 }
 
-function TikTokIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
-      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15.3a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.74a8.27 8.27 0 0 0 4.83 1.54V6.84a4.85 4.85 0 0 1-1.07-.15z" />
-    </svg>
-  );
-}

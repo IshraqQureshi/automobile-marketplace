@@ -58,7 +58,9 @@ interface VehicleFormState {
   financingDownPaymentType: DownPaymentType;
   financingDownPaymentPercent: string;
   financingDownPaymentAmount: string;
+  financingInterestRateType: DownPaymentType;
   financingInterestRate: string;
+  financingInterestRateAmount: string;
   financingInsurancePercent: string;
   financingPartner: string;
   financingTenureMonths: string[];
@@ -95,7 +97,9 @@ function emptyForm(): VehicleFormState {
     financingDownPaymentType: "PERCENT",
     financingDownPaymentPercent: "",
     financingDownPaymentAmount: "",
+    financingInterestRateType: "PERCENT",
     financingInterestRate: "",
+    financingInterestRateAmount: "",
     financingInsurancePercent: "",
     financingPartner: "",
     financingTenureMonths: [],
@@ -137,7 +141,9 @@ function formFromVehicle(vehicle: VehicleListItem, brands: CatalogOption[]): Veh
     financingDownPaymentType: vehicle.financingDownPaymentType,
     financingDownPaymentPercent: vehicle.financingDownPaymentPercent != null ? String(vehicle.financingDownPaymentPercent) : "",
     financingDownPaymentAmount: vehicle.financingDownPaymentAmount != null ? String(vehicle.financingDownPaymentAmount) : "",
+    financingInterestRateType: vehicle.financingInterestRateType,
     financingInterestRate: vehicle.financingInterestRate != null ? String(vehicle.financingInterestRate) : "",
+    financingInterestRateAmount: vehicle.financingInterestRateAmount != null ? String(vehicle.financingInterestRateAmount) : "",
     financingInsurancePercent: vehicle.financingInsurancePercent != null ? String(vehicle.financingInsurancePercent) : "",
     financingPartner: vehicle.financingPartner ?? "",
     financingTenureMonths: (vehicle.financingTenureMonths ?? []).map(String),
@@ -172,6 +178,7 @@ const FINANCING_VALIDATED_FIELDS = [
   "financingDownPaymentPercent",
   "financingDownPaymentAmount",
   "financingInterestRate",
+  "financingInterestRateAmount",
   "financingInsurancePercent",
   "financingPartner",
   "financingTracker1YearPrice",
@@ -272,7 +279,9 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
     formData.set("financingDownPaymentType", form.financingDownPaymentType);
     formData.set("financingDownPaymentPercent", form.financingDownPaymentPercent);
     formData.set("financingDownPaymentAmount", form.financingDownPaymentAmount);
+    formData.set("financingInterestRateType", form.financingInterestRateType);
     formData.set("financingInterestRate", form.financingInterestRate);
+    formData.set("financingInterestRateAmount", form.financingInterestRateAmount);
     formData.set("financingInsurancePercent", form.financingInsurancePercent);
     formData.set("financingPartner", form.financingPartner);
     for (const months of form.financingTenureMonths) formData.append("financingTenureMonths", months);
@@ -645,17 +654,47 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
             </div>
 
             <div>
-              <FieldLabel htmlFor="vehicle-interest-rate">Interest rate, % per year</FieldLabel>
-              <Input
-                id="vehicle-interest-rate"
-                inputMode="decimal"
-                value={form.financingInterestRate}
-                onChange={(e) => setField("financingInterestRate", e.target.value)}
-                onBlur={(e) => validate("financingInterestRate", e.target.value)}
-                placeholder="e.g. 14"
-                error={!!errorFor("financingInterestRate")}
-              />
-              {errorFor("financingInterestRate") && <p className="mt-1 text-sm text-red-600">{errorFor("financingInterestRate")}</p>}
+              <FieldLabel htmlFor="vehicle-interest-rate-value">Interest</FieldLabel>
+              <div className="flex gap-2">
+                <select
+                  aria-label="Interest rate type"
+                  value={form.financingInterestRateType}
+                  onChange={(e) => setField("financingInterestRateType", e.target.value as DownPaymentType)}
+                  className={`${selectClassName} w-28 shrink-0`}
+                >
+                  {DOWN_PAYMENT_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type === "PERCENT" ? "%/year" : "Fixed (KES)"}
+                    </option>
+                  ))}
+                </select>
+                {form.financingInterestRateType === "PERCENT" ? (
+                  <Input
+                    id="vehicle-interest-rate-value"
+                    inputMode="decimal"
+                    value={form.financingInterestRate}
+                    onChange={(e) => setField("financingInterestRate", e.target.value)}
+                    onBlur={(e) => validate("financingInterestRate", e.target.value)}
+                    placeholder="e.g. 14"
+                    error={!!errorFor("financingInterestRate")}
+                    className="min-w-0 flex-1"
+                  />
+                ) : (
+                  <Input
+                    id="vehicle-interest-rate-value"
+                    inputMode="decimal"
+                    value={form.financingInterestRateAmount}
+                    onChange={(e) => setField("financingInterestRateAmount", e.target.value)}
+                    onBlur={(e) => validate("financingInterestRateAmount", e.target.value)}
+                    placeholder="e.g. 50000"
+                    error={!!errorFor("financingInterestRateAmount")}
+                    className="min-w-0 flex-1"
+                  />
+                )}
+              </div>
+              {(errorFor("financingInterestRate") || errorFor("financingInterestRateAmount")) && (
+                <p className="mt-1 text-sm text-red-600">{errorFor("financingInterestRate") || errorFor("financingInterestRateAmount")}</p>
+              )}
             </div>
 
             <div>

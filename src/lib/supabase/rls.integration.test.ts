@@ -627,18 +627,14 @@ describe("RLS authorization (integration)", () => {
       expect(data).toEqual([]);
     });
 
-    it("an anonymous visitor can book an appointment and attach a vehicle to it", async () => {
-      // The action layer generates the id itself (never .select()s an
-      // anonymous insert — same RLS-with-RETURNING gotcha as
-      // vehicle_inquiries/financing_applications), so this test does the
-      // same to exercise the real path, including the security-definer
-      // appointment_allows_public_vehicle_insert() function the
-      // appointment_vehicles insert policy relies on for an anonymous
-      // caller (a plain EXISTS subquery would silently see nothing here,
-      // since anon has no SELECT visibility into appointments at all).
-      const anonAppointmentId = crypto.randomUUID();
+    it("an anonymous visitor cannot book an appointment (client feedback: booking now requires an account)", async () => {
+      // appointments_insert_customer now requires `to authenticated` +
+      // customer_id = auth.uid() — a booking that never resolves to a real
+      // account would be permanently invisible in anyone's dashboard
+      // afterwards, so the anonymous path this test used to exercise was
+      // removed at the RLS layer, not just in the application's own server
+      // action.
       const { error: insertError } = await anon.from("appointments").insert({
-        id: anonAppointmentId,
         booking_reference: `BK-RLS-ANON-${testId}`,
         customer_id: null,
         showroom_id: showroomAId,
@@ -649,14 +645,7 @@ describe("RLS authorization (integration)", () => {
         contact_email: "anon-visitor@example.com",
         contact_phone: "+254712345680",
       });
-      expect(insertError).toBeNull();
-
-      const { error: attachError } = await anon
-        .from("appointment_vehicles")
-        .insert({ appointment_id: anonAppointmentId, vehicle_id: activeVehicleAId });
-      expect(attachError).toBeNull();
-
-      await admin.from("appointments").delete().eq("id", anonAppointmentId);
+      expect(insertError).not.toBeNull();
     });
   });
 

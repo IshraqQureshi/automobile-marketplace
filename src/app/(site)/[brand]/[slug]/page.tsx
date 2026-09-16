@@ -65,12 +65,37 @@ export async function generateMetadata({ params }: VehicleDetailPageProps): Prom
   const { vehicle } = result;
   const title = `${vehicle.year} ${vehicle.make} ${vehicle.model} — HarakaGari`;
   const description = `${currencyFormatter.format(vehicle.price)} — ${vehicle.mileage != null ? `${mileageFormatter.format(vehicle.mileage)} km` : "Mileage n/a"} — listed by ${vehicle.showroomName}.`;
+  const primaryPhoto = vehicle.photos[0];
   return {
     title,
     description,
     alternates: { canonical: getVehicleDetailPath(vehicle) },
-    openGraph: { title, description, url: getVehicleDetailPath(vehicle), images: vehicle.photos[0] ? [vehicle.photos[0].url] : undefined },
+    openGraph: {
+      title,
+      description,
+      url: getVehicleDetailPath(vehicle),
+      // WhatsApp's own link-preview crawler is known to be pickier than
+      // Facebook's/Twitter's about rendering an og:image thumbnail when
+      // width/height/type hints are missing — a plain string URL (as this
+      // was before) omits all three. `type` reflects the real uploaded
+      // file's own extension (not guessed). Per-photo pixel dimensions
+      // aren't stored anywhere, so width/height are a best-effort
+      // landscape-photo hint rather than this exact photo's real size —
+      // crawlers use this as a layout hint, not a strict assertion, and
+      // supplying a reasonable hint is still meaningfully better than
+      // supplying none at all (a plain string image URL, as before).
+      images: primaryPhoto
+        ? [{ url: primaryPhoto.url, width: 1200, height: 900, type: mimeTypeFromStoragePath(primaryPhoto.url) }]
+        : undefined,
+    },
   };
+}
+
+function mimeTypeFromStoragePath(url: string): string {
+  const extension = url.split(".").pop()?.toLowerCase().split(/[?#]/)[0];
+  if (extension === "png") return "image/png";
+  if (extension === "webp") return "image/webp";
+  return "image/jpeg";
 }
 
 export default async function VehicleDetailPage({ params }: VehicleDetailPageProps) {
@@ -199,7 +224,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
 
   const hasRealFinancing =
     (vehicle.bankFinanceEnabled || vehicle.installmentEnabled) &&
-    vehicle.financingInterestRate != null &&
+    (vehicle.financingInterestRateType === "FIXED" ? vehicle.financingInterestRateAmount != null : vehicle.financingInterestRate != null) &&
     vehicle.financingTenureMonths != null &&
     vehicle.financingTenureMonths.length > 0;
 
@@ -327,6 +352,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                       availableDaysOfWeek={availableDaysOfWeek}
                       otherVehicles={otherShowroomVehicles}
                       initialValues={inquiryInitialValues}
+                      isSignedIn={userResult.user != null}
                     />
                   ) : (
                     <DisabledCta label="Schedule Test Drive" title="This showroom hasn't set their availability yet" tone="neutral" icon={<CalendarIcon />} />
@@ -397,7 +423,9 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                 downPaymentType={vehicle.financingDownPaymentType}
                 downPaymentPercent={vehicle.financingDownPaymentPercent}
                 downPaymentAmount={vehicle.financingDownPaymentAmount}
-                interestRatePercentPerYear={vehicle.financingInterestRate!}
+                interestRateType={vehicle.financingInterestRateType}
+                interestRatePercentPerYear={vehicle.financingInterestRate ?? 0}
+                interestRateAmount={vehicle.financingInterestRateAmount}
                 insurancePercent={vehicle.financingInsurancePercent}
                 trackerOptions={vehicle.financingTrackerOptions ?? []}
                 tenureOptionsMonths={vehicle.financingTenureMonths!}
@@ -429,8 +457,12 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                   vehicleId={vehicle.id}
                   vehicleTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                   initialValues={inquiryInitialValues}
+                  price={vehicle.price}
+                  downPaymentType={vehicle.financingDownPaymentType}
+                  downPaymentPercent={vehicle.financingDownPaymentPercent}
                   defaultDesiredDownPayment={defaultDesiredDownPayment}
                   tenureOptionsMonths={vehicle.financingTenureMonths!}
+                  trackerOptions={vehicle.financingTrackerOptions ?? []}
                 />
               ) : (
                 <button

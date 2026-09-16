@@ -34,7 +34,7 @@ const getShowroomData = cache(async (id: string) => {
   const { data: showroom } = await supabase
     .from("showrooms")
     .select(
-      "id, business_name, city, address, phone, latitude, longitude, description, opening_hours, verified, created_at, logo_storage_path, youtube_playlist_url",
+      "id, business_name, city, address, phone, latitude, longitude, description, opening_hours, verified, created_at, logo_storage_path, youtube_playlist_url, tiktok_url",
     )
     .eq("id", id)
     .eq("status", "APPROVED")
@@ -236,7 +236,7 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
         </div>
       </section>
 
-      <ShowroomPlaylistSection businessName={showroom.business_name} playlistUrl={showroom.youtube_playlist_url} />
+      <ShowroomPlaylistSection businessName={showroom.business_name} playlistUrl={showroom.youtube_playlist_url} tiktokUrl={showroom.tiktok_url} />
     </div>
   );
 }

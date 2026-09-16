@@ -39,6 +39,22 @@ export const financingDesiredDownPaymentSchema = z
   .transform(Number)
   .pipe(z.number().min(0, "Down payment can't be negative"));
 
+// A required 0-100 percent, used when the vehicle's own down payment type
+// is PERCENT — deliberately NOT reusing vehicleDownPaymentPercentSchema
+// (src/features/vehicle/schemas.ts), which is `.optional()` because an
+// admin editing a vehicle may legitimately leave financing unconfigured.
+// An applicant filling out THIS form has no such legitimate "leave it
+// blank" case — reusing the optional schema let an empty field silently
+// resolve to a KES 0 down payment with no validation error at all (unlike
+// the FIXED-type branch's financingDesiredDownPaymentSchema above, which
+// has always correctly required a value).
+export const financingDesiredDownPaymentPercentSchema = z
+  .string()
+  .trim()
+  .pipe(z.string().regex(DECIMAL_REGEX, "Enter a valid down payment percentage"))
+  .transform(Number)
+  .pipe(z.number().min(0, "Down payment can't be negative").max(100, "Down payment can't exceed 100%"));
+
 export const financingDesiredTenureMonthsSchema = z
   .string()
   .trim()
@@ -53,6 +69,17 @@ export const financingNotesSchema = z
   .optional()
   .transform((value) => value || undefined);
 
+// A vehicle's own tracker fee options are just a duration label ("1 Year",
+// "2 Years") — same shape the finance calculator already renders (see
+// FinancingCalculator's trackerOptions prop), reused here so this form can
+// offer the same choice, not just down payment/tenure.
+export const financingDesiredTrackerDurationSchema = z
+  .string()
+  .trim()
+  .max(20, "Invalid tracker option")
+  .optional()
+  .transform((value) => value || undefined);
+
 export const financingApplicationFieldSchemas = {
   name: inquiryNameSchema,
   email: inquiryEmailSchema,
@@ -62,5 +89,6 @@ export const financingApplicationFieldSchemas = {
   nationalId: financingNationalIdSchema,
   desiredDownPayment: financingDesiredDownPaymentSchema,
   desiredTenureMonths: financingDesiredTenureMonthsSchema,
+  desiredTrackerDuration: financingDesiredTrackerDurationSchema,
   notes: financingNotesSchema,
 };

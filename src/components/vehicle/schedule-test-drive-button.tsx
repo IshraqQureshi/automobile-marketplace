@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { FieldLabel } from "@/components/admin/admin-ui";
 import { Dialog } from "@/components/ui/dialog";
@@ -29,6 +30,7 @@ interface ScheduleTestDriveButtonProps {
   availableDaysOfWeek: number[];
   otherVehicles: OtherShowroomVehicle[];
   initialValues: ScheduleTestDriveInitialValues | null;
+  isSignedIn: boolean;
 }
 
 const FORM_FIELD_SCHEMAS = appointmentFieldSchemas;
@@ -63,7 +65,9 @@ export function ScheduleTestDriveButton({
   availableDaysOfWeek,
   otherVehicles,
   initialValues,
+  isSignedIn,
 }: ScheduleTestDriveButtonProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitted, setSubmitted] = useState<string | null>(null); // booking reference once submitted
@@ -95,6 +99,15 @@ export function ScheduleTestDriveButton({
   }
 
   function openDialog() {
+    // A booked appointment is tied to the signed-in customer_id so it shows
+    // up in their dashboard (APT bookings list) — an anonymous booking has
+    // customer_id null and is invisible to anyone afterwards, which is
+    // exactly the reported problem. Same "send them to /login rather than a
+    // disabled button or silent no-op" precedent as FavoriteButton.
+    if (!isSignedIn) {
+      router.push("/login");
+      return;
+    }
     setStep(1);
     setSubmitted(null);
     setSelectedVehicleIds([vehicleId]);

@@ -162,13 +162,14 @@ export interface AppointmentActionResult {
 }
 
 /**
- * Submits a "Schedule Test Drive" appointment request — works for both a
- * signed-in customer (customer_id set) and an anonymous visitor
- * (customer_id null), same RLS-driven split as vehicle inquiries/financing
- * applications. Supports multiple vehicles in one appointment (APT-003) —
- * all must belong to the same showroom, validated here (not just left to
- * the DB trigger) so a mismatched selection gets a clear message instead
- * of a raw Postgres error.
+ * Submits a "Schedule Test Drive" appointment request. Requires a signed-in
+ * customer — unlike vehicle inquiries/financing applications, an anonymous
+ * booking would have customer_id null and never show up anywhere again (the
+ * dashboard's appointments list is scoped to the signed-in customer_id).
+ * Supports multiple vehicles in one appointment (APT-003) — all must belong
+ * to the same showroom, validated here (not just left to the DB trigger) so
+ * a mismatched selection gets a clear message instead of a raw Postgres
+ * error.
  */
 export async function submitAppointmentAction(formData: FormData): Promise<AppointmentActionResult> {
   const nameResult = appointmentFieldSchemas.name.safeParse(formData.get("name"));
@@ -203,6 +204,17 @@ export async function submitAppointmentAction(formData: FormData): Promise<Appoi
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // A booking now requires a real account so it's tied to a customer_id and
+  // actually shows up somewhere afterwards (the customer dashboard's
+  // appointments list is scoped `customer_id = auth.uid()` — an anonymous
+  // booking would be permanently invisible to whoever made it). The client
+  // already redirects a signed-out visitor to /login before this is ever
+  // called, but that's a UX nicety, not the real boundary — re-check here so
+  // a direct call can't bypass it.
+  if (!user) {
+    return { error: "Please log in or create an account to schedule a test drive." };
+  }
 
   const { data: vehicles, error: vehiclesError } = await supabase
     .from("vehicles")
@@ -254,7 +266,7 @@ export async function submitAppointmentAction(formData: FormData): Promise<Appoi
   const { error: insertError } = await supabase.from("appointments").insert({
     id: appointmentId,
     booking_reference: bookingReference,
-    customer_id: user?.id ?? null,
+    customer_id: user.id,
     showroom_id: showroomId,
     appointment_date: dateResult.data,
     start_time: startTimeResult.data,

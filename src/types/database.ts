@@ -252,6 +252,7 @@ export type Database = {
           customer_id: string | null
           desired_down_payment: number
           desired_tenure_months: number
+          desired_tracker_duration: string | null
           employment_status: string
           id: string
           monthly_income: number
@@ -269,6 +270,7 @@ export type Database = {
           customer_id?: string | null
           desired_down_payment: number
           desired_tenure_months: number
+          desired_tracker_duration?: string | null
           employment_status: string
           id?: string
           monthly_income: number
@@ -286,6 +288,7 @@ export type Database = {
           customer_id?: string | null
           desired_down_payment?: number
           desired_tenure_months?: number
+          desired_tracker_duration?: string | null
           employment_status?: string
           id?: string
           monthly_income?: number
@@ -718,6 +721,7 @@ export type Database = {
           phone: string
           slot_duration_minutes: number
           status: Database["public"]["Enums"]["showroom_status"]
+          tiktok_url: string | null
           updated_at: string
           verified: boolean
           youtube_playlist_url: string | null
@@ -739,6 +743,7 @@ export type Database = {
           phone: string
           slot_duration_minutes?: number
           status?: Database["public"]["Enums"]["showroom_status"]
+          tiktok_url?: string | null
           updated_at?: string
           verified?: boolean
           youtube_playlist_url?: string | null
@@ -760,6 +765,7 @@ export type Database = {
           phone?: string
           slot_duration_minutes?: number
           status?: Database["public"]["Enums"]["showroom_status"]
+          tiktok_url?: string | null
           updated_at?: string
           verified?: boolean
           youtube_playlist_url?: string | null
@@ -1096,6 +1102,8 @@ export type Database = {
           financing_down_payment_type: string
           financing_insurance_percent: number | null
           financing_interest_rate: number | null
+          financing_interest_rate_amount: number | null
+          financing_interest_rate_type: string
           financing_partner: string | null
           financing_tenure_options_months: number[] | null
           financing_tracker_options: Json | null
@@ -1131,6 +1139,8 @@ export type Database = {
           financing_down_payment_type?: string
           financing_insurance_percent?: number | null
           financing_interest_rate?: number | null
+          financing_interest_rate_amount?: number | null
+          financing_interest_rate_type?: string
           financing_partner?: string | null
           financing_tenure_options_months?: number[] | null
           financing_tracker_options?: Json | null
@@ -1166,6 +1176,8 @@ export type Database = {
           financing_down_payment_type?: string
           financing_insurance_percent?: number | null
           financing_interest_rate?: number | null
+          financing_interest_rate_amount?: number | null
+          financing_interest_rate_type?: string
           financing_partner?: string | null
           financing_tenure_options_months?: number[] | null
           financing_tracker_options?: Json | null

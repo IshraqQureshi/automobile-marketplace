@@ -34,7 +34,9 @@ const validFullVehicle = {
   financingDownPaymentType: "PERCENT",
   financingDownPaymentPercent: "20",
   financingDownPaymentAmount: "",
+  financingInterestRateType: "PERCENT",
   financingInterestRate: "12.5",
+  financingInterestRateAmount: "",
   financingInsurancePercent: "3",
   financingPartner: "KCB Bank",
   financingTenureMonths: ["12", "24"],
@@ -167,6 +169,7 @@ describe("vehicleSchema (full object)", () => {
       financingDownPaymentPercent: "",
       financingDownPaymentAmount: "",
       financingInterestRate: "",
+      financingInterestRateAmount: "",
       financingInsurancePercent: "",
       financingPartner: "",
       financingTenureMonths: [],
@@ -193,6 +196,19 @@ describe("vehicleSchema (full object)", () => {
     if (result.success) {
       expect(result.data.financingDownPaymentAmount).toBe(500000);
       expect(result.data.financingDownPaymentPercent).toBeUndefined();
+    }
+  });
+
+  it("accepts a fixed interest amount and drops the unused percent field", () => {
+    const result = vehicleSchema.safeParse({
+      ...validFullVehicle,
+      financingInterestRateType: "FIXED",
+      financingInterestRateAmount: "50000",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.financingInterestRateAmount).toBe(50000);
+      expect(result.data.financingInterestRate).toBeUndefined();
     }
   });
 

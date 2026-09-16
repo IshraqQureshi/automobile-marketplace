@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useDropdown } from "@/components/ui/use-dropdown";
-import { CopyLinkIcon, EmailIcon, FacebookIcon, InstagramIcon, LinkedInIcon, XIcon } from "@/components/ui/social-icons";
+import { CopyLinkIcon, EmailIcon, FacebookIcon, InstagramIcon, LinkedInIcon, WhatsAppIcon, XIcon } from "@/components/ui/social-icons";
 
 interface ShareButtonProps {
   title: string;
@@ -15,6 +15,9 @@ interface ShareButtonProps {
  * support and can't be scoped to a specific fixed set of platforms. Each
  * item opens that platform's own real share-intent URL in a small popup
  * window, prefilled with this listing's title/link, except:
+ *  - WhatsApp, which has no fixed recipient — wa.me/?text=... opens
+ *    WhatsApp with the message ready to send, letting the user pick who
+ *    to send it to (same as every other "share to WhatsApp" button).
  *  - Email, which navigates to a real mailto: link (no popup — the OS/
  *    browser handles it, same as clicking any other mailto link).
  *  - Instagram, which has no web share-intent for an arbitrary link at all
@@ -51,6 +54,16 @@ export function ShareButton({ title, url }: ShareButtonProps) {
   const encodedTitle = encodeURIComponent(title);
 
   const options: { key: string; label: string; icon: React.ReactNode; onClick: () => void }[] = [
+    {
+      key: "whatsapp",
+      label: "WhatsApp",
+      icon: <WhatsAppIcon />,
+      // No fixed recipient number — https://wa.me/?text=... opens WhatsApp
+      // (web or app) with the message pre-filled and lets the user pick
+      // who to send it to, same as tapping the native OS share sheet's own
+      // WhatsApp entry would.
+      onClick: () => openShareWindow(`https://wa.me/?text=${encodeURIComponent(`${title} ${url}`)}`),
+    },
     {
       key: "facebook",
       label: "Facebook",

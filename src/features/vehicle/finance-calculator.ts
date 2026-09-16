@@ -12,7 +12,13 @@ export interface FinanceCalculatorInputs {
   downPaymentType: "PERCENT" | "FIXED";
   downPaymentPercent: number | null;
   downPaymentAmount: number | null;
+  // FIXED is a flat total interest charge (same "literal amount, not a
+  // formula input" semantics as downPaymentType FIXED) rather than a %/year
+  // rate scaled by loan amount and tenure — optional/defaults to PERCENT so
+  // every existing PERCENT-only caller keeps working unchanged.
+  interestRateType?: "PERCENT" | "FIXED";
   interestRatePercentPerYear: number;
+  interestRateAmount?: number | null;
   insurancePercent: number | null;
   trackerFee: number;
   tenureMonths: number;
@@ -33,7 +39,10 @@ export function calculateFinanceEstimate(inputs: FinanceCalculatorInputs): Finan
     inputs.downPaymentType === "FIXED" ? Math.max(0, inputs.downPaymentAmount ?? 0) : inputs.price * (Math.max(0, inputs.downPaymentPercent ?? 0) / 100);
 
   const loanAmount = Math.max(0, inputs.price - downPayment);
-  const totalInterest = loanAmount * (Math.max(0, inputs.interestRatePercentPerYear) / 100) * (Math.max(1, inputs.tenureMonths) / 12);
+  const totalInterest =
+    inputs.interestRateType === "FIXED"
+      ? Math.max(0, inputs.interestRateAmount ?? 0)
+      : loanAmount * (Math.max(0, inputs.interestRatePercentPerYear) / 100) * (Math.max(1, inputs.tenureMonths) / 12);
   const insurance = inputs.price * (Math.max(0, inputs.insurancePercent ?? 0) / 100);
   const trackerFee = Math.max(0, inputs.trackerFee);
 
