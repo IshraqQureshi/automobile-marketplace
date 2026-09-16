@@ -21,6 +21,12 @@ export interface FinanceCalculatorInputs {
   interestRateAmount?: number | null;
   insurancePercent: number | null;
   trackerFee: number;
+  // The selected tracker plan's OWN duration in months (e.g. a "3 Years"
+  // plan is 36), independent of tenureMonths (the loan's own term). Used to
+  // spread the tracker's real fee into a real monthly figure instead of
+  // dividing it by an unrelated loan term. null/0 when no tracker is
+  // selected.
+  trackerDurationMonths?: number | null;
   tenureMonths: number;
 }
 
@@ -30,8 +36,20 @@ export interface FinanceCalculatorResult {
   totalInterest: number;
   insurance: number;
   trackerFee: number;
+  trackerMonthlyFee: number;
   monthlyPayment: number;
   totalPayable: number;
+}
+
+// Parses the leading number out of a tracker duration label like "1 Year" /
+// "2 Years" / "3 Years" (the exact strings produced by the fixed-slot
+// tracker fields in schemas.ts) and converts to months. Returns 0 for an
+// unrecognized/empty label so callers can safely skip the monthly-fee
+// spread rather than divide by zero.
+export function trackerDurationToMonths(duration: string | null | undefined): number {
+  if (!duration) return 0;
+  const years = Number.parseInt(duration, 10);
+  return Number.isFinite(years) && years > 0 ? years * 12 : 0;
 }
 
 export function calculateFinanceEstimate(inputs: FinanceCalculatorInputs): FinanceCalculatorResult {
@@ -45,9 +63,14 @@ export function calculateFinanceEstimate(inputs: FinanceCalculatorInputs): Finan
       : loanAmount * (Math.max(0, inputs.interestRatePercentPerYear) / 100) * (Math.max(1, inputs.tenureMonths) / 12);
   const insurance = inputs.price * (Math.max(0, inputs.insurancePercent ?? 0) / 100);
   const trackerFee = Math.max(0, inputs.trackerFee);
+  const trackerDurationMonths = Math.max(0, inputs.trackerDurationMonths ?? 0);
+  // The tracker's fee is a real recurring cost over its OWN plan duration,
+  // not the loan's tenure — a 3-year tracker fee divided by a 12-month loan
+  // tenure would overstate the effective monthly cost roughly 3x.
+  const trackerMonthlyFee = trackerDurationMonths > 0 ? trackerFee / trackerDurationMonths : 0;
 
   const totalPayable = downPayment + loanAmount + totalInterest + insurance + trackerFee;
-  const monthlyPayment = inputs.tenureMonths > 0 ? (loanAmount + totalInterest + insurance + trackerFee) / inputs.tenureMonths : 0;
+  const monthlyPayment = inputs.tenureMonths > 0 ? (loanAmount + totalInterest + insurance) / inputs.tenureMonths + trackerMonthlyFee : trackerMonthlyFee;
 
   return {
     downPayment: Math.round(downPayment),
@@ -55,6 +78,7 @@ export function calculateFinanceEstimate(inputs: FinanceCalculatorInputs): Finan
     totalInterest: Math.round(totalInterest),
     insurance: Math.round(insurance),
     trackerFee: Math.round(trackerFee),
+    trackerMonthlyFee: Math.round(trackerMonthlyFee),
     monthlyPayment: Math.round(monthlyPayment),
     totalPayable: Math.round(totalPayable),
   };

@@ -414,7 +414,8 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                 interestRateType={vehicle.financingInterestRateType}
                 interestRatePercentPerYear={vehicle.financingInterestRate ?? 0}
                 interestRateAmount={vehicle.financingInterestRateAmount}
-                insurancePercent={vehicle.financingInsurancePercent}
+                insurancePercentPsv={vehicle.financingInsurancePercentPsv}
+                insurancePercentPrivate={vehicle.financingInsurancePercentPrivate}
                 trackerOptions={vehicle.financingTrackerOptions ?? []}
                 tenureOptionsMonths={vehicle.financingTenureMonths!}
               />

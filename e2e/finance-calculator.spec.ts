@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { calculateFinanceEstimate } from "../src/features/vehicle/finance-calculator";
+import { calculateFinanceEstimate, trackerDurationToMonths } from "../src/features/vehicle/finance-calculator";
 
 // Own dedicated fixture showroom/vehicle (per this repo's convention). The
 // vehicle carries real, showroom-configured financing fields — the existing
@@ -25,7 +25,8 @@ function admin() {
 const PRICE = 3_000_000;
 const DOWN_PAYMENT_PERCENT = 20;
 const INTEREST_RATE = 12.5;
-const INSURANCE_PERCENT = 3;
+const INSURANCE_PERCENT_PSV = 4.5;
+const INSURANCE_PERCENT_PRIVATE = 3;
 const TENURE_OPTIONS = [12, 24];
 const TRACKER_OPTIONS = [
   { duration: "1 Year", price: 15_000 },
@@ -85,7 +86,8 @@ test.beforeAll(async () => {
       financing_down_payment_type: "PERCENT",
       financing_down_payment_percent: DOWN_PAYMENT_PERCENT,
       financing_interest_rate: INTEREST_RATE,
-      financing_insurance_percent: INSURANCE_PERCENT,
+      financing_insurance_percent_psv: INSURANCE_PERCENT_PSV,
+      financing_insurance_percent_private: INSURANCE_PERCENT_PRIVATE,
       financing_tenure_options_months: TENURE_OPTIONS,
       financing_tracker_options: TRACKER_OPTIONS,
     })
@@ -112,15 +114,18 @@ test("a vehicle with real showroom-configured financing renders a working calcul
   await expect(page.getByRole("heading", { name: "Financing Calculator" })).toBeVisible();
   await expect(page.getByText("Financing details not provided for this listing")).toHaveCount(0);
 
-  // Defaults to the first tenure/tracker option (12 months, 1 Year tracker).
+  // Defaults to the first tenure/tracker/insurance-type option (12 months,
+  // 1 Year tracker, PSV — since both PSV and Private are configured, PSV
+  // wins as the first available option).
   const expected = calculateFinanceEstimate({
     price: PRICE,
     downPaymentType: "PERCENT",
     downPaymentPercent: DOWN_PAYMENT_PERCENT,
     downPaymentAmount: null,
     interestRatePercentPerYear: INTEREST_RATE,
-    insurancePercent: INSURANCE_PERCENT,
+    insurancePercent: INSURANCE_PERCENT_PSV,
     trackerFee: TRACKER_OPTIONS[0]!.price,
+    trackerDurationMonths: trackerDurationToMonths(TRACKER_OPTIONS[0]!.duration),
     tenureMonths: TENURE_OPTIONS[0]!,
   });
 
@@ -159,6 +164,7 @@ test("changing loan term and tracker duration recalculates the estimate instantl
 
   await page.getByLabel("Loan term").selectOption("24");
   await page.getByLabel("Tracker duration").selectOption("1");
+  await page.getByLabel("Insurance type").selectOption("PRIVATE");
 
   const expected = calculateFinanceEstimate({
     price: PRICE,
@@ -166,8 +172,9 @@ test("changing loan term and tracker duration recalculates the estimate instantl
     downPaymentPercent: DOWN_PAYMENT_PERCENT,
     downPaymentAmount: null,
     interestRatePercentPerYear: INTEREST_RATE,
-    insurancePercent: INSURANCE_PERCENT,
+    insurancePercent: INSURANCE_PERCENT_PRIVATE,
     trackerFee: TRACKER_OPTIONS[1]!.price,
+    trackerDurationMonths: trackerDurationToMonths(TRACKER_OPTIONS[1]!.duration),
     tenureMonths: TENURE_OPTIONS[1]!,
   });
 
