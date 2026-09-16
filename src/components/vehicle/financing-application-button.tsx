@@ -6,8 +6,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
 import { submitFinancingApplicationAction } from "@/features/financing/actions";
-import { EMPLOYMENT_STATUS_OPTIONS, financingApplicationFieldSchemas } from "@/features/financing/schemas";
-import { vehicleDownPaymentPercentSchema } from "@/features/vehicle/schemas";
+import { EMPLOYMENT_STATUS_OPTIONS, financingApplicationFieldSchemas, financingDesiredDownPaymentPercentSchema } from "@/features/financing/schemas";
 import { currencyFormatter } from "@/features/vehicle/types";
 import { stripKenyaPrefix } from "@/lib/validation/kenya-phone";
 
@@ -31,9 +30,11 @@ interface FinancingApplicationButtonProps {
 
 // Extends the server-matching schema shape with one UI-only field —
 // desiredDownPaymentPercent never itself reaches the server (it's converted
-// to a KES amount before submit, see handleSubmit), but reuses the exact
-// same 0-100 bound the vehicle form's own down payment percent field uses.
-const FORM_FIELD_SCHEMAS = { ...financingApplicationFieldSchemas, desiredDownPaymentPercent: vehicleDownPaymentPercentSchema };
+// to a KES amount before submit, see handleSubmit). Required, unlike the
+// vehicle form's own (optional) down payment percent field — an admin may
+// leave a vehicle's financing unconfigured, but an applicant filling out
+// this form has no equivalent "leave it blank" case.
+const FORM_FIELD_SCHEMAS = { ...financingApplicationFieldSchemas, desiredDownPaymentPercent: financingDesiredDownPaymentPercentSchema };
 
 /**
  * Real "Apply for Financing" flow (previously a disabled placeholder) —

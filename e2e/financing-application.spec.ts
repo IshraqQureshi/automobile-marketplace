@@ -193,6 +193,23 @@ test("the desired tracker option (matching the calculator's own options) can be 
   expect(data?.desired_tracker_duration).toBe("2 Years");
 });
 
+test("a blank desired down payment percent is rejected, not silently treated as 0%", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await page.getByRole("button", { name: "Apply for Financing" }).click();
+
+  await page.getByLabel("Desired Down Payment (%)").fill("");
+  await fillFinancingForm(page, { email: `blank-percent-${unique}@example.com` });
+  await page.getByRole("button", { name: "Submit Application" }).click();
+
+  await expect(page.getByText("Enter a valid down payment percentage")).toBeVisible();
+
+  const { count } = await admin()
+    .from("financing_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("contact_email", `blank-percent-${unique}@example.com`);
+  expect(count).toBe(0);
+});
+
 test("the form validates required fields before submitting", async ({ page }) => {
   await page.goto(vehiclePath);
   await page.getByRole("button", { name: "Apply for Financing" }).click();
