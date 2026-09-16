@@ -72,4 +72,17 @@ describe("youtubePlaylistUrlSchema", () => {
   it("rejects a malformed URL", () => {
     expect(youtubePlaylistUrlSchema.safeParse("not-a-url").success).toBe(false);
   });
+
+  it("rejects a syntactically valid URL that isn't a real playlist link (e.g. a channel URL)", () => {
+    // Found live: this passed the old .url()-only check, saved with no
+    // error, and silently rendered nothing on the public showroom page —
+    // an admin had no way to tell "not configured" from "wrong link type."
+    const result = youtubePlaylistUrlSchema.safeParse("https://www.youtube.com/@somechannel");
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toContain("list=");
+  });
+
+  it("rejects a single video watch URL (no list= parameter)", () => {
+    expect(youtubePlaylistUrlSchema.safeParse("https://www.youtube.com/watch?v=dQw4w9WgXcQ").success).toBe(false);
+  });
 });

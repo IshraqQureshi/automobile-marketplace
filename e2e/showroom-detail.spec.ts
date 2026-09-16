@@ -328,6 +328,27 @@ test("the Follow on TikTok button still shows even when every configured video U
   await supabase.from("showrooms").update({ tiktok_url: null, tiktok_video_urls: null }).eq("id", showroomId);
 });
 
+test("admin gets a clear inline error pasting a non-playlist YouTube link (e.g. a channel URL), not a silent no-op", async ({ page }) => {
+  // Found live: a channel URL like youtube.com/@handle passed the old
+  // .url()-only check, saved with no error, and rendered nothing on the
+  // public page — the admin had no way to tell "not configured" from
+  // "wrong kind of link."
+  await page.goto("/admin/login");
+  await page.getByLabel("Email address").fill(ADMIN_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to admin" }).click();
+  await page.waitForURL(/\/admin$/);
+
+  await page.goto("/admin/showrooms");
+  await page.getByRole("row", { name: new RegExp(SHOWROOM_NAME) }).getByRole("button", { name: "Edit" }).click();
+  const playlistInput = page.getByLabel(/YouTube playlist URL/);
+  await playlistInput.fill("https://www.youtube.com/@somechannel");
+  await page.getByRole("button", { name: "Save changes" }).click();
+
+  await expect(page.getByText(/list=/)).toBeVisible();
+  await expect(page.getByText("Showroom updated.")).toHaveCount(0);
+});
+
 test("admin can set a showroom's YouTube playlist URL, reflected on the public page", async ({ page }) => {
   await page.goto("/admin/login");
   await page.getByLabel("Email address").fill(ADMIN_EMAIL);
