@@ -230,6 +230,43 @@ test("the showroom owner's own profile page has no YouTube/video management UI �
   await expect(page.getByLabel(/Channel URL/)).toHaveCount(0);
 });
 
+test("a showroom owner can paste TikTok video links on their own profile, embedded on the public page", async ({ page }) => {
+  // Unlike youtube_playlist_url (admin-only), TikTok is owner-editable —
+  // the owner sets both the follow link and up to 4 individual video
+  // links themselves, no admin step needed.
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(OWNER_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await page.waitForURL("**/dashboard");
+
+  await page.goto("/dashboard/profile", { waitUntil: "domcontentloaded" });
+  await page.locator("#showroom-tiktok-url").fill(`https://www.tiktok.com/@e2e-showroom-detail-${unique}`);
+  // A numeric path segment so getTikTokEmbedUrl (src/lib/video-embed.ts)
+  // can derive a real `embed/v2/{id}` URL from it — same convention
+  // e2e/homepage-highlights.spec.ts already uses; this test asserts the
+  // iframe's own src attribute (matching the YouTube playlist test's
+  // style above), not that a real video plays.
+  await page.locator("#showroom-tiktok-video-1").fill(`https://www.tiktok.com/@e2e-showroom-detail-${unique}/video/7000000000000000001`);
+  await page.locator("#showroom-tiktok-video-2").fill(`https://www.tiktok.com/@e2e-showroom-detail-${unique}/video/7000000000000000002`);
+  // A short/shared link carries no numeric video ID in the URL itself
+  // (getTikTokEmbedUrl returns null for these — see its own test in
+  // video-embed.test.ts) — this one must be silently dropped from the
+  // rendered grid, not rendered as a broken iframe.
+  await page.locator("#showroom-tiktok-video-3").fill("https://vm.tiktok.com/ZMabcdefg/");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Showroom profile updated.")).toBeVisible();
+
+  await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("link", { name: "Follow on TikTok" })).toHaveAttribute("href", `https://www.tiktok.com/@e2e-showroom-detail-${unique}`);
+  const videoIframes = page.locator('iframe[src*="tiktok.com/embed"]');
+  // Exactly 2, not 3 — proves the unresolvable short link was dropped,
+  // not just that the two resolvable ones happen to be present.
+  await expect(videoIframes).toHaveCount(2);
+  await expect(videoIframes.nth(0)).toHaveAttribute("src", "https://www.tiktok.com/embed/v2/7000000000000000001");
+  await expect(videoIframes.nth(1)).toHaveAttribute("src", "https://www.tiktok.com/embed/v2/7000000000000000002");
+});
+
 test("admin can set a showroom's YouTube playlist URL, reflected on the public page", async ({ page }) => {
   await page.goto("/admin/login");
   await page.getByLabel("Email address").fill(ADMIN_EMAIL);
@@ -242,11 +279,21 @@ test("admin can set a showroom's YouTube playlist URL, reflected on the public p
   const newPlaylistUrl = "https://www.youtube.com/playlist?list=PLnewplaylistid1234567890abcdef";
   const playlistInput = page.getByLabel(/YouTube playlist URL/);
   await playlistInput.fill(newPlaylistUrl);
+  // TikTok video links are owner-editable, but admin can manage them too
+  // (same convention as tiktok_url itself) — set one here alongside the
+  // playlist to confirm the admin panel's own copy of these fields works.
+  await page.locator("#showroom-tiktok-video-1").fill(`https://www.tiktok.com/@${SHOWROOM_NAME.toLowerCase().replace(/\s+/g, "-")}/video/7000000000000000003`);
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Showroom updated.")).toBeVisible();
 
   await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
-  await expect(page.locator("iframe")).toHaveAttribute("src", "https://www.youtube.com/embed/videoseries?list=PLnewplaylistid1234567890abcdef");
+  await expect(page.locator("iframe").first()).toHaveAttribute("src", "https://www.youtube.com/embed/videoseries?list=PLnewplaylistid1234567890abcdef");
+  // The prior owner test left video 2 already set on this same fixture
+  // showroom (this edit dialog pre-fills existing values, and only video 1
+  // was changed here) — asserting on the first (fixed-slot-1) TikTok
+  // iframe specifically is what actually proves this admin edit took
+  // effect, regardless of how many video slots are populated overall.
+  await expect(page.locator('iframe[src*="tiktok.com/embed"]').first()).toHaveAttribute("src", "https://www.tiktok.com/embed/v2/7000000000000000003");
 });
 
 test("the Message button opens WhatsApp to the admin-configured global number, and is disabled when unset", async ({ page }) => {

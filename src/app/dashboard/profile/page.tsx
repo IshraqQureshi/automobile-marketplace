@@ -26,7 +26,7 @@ export default async function DashboardProfilePage() {
 
   const { data: full } = await supabase
     .from("showrooms")
-    .select("business_name, city, phone, email, address, description, logo_storage_path, opening_hours, tiktok_url")
+    .select("business_name, city, phone, email, address, description, logo_storage_path, opening_hours, tiktok_url, tiktok_video_urls")
     .eq("id", showroom.id)
     .single();
 
@@ -48,6 +48,10 @@ export default async function DashboardProfilePage() {
           description: full?.description ?? "",
           openingHours: typeof full?.opening_hours === "string" ? full.opening_hours : "",
           tiktokUrl: full?.tiktok_url ?? "",
+          tiktokVideoUrl1: full?.tiktok_video_urls?.[0] ?? "",
+          tiktokVideoUrl2: full?.tiktok_video_urls?.[1] ?? "",
+          tiktokVideoUrl3: full?.tiktok_video_urls?.[2] ?? "",
+          tiktokVideoUrl4: full?.tiktok_video_urls?.[3] ?? "",
           logoUrl,
         }}
       />

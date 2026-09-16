@@ -27,6 +27,35 @@ describe("adminShowroomSchema — opening hours field", () => {
   });
 });
 
+describe("adminShowroomSchema — tiktokVideoUrls (up to 4 individual video links)", () => {
+  it("combines the 4 fixed-slot fields into one array, dropping blanks", () => {
+    const result = adminShowroomSchema.safeParse({
+      ...valid,
+      tiktokVideoUrl1: "https://www.tiktok.com/@showroom/video/1111111111111111111",
+      tiktokVideoUrl2: "",
+      tiktokVideoUrl3: "https://www.tiktok.com/@showroom/video/3333333333333333333",
+      tiktokVideoUrl4: "",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.tiktokVideoUrls).toEqual([
+        "https://www.tiktok.com/@showroom/video/1111111111111111111",
+        "https://www.tiktok.com/@showroom/video/3333333333333333333",
+      ]);
+    }
+  });
+
+  it("returns an empty array when all 4 are left blank", () => {
+    const result = adminShowroomSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.tiktokVideoUrls).toEqual([]);
+  });
+
+  it("rejects a malformed video URL", () => {
+    expect(adminShowroomSchema.safeParse({ ...valid, tiktokVideoUrl1: "not-a-url" }).success).toBe(false);
+  });
+});
+
 // Deliberately its own schema, not part of adminShowroomSchema above — see
 // youtubePlaylistUrlSchema's own comment (admin-only, not shared with
 // updateShowroomProfile's owner-facing validation).

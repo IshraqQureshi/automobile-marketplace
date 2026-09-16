@@ -2,6 +2,20 @@ import { z } from "zod";
 import { ownerFullNameSchema, registerShowroomFieldSchemas } from "@/features/showroom/schemas";
 import { kenyaLocalPhoneOptionalSchema } from "@/lib/validation/kenya-phone";
 
+// Generic URL validation (not restricted to tiktok.com specifically) —
+// TikTok itself serves videos from several domains depending on how a
+// link was copied (tiktok.com, vm.tiktok.com, vt.tiktok.com short links),
+// so a domain allowlist would reject legitimate links; the embed step
+// (TikTokVideoGrid) is what actually determines whether a given URL
+// renders, not this schema.
+const showroomTiktokVideoUrlSchema = z
+  .string()
+  .trim()
+  .url("Enter a valid URL")
+  .or(z.literal(""))
+  .optional()
+  .transform((value) => value || undefined);
+
 // Reuses the same business-name/location/phone/email validation the
 // self-registration form uses (src/features/showroom/schemas.ts) rather
 // than duplicating it — `location` maps to `showrooms.city`, same as
@@ -44,9 +58,27 @@ export const showroomFieldSchemas = {
     .or(z.literal(""))
     .optional()
     .transform((value) => value || undefined),
+  // Up to 4 individual video URLs, embedded directly on the public
+  // showroom page — same fixed-slot convention as the vehicle financing
+  // form's Tracker 1/2-Year fields (src/features/vehicle/schemas.ts),
+  // rather than a dynamic add/remove list, since the count is small and
+  // fixed. True "pull the N latest videos automatically" would need
+  // TikTok's OAuth Display API (per-showroom login/consent, token
+  // storage) — out of scope per direct decision; this is the manual
+  // alternative, same tradeoff already made for YouTube (a single
+  // manually-set playlist URL, not an API-driven feed).
+  tiktokVideoUrl1: showroomTiktokVideoUrlSchema,
+  tiktokVideoUrl2: showroomTiktokVideoUrlSchema,
+  tiktokVideoUrl3: showroomTiktokVideoUrlSchema,
+  tiktokVideoUrl4: showroomTiktokVideoUrlSchema,
 };
 
-export const adminShowroomSchema = z.object(showroomFieldSchemas);
+export const adminShowroomSchema = z.object(showroomFieldSchemas).transform((data) => ({
+  ...data,
+  tiktokVideoUrls: [data.tiktokVideoUrl1, data.tiktokVideoUrl2, data.tiktokVideoUrl3, data.tiktokVideoUrl4].filter(
+    (url): url is string => url != null,
+  ),
+}));
 export type AdminShowroomInput = z.infer<typeof adminShowroomSchema>;
 
 // Deliberately NOT part of showroomFieldSchemas/adminShowroomSchema above —

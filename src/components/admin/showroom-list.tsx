@@ -56,6 +56,7 @@ export interface ShowroomListItem {
   openingHours: string | null;
   youtubePlaylistUrl: string | null;
   tiktokUrl: string | null;
+  tiktokVideoUrls: string[] | null;
   status: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
   createdAt: string;
   documents: ShowroomDocumentItem[];
@@ -118,6 +119,10 @@ interface ShowroomFormState {
   openingHours: string;
   youtubePlaylistUrl: string;
   tiktokUrl: string;
+  tiktokVideoUrl1: string;
+  tiktokVideoUrl2: string;
+  tiktokVideoUrl3: string;
+  tiktokVideoUrl4: string;
 }
 
 const BLANK_FORM: ShowroomFormState = {
@@ -130,6 +135,10 @@ const BLANK_FORM: ShowroomFormState = {
   openingHours: "",
   youtubePlaylistUrl: "",
   tiktokUrl: "",
+  tiktokVideoUrl1: "",
+  tiktokVideoUrl2: "",
+  tiktokVideoUrl3: "",
+  tiktokVideoUrl4: "",
 };
 
 interface NewOwnerFormState {
@@ -338,6 +347,10 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       openingHours: item.openingHours ?? "",
       youtubePlaylistUrl: item.youtubePlaylistUrl ?? "",
       tiktokUrl: item.tiktokUrl ?? "",
+      tiktokVideoUrl1: item.tiktokVideoUrls?.[0] ?? "",
+      tiktokVideoUrl2: item.tiktokVideoUrls?.[1] ?? "",
+      tiktokVideoUrl3: item.tiktokVideoUrls?.[2] ?? "",
+      tiktokVideoUrl4: item.tiktokVideoUrls?.[3] ?? "",
     });
     setOwnerMode("existing");
     setSelectedOwner(null);
@@ -400,6 +413,10 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       description: form.description,
       openingHours: form.openingHours,
       tiktokUrl: form.tiktokUrl,
+      tiktokVideoUrl1: form.tiktokVideoUrl1,
+      tiktokVideoUrl2: form.tiktokVideoUrl2,
+      tiktokVideoUrl3: form.tiktokVideoUrl3,
+      tiktokVideoUrl4: form.tiktokVideoUrl4,
     });
     const playlistParsed = youtubePlaylistUrlSchema.safeParse(form.youtubePlaylistUrl);
     if (!businessParsed.success || !playlistParsed.success) {
@@ -448,6 +465,10 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
       formData.set("description", form.description);
       formData.set("openingHours", form.openingHours);
       formData.set("tiktokUrl", form.tiktokUrl);
+      formData.set("tiktokVideoUrl1", form.tiktokVideoUrl1);
+      formData.set("tiktokVideoUrl2", form.tiktokVideoUrl2);
+      formData.set("tiktokVideoUrl3", form.tiktokVideoUrl3);
+      formData.set("tiktokVideoUrl4", form.tiktokVideoUrl4);
       formData.set("youtubePlaylistUrl", form.youtubePlaylistUrl);
       if (logo) formData.set("logo", logo);
       if (editingItem) {
@@ -1070,6 +1091,29 @@ export function ShowroomList({ items, onCreate, onUpdate, onDelete, onSearchOwne
             />
             {errorForField("tiktokUrl") && <p className="mt-1 text-sm text-red-600">{errorForField("tiktokUrl")}</p>}
             <p className="mt-1 text-xs text-neutral-400">The showroom&apos;s own TikTok account.</p>
+          </div>
+
+          <div>
+            <FieldLabel htmlFor="showroom-tiktok-video-1">TikTok videos (optional)</FieldLabel>
+            <p className="mb-2 text-xs text-neutral-400">Up to 4 individual video links, embedded on the showroom&apos;s public page.</p>
+            <div className="flex flex-col gap-2">
+              {([1, 2, 3, 4] as const).map((n) => {
+                const field = `tiktokVideoUrl${n}` as const;
+                return (
+                  <div key={n}>
+                    <Input
+                      id={`showroom-tiktok-video-${n}`}
+                      value={form[field]}
+                      onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
+                      onBlur={(e) => validateField(field, e.target.value)}
+                      placeholder={`Video ${n} URL`}
+                      error={!!errorForField(field)}
+                    />
+                    {errorForField(field) && <p className="mt-1 text-sm text-red-600">{errorForField(field)}</p>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <DialogFormActions pending={crudPending} submitLabel={editingItem ? "Save changes" : "Create"} onCancel={closeDialog} />
