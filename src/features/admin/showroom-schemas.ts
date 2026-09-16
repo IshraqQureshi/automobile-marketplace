@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ownerFullNameSchema, registerShowroomFieldSchemas } from "@/features/showroom/schemas";
+import { getYouTubePlaylistEmbedUrl } from "@/lib/video-embed";
 import { kenyaLocalPhoneOptionalSchema } from "@/lib/validation/kenya-phone";
 
 // Generic URL validation (not restricted to tiktok.com specifically) —
@@ -97,6 +98,17 @@ export const youtubePlaylistUrlSchema = z
   .trim()
   .url("Enter a valid URL")
   .or(z.literal(""))
+  // A channel/video/watch URL passes plain .url() validation (it IS a
+  // syntactically valid URL) but has no `list=` parameter, so it silently
+  // saved with no error and rendered nothing on the public page — a real
+  // bug found live: an admin can't tell the difference between "no
+  // playlist configured" and "I pasted the wrong kind of YouTube link."
+  // Reuses getYouTubePlaylistEmbedUrl (the same function that actually
+  // renders the embed) as the single source of truth for "is this
+  // resolvable," rather than a second, potentially-drifting check.
+  .refine((value) => value === "" || getYouTubePlaylistEmbedUrl(value) !== null, {
+    message: 'Enter a real YouTube playlist URL (it must include a "list=" parameter) — a channel or video link won\'t work here.',
+  })
   .transform((value) => value || undefined);
 
 export const ownerUserIdSchema = z.string().uuid("Choose an owner for this showroom.");
