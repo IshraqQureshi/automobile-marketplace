@@ -722,6 +722,7 @@ export type Database = {
           slot_duration_minutes: number
           status: Database["public"]["Enums"]["showroom_status"]
           tiktok_url: string | null
+          tiktok_video_urls: string[] | null
           updated_at: string
           verified: boolean
           youtube_playlist_url: string | null
@@ -744,6 +745,7 @@ export type Database = {
           slot_duration_minutes?: number
           status?: Database["public"]["Enums"]["showroom_status"]
           tiktok_url?: string | null
+          tiktok_video_urls?: string[] | null
           updated_at?: string
           verified?: boolean
           youtube_playlist_url?: string | null
@@ -766,6 +768,7 @@ export type Database = {
           slot_duration_minutes?: number
           status?: Database["public"]["Enums"]["showroom_status"]
           tiktok_url?: string | null
+          tiktok_video_urls?: string[] | null
           updated_at?: string
           verified?: boolean
           youtube_playlist_url?: string | null

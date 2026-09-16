@@ -21,6 +21,10 @@ export interface ShowroomProfileInitialValues {
   description: string;
   openingHours: string;
   tiktokUrl: string;
+  tiktokVideoUrl1: string;
+  tiktokVideoUrl2: string;
+  tiktokVideoUrl3: string;
+  tiktokVideoUrl4: string;
   logoUrl: string | null;
 }
 
@@ -41,6 +45,10 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     description: initialValues.description,
     openingHours: initialValues.openingHours,
     tiktokUrl: initialValues.tiktokUrl,
+    tiktokVideoUrl1: initialValues.tiktokVideoUrl1,
+    tiktokVideoUrl2: initialValues.tiktokVideoUrl2,
+    tiktokVideoUrl3: initialValues.tiktokVideoUrl3,
+    tiktokVideoUrl4: initialValues.tiktokVideoUrl4,
   });
   const [logo, setLogo] = useState<File | null>(null);
   const [logoInputKey, setLogoInputKey] = useState(0);
@@ -66,6 +74,10 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
       "description",
       "openingHours",
       "tiktokUrl",
+      "tiktokVideoUrl1",
+      "tiktokVideoUrl2",
+      "tiktokVideoUrl3",
+      "tiktokVideoUrl4",
     ] as const) {
       if (!showroomFieldSchemas[field].safeParse(form[field]).success) {
         validate(field, form[field]);
@@ -83,6 +95,10 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     formData.set("description", form.description);
     formData.set("openingHours", form.openingHours);
     formData.set("tiktokUrl", form.tiktokUrl);
+    formData.set("tiktokVideoUrl1", form.tiktokVideoUrl1);
+    formData.set("tiktokVideoUrl2", form.tiktokVideoUrl2);
+    formData.set("tiktokVideoUrl3", form.tiktokVideoUrl3);
+    formData.set("tiktokVideoUrl4", form.tiktokVideoUrl4);
     if (logo) formData.set("logo", logo);
     if (removeLogo) formData.set("removeLogo", "true");
 
@@ -336,6 +352,31 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
               <p className="mt-1 text-xs text-neutral-400">
                 Your own TikTok account — shown on your public showroom page.
               </p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="showroom-tiktok-video-1">TikTok videos (optional)</FieldLabel>
+              <p className="mb-2 text-xs text-neutral-400">
+                Paste up to 4 individual TikTok video links to show on your public showroom page.
+              </p>
+              <div className="flex flex-col gap-2">
+                {([1, 2, 3, 4] as const).map((n) => {
+                  const field = `tiktokVideoUrl${n}` as const;
+                  return (
+                    <div key={n}>
+                      <Input
+                        id={`showroom-tiktok-video-${n}`}
+                        value={form[field]}
+                        onChange={(e) => setField(field, e.target.value)}
+                        onBlur={(e) => validate(field, e.target.value)}
+                        placeholder={`https://www.tiktok.com/@yourshowroom/video/... (video ${n})`}
+                        error={!!errorFor(field)}
+                      />
+                      {errorFor(field) && <p className="mt-1 text-sm text-red-600">{errorFor(field)}</p>}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>

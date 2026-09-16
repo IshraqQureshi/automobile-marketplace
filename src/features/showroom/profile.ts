@@ -22,6 +22,10 @@ export interface ShowroomProfileFormFields {
   description: FormDataEntryValue | null;
   openingHours: FormDataEntryValue | null;
   tiktokUrl: FormDataEntryValue | null;
+  tiktokVideoUrl1: FormDataEntryValue | null;
+  tiktokVideoUrl2: FormDataEntryValue | null;
+  tiktokVideoUrl3: FormDataEntryValue | null;
+  tiktokVideoUrl4: FormDataEntryValue | null;
 }
 
 export function readShowroomProfileFormFields(formData: FormData): ShowroomProfileFormFields {
@@ -34,6 +38,10 @@ export function readShowroomProfileFormFields(formData: FormData): ShowroomProfi
     description: formData.get("description"),
     openingHours: formData.get("openingHours"),
     tiktokUrl: formData.get("tiktokUrl"),
+    tiktokVideoUrl1: formData.get("tiktokVideoUrl1"),
+    tiktokVideoUrl2: formData.get("tiktokVideoUrl2"),
+    tiktokVideoUrl3: formData.get("tiktokVideoUrl3"),
+    tiktokVideoUrl4: formData.get("tiktokVideoUrl4"),
   };
 }
 
@@ -74,6 +82,7 @@ export async function updateShowroomProfile(
       description: parsed.description ?? null,
       opening_hours: parsed.openingHours ?? null,
       tiktok_url: parsed.tiktokUrl ?? null,
+      tiktok_video_urls: parsed.tiktokVideoUrls.length > 0 ? parsed.tiktokVideoUrls : null,
       // youtube_playlist_url is deliberately NOT written here — it's
       // admin-only (prevent_showroom_youtube_playlist_self_edit), and this
       // function is shared with the showroom owner's own profile save. An
