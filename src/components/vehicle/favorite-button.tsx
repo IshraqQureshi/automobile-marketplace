@@ -57,7 +57,15 @@ export function FavoriteButton({ vehicleId, initialFavorited, isSignedIn }: Favo
         <HeartIcon filled={favorited} />
       </button>
       {error && (
-        <p role="alert" className="absolute top-full right-0 z-10 mt-1 w-max max-w-52 text-right text-xs text-red-600">
+        // Same mobile-overflow issue as ShareButton's popover/toast (see
+        // its own comment) — this sits in the identical header row, which
+        // stacks to put the button near the LEFT edge on mobile but stays
+        // right-aligned on desktop. left-0/text-left below md, right-0/
+        // text-right (unchanged) at md and up.
+        <p
+          role="alert"
+          className="absolute top-full left-0 z-10 mt-1 w-max max-w-52 text-left text-xs text-red-600 md:left-auto md:right-0 md:text-right"
+        >
           {error}
         </p>
       )}
