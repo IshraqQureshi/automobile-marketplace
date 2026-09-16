@@ -141,6 +141,19 @@ test("searching by keyword filters to only matching results", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Beta" })).toBeVisible();
 });
 
+// Regression: a multi-word query combining a year with a brand/model
+// previously matched the whole phrase as one contiguous substring against
+// each field, so "{make} 2018" never matched a real title like "{make}
+// Cheap" (year 2018) even though both words are individually true of that
+// vehicle — every word must now independently match something (title,
+// make, model, or year), so this correctly narrows to just the one
+// vehicle that satisfies both, not zero results.
+test("searching by a year combined with a brand narrows to the matching vehicle, not zero results", async ({ page }) => {
+  await page.goto(`/listing?q=${encodeURIComponent(`${MAKE} 2018`)}`);
+  await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Beta" })).toHaveCount(0);
+});
+
 test("filtering by brand narrows results to just that brand", async ({ page }) => {
   await page.goto("/listing");
   await expect(page.getByText("Brand", { exact: true })).toBeVisible();
@@ -196,7 +209,7 @@ test("the Share button opens a popover with every direct-share option", async ({
   await page.getByRole("button", { name: "Share this listing" }).click();
   const menu = page.getByRole("menu");
   await expect(menu).toBeVisible();
-  for (const label of ["Facebook", "X", "LinkedIn", "Instagram", "Email", "Copy link"]) {
+  for (const label of ["WhatsApp", "Facebook", "X", "LinkedIn", "Instagram", "Email", "Copy link"]) {
     await expect(menu.getByRole("menuitem", { name: label })).toBeVisible();
   }
 });
@@ -211,6 +224,35 @@ test("the Share popover's Facebook option opens Facebook's real sharer with the 
   expect(popup.url()).toContain("facebook.com/sharer/sharer.php");
   expect(decodeURIComponent(popup.url())).toContain(path);
   await popup.close();
+});
+
+test("the Share popover's WhatsApp option opens wa.me with the vehicle title and URL, no fixed recipient", async ({ page }) => {
+  const path = detailPath(expensiveVehicleId, "Beta");
+  await page.goto(path);
+
+  // Intercepts the exact URL passed to window.open() instead of waiting
+  // for a real new page/navigation to wa.me — this sandbox has no network
+  // route to wa.me/api.whatsapp.com at all (confirmed: even a plain curl
+  // to those hosts times out, while e.g. facebook.com resolves fine), so
+  // asserting on an actual popup navigation there would be testing this
+  // environment's network policy, not this button's own behavior.
+  await page.addInitScript(() => {
+    (window as unknown as { __openedUrls: string[] }).__openedUrls = [];
+    const originalOpen = window.open.bind(window);
+    window.open = (url?: string | URL, ...rest) => {
+      (window as unknown as { __openedUrls: string[] }).__openedUrls.push(String(url ?? ""));
+      return originalOpen(url, ...rest);
+    };
+  });
+  await page.reload();
+
+  await page.getByRole("button", { name: "Share this listing" }).click();
+  await page.getByRole("menuitem", { name: "WhatsApp" }).click();
+
+  const openedUrls = await page.evaluate(() => (window as unknown as { __openedUrls: string[] }).__openedUrls);
+  expect(openedUrls).toHaveLength(1);
+  expect(openedUrls[0]).toContain("wa.me/?text=");
+  expect(decodeURIComponent(openedUrls[0]!)).toContain(path);
 });
 
 test("the Share popover's Copy link option copies the real vehicle URL to the clipboard", async ({ page, context }) => {

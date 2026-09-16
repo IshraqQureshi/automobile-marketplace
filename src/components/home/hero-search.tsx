@@ -10,19 +10,15 @@ export interface CertifiedShowroomItem {
 }
 
 interface HeroSearchProps {
-  showroomCount: number;
-  vehicleCount: number;
   showrooms: CertifiedShowroomItem[];
 }
-
-const numberFormatter = new Intl.NumberFormat("en-KE");
 
 /**
  * The certified-showrooms marquee is part of this same section (not a
  * separate component) — it's visually one continuous dark band with the
  * search banner above it, confirmed against the real rendered design.
  */
-export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearchProps) {
+export function HeroSearch({ showrooms }: HeroSearchProps) {
   return (
     <section className="relative overflow-hidden bg-brand">
       <div
@@ -33,11 +29,10 @@ export function HeroSearch({ showroomCount, vehicleCount, showrooms }: HeroSearc
       <div className="relative z-10 px-6 pt-10 pb-8 text-center">
         {/* The homepage's only <h1> — same small eyebrow-label styling as
             designed (semantic level and visual size are independent; this
-            was a <p> with no <h1> anywhere on the page at all before). */}
-        <h1 className="mb-2 text-xs font-semibold tracking-[0.2em] text-white/60 uppercase">The Premium Car Marketplace</h1>
-        <p className="mb-7 text-sm text-white/65">
-          Search across {numberFormatter.format(showroomCount)}+ certified showrooms — {numberFormatter.format(vehicleCount)}+ verified listings.
-        </p>
+            was a <p> with no <h1> anywhere on the page at all before). The
+            "Search across N certified showrooms..." line previously here
+            was removed per direct request. */}
+        <h1 className="mb-6 text-xs font-semibold tracking-[0.2em] text-white/60 uppercase">The Premium Car Marketplace</h1>
 
         {/* Plain GET form straight to /listing's own search (same `q` param
             /listing's own filter form and VehicleSortSelect already use) —

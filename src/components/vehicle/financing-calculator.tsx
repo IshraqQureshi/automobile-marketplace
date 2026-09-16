@@ -9,7 +9,9 @@ export interface FinancingCalculatorProps {
   downPaymentType: "PERCENT" | "FIXED";
   downPaymentPercent: number | null;
   downPaymentAmount: number | null;
+  interestRateType: "PERCENT" | "FIXED";
   interestRatePercentPerYear: number;
+  interestRateAmount: number | null;
   insurancePercent: number | null;
   trackerOptions: { duration: string; price: number }[];
   tenureOptionsMonths: number[];
@@ -29,7 +31,9 @@ export function FinancingCalculator({
   downPaymentType,
   downPaymentPercent,
   downPaymentAmount,
+  interestRateType,
   interestRatePercentPerYear,
+  interestRateAmount,
   insurancePercent,
   trackerOptions,
   tenureOptionsMonths,
@@ -46,16 +50,31 @@ export function FinancingCalculator({
         downPaymentType,
         downPaymentPercent,
         downPaymentAmount,
+        interestRateType,
         interestRatePercentPerYear,
+        interestRateAmount,
         insurancePercent,
         trackerFee: selectedTracker?.price ?? 0,
         tenureMonths,
       }),
-    [price, downPaymentType, downPaymentPercent, downPaymentAmount, interestRatePercentPerYear, insurancePercent, selectedTracker, tenureMonths],
+    [
+      price,
+      downPaymentType,
+      downPaymentPercent,
+      downPaymentAmount,
+      interestRateType,
+      interestRatePercentPerYear,
+      interestRateAmount,
+      insurancePercent,
+      selectedTracker,
+      tenureMonths,
+    ],
   );
 
   const downPaymentLabel =
     downPaymentType === "PERCENT" ? `Deposit (${downPaymentPercent}%)` : "Deposit (fixed)";
+  const interestSub =
+    interestRateType === "PERCENT" ? `${interestRatePercentPerYear}% per year, over the loan term` : "Fixed amount";
 
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
@@ -67,7 +86,7 @@ export function FinancingCalculator({
           </div>
 
           <FinanceRow label={downPaymentLabel} sub="Paid upfront" value={currencyFormatter.format(result.downPayment)} />
-          <FinanceRow label="Interest" sub={`${interestRatePercentPerYear}% per year, over the loan term`} value={currencyFormatter.format(result.totalInterest)} />
+          <FinanceRow label="Interest" sub={interestSub} value={currencyFormatter.format(result.totalInterest)} />
           {insurancePercent != null && (
             <FinanceRow label={`Insurance (${insurancePercent}%)`} sub="Annual comprehensive cover" value={currencyFormatter.format(result.insurance)} />
           )}

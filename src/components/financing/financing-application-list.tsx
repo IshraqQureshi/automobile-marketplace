@@ -145,6 +145,12 @@ export function FinancingApplicationList({ items, showShowroomColumn = false }: 
                 <p className="text-xs font-semibold text-neutral-400 uppercase">Desired Loan Term</p>
                 <p className="text-neutral-800">{selected.desiredTenureMonths} months</p>
               </div>
+              {selected.desiredTrackerDuration && (
+                <div>
+                  <p className="text-xs font-semibold text-neutral-400 uppercase">Desired Tracker</p>
+                  <p className="text-neutral-800">{selected.desiredTrackerDuration}</p>
+                </div>
+              )}
               <div>
                 <p className="text-xs font-semibold text-neutral-400 uppercase">Received</p>
                 <p className="text-neutral-800">{dateFormatter.format(new Date(selected.createdAt))}</p>

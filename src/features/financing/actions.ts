@@ -42,6 +42,7 @@ export async function submitFinancingApplicationAction(formData: FormData): Prom
   const nationalIdResult = financingApplicationFieldSchemas.nationalId.safeParse(formData.get("nationalId"));
   const desiredDownPaymentResult = financingApplicationFieldSchemas.desiredDownPayment.safeParse(formData.get("desiredDownPayment"));
   const desiredTenureMonthsResult = financingApplicationFieldSchemas.desiredTenureMonths.safeParse(formData.get("desiredTenureMonths"));
+  const desiredTrackerDurationResult = financingApplicationFieldSchemas.desiredTrackerDuration.safeParse(formData.get("desiredTrackerDuration"));
   const notesResult = financingApplicationFieldSchemas.notes.safeParse(formData.get("notes"));
 
   const fieldErrors: Record<string, string> = {};
@@ -102,6 +103,7 @@ export async function submitFinancingApplicationAction(formData: FormData): Prom
     national_id: nationalIdResult.data,
     desired_down_payment: desiredDownPaymentResult.data,
     desired_tenure_months: desiredTenureMonthsResult.data,
+    desired_tracker_duration: desiredTrackerDurationResult.data ?? null,
     notes: notesResult.data ?? null,
   });
   if (insertError) {

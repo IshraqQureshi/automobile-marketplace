@@ -53,6 +53,17 @@ export const financingNotesSchema = z
   .optional()
   .transform((value) => value || undefined);
 
+// A vehicle's own tracker fee options are just a duration label ("1 Year",
+// "2 Years") — same shape the finance calculator already renders (see
+// FinancingCalculator's trackerOptions prop), reused here so this form can
+// offer the same choice, not just down payment/tenure.
+export const financingDesiredTrackerDurationSchema = z
+  .string()
+  .trim()
+  .max(20, "Invalid tracker option")
+  .optional()
+  .transform((value) => value || undefined);
+
 export const financingApplicationFieldSchemas = {
   name: inquiryNameSchema,
   email: inquiryEmailSchema,
@@ -62,5 +73,6 @@ export const financingApplicationFieldSchemas = {
   nationalId: financingNationalIdSchema,
   desiredDownPayment: financingDesiredDownPaymentSchema,
   desiredTenureMonths: financingDesiredTenureMonthsSchema,
+  desiredTrackerDuration: financingDesiredTrackerDurationSchema,
   notes: financingNotesSchema,
 };

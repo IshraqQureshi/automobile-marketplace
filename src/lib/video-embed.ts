@@ -51,7 +51,17 @@ export function getYouTubeEmbedUrl(url: string, options: { autoplay?: boolean } 
   return `https://www.youtube.com/embed/${id}?autoplay=${autoplay ? 1 : 0}&rel=0`;
 }
 
-const YOUTUBE_PLAYLIST_ID_PATTERN = /^[A-Za-z0-9_-]{10,40}$/;
+// Real YouTube playlist IDs are consistently 34 characters (PL/UU/OL/RD/...
+// + 32 more) — a shorter minimum previously let through a genuinely
+// truncated/malformed id (confirmed live: a 13-character id stored for a
+// real showroom resolved via YouTube's own oembed API to an unrelated
+// single video, not a playlist, because it isn't a real playlist id at
+// all — the embed silently "worked" by falling back to showing just that
+// one video, which is what looked like "only the latest video" rather
+// than a full playlist). 16 stays safely below the real 34-character
+// length (room for any shorter-but-still-real id YouTube might use) while
+// rejecting obviously-truncated fragments like the one that caused this.
+const YOUTUBE_PLAYLIST_ID_PATTERN = /^[A-Za-z0-9_-]{16,40}$/;
 
 /**
  * Derives a playable YouTube playlist embed URL (the "videoseries" embed

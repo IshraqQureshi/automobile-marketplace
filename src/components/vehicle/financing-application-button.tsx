@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { FieldLabel } from "@/components/admin/admin-ui";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
 import { submitFinancingApplicationAction } from "@/features/financing/actions";
 import { EMPLOYMENT_STATUS_OPTIONS, financingApplicationFieldSchemas } from "@/features/financing/schemas";
+import { vehicleDownPaymentPercentSchema } from "@/features/vehicle/schemas";
+import { currencyFormatter } from "@/features/vehicle/types";
 import { stripKenyaPrefix } from "@/lib/validation/kenya-phone";
 
 export interface FinancingApplicationInitialValues {
@@ -19,11 +21,19 @@ interface FinancingApplicationButtonProps {
   vehicleId: string;
   vehicleTitle: string;
   initialValues: FinancingApplicationInitialValues | null;
+  price: number;
+  downPaymentType: "PERCENT" | "FIXED";
+  downPaymentPercent: number | null;
   defaultDesiredDownPayment: number;
   tenureOptionsMonths: number[];
+  trackerOptions: { duration: string; price: number }[];
 }
 
-const FORM_FIELD_SCHEMAS = financingApplicationFieldSchemas;
+// Extends the server-matching schema shape with one UI-only field —
+// desiredDownPaymentPercent never itself reaches the server (it's converted
+// to a KES amount before submit, see handleSubmit), but reuses the exact
+// same 0-100 bound the vehicle form's own down payment percent field uses.
+const FORM_FIELD_SCHEMAS = { ...financingApplicationFieldSchemas, desiredDownPaymentPercent: vehicleDownPaymentPercentSchema };
 
 /**
  * Real "Apply for Financing" flow (previously a disabled placeholder) —
@@ -40,8 +50,12 @@ export function FinancingApplicationButton({
   vehicleId,
   vehicleTitle,
   initialValues,
+  price,
+  downPaymentType,
+  downPaymentPercent,
   defaultDesiredDownPayment,
   tenureOptionsMonths,
+  trackerOptions,
 }: FinancingApplicationButtonProps) {
   const [open, setOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -51,8 +65,17 @@ export function FinancingApplicationButton({
   const [employmentStatus, setEmploymentStatus] = useState("");
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [nationalId, setNationalId] = useState("");
-  const [desiredDownPayment, setDesiredDownPayment] = useState(String(Math.round(defaultDesiredDownPayment)));
+  // Mirrors the vehicle's own financingDownPaymentType (same convention as
+  // FinancingCalculator) — a PERCENT-configured vehicle collects the
+  // applicant's desired down payment as a percentage too, not a KES amount
+  // they'd have to compute by hand; converted to the equivalent KES amount
+  // right before submit, since desired_down_payment is stored as an amount
+  // regardless of how it was entered (same column the calculator's own
+  // "Deposit" figure isn't tied to).
+  const [desiredDownPaymentPercent, setDesiredDownPaymentPercent] = useState(String(downPaymentPercent ?? ""));
+  const [desiredDownPaymentAmount, setDesiredDownPaymentAmount] = useState(String(Math.round(defaultDesiredDownPayment)));
   const [desiredTenureMonths, setDesiredTenureMonths] = useState(String(tenureOptionsMonths[0] ?? ""));
+  const [desiredTrackerDuration, setDesiredTrackerDuration] = useState(trackerOptions[0]?.duration ?? "");
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string>>({});
@@ -71,6 +94,12 @@ export function FinancingApplicationButton({
     setOpen(true);
   }
 
+  const desiredDownPaymentKes = useMemo(() => {
+    if (downPaymentType !== "PERCENT") return Number(desiredDownPaymentAmount) || 0;
+    const percent = Number(desiredDownPaymentPercent);
+    return Number.isFinite(percent) ? Math.round(price * (percent / 100)) : 0;
+  }, [downPaymentType, desiredDownPaymentPercent, desiredDownPaymentAmount, price]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -83,7 +112,7 @@ export function FinancingApplicationButton({
       ["employmentStatus", employmentStatus],
       ["monthlyIncome", monthlyIncome],
       ["nationalId", nationalId],
-      ["desiredDownPayment", desiredDownPayment],
+      [downPaymentType === "PERCENT" ? "desiredDownPaymentPercent" : "desiredDownPayment", downPaymentType === "PERCENT" ? desiredDownPaymentPercent : desiredDownPaymentAmount],
       ["desiredTenureMonths", desiredTenureMonths],
       ["notes", notes],
     ] as const) {
@@ -102,8 +131,9 @@ export function FinancingApplicationButton({
     formData.set("employmentStatus", employmentStatus);
     formData.set("monthlyIncome", monthlyIncome);
     formData.set("nationalId", nationalId);
-    formData.set("desiredDownPayment", desiredDownPayment);
+    formData.set("desiredDownPayment", String(desiredDownPaymentKes));
     formData.set("desiredTenureMonths", desiredTenureMonths);
+    formData.set("desiredTrackerDuration", desiredTrackerDuration);
     formData.set("notes", notes);
 
     startTransition(async () => {
@@ -243,16 +273,35 @@ export function FinancingApplicationButton({
               </div>
 
               <div>
-                <FieldLabel htmlFor="financing-down-payment">Desired Down Payment (KES)</FieldLabel>
-                <Input
-                  id="financing-down-payment"
-                  inputMode="numeric"
-                  value={desiredDownPayment}
-                  onChange={(e) => setDesiredDownPayment(e.target.value)}
-                  onBlur={(e) => validate("desiredDownPayment", e.target.value)}
-                  error={!!errorFor("desiredDownPayment")}
-                />
-                {errorFor("desiredDownPayment") && <p className="mt-1 text-sm text-red-600">{errorFor("desiredDownPayment")}</p>}
+                <FieldLabel htmlFor="financing-down-payment">
+                  {downPaymentType === "PERCENT" ? "Desired Down Payment (%)" : "Desired Down Payment (KES)"}
+                </FieldLabel>
+                {downPaymentType === "PERCENT" ? (
+                  <>
+                    <Input
+                      id="financing-down-payment"
+                      inputMode="decimal"
+                      value={desiredDownPaymentPercent}
+                      onChange={(e) => setDesiredDownPaymentPercent(e.target.value)}
+                      onBlur={(e) => validate("desiredDownPaymentPercent", e.target.value)}
+                      placeholder="e.g. 20"
+                      error={!!errorFor("desiredDownPaymentPercent")}
+                    />
+                    <p className="mt-1 text-xs text-neutral-400">≈ {currencyFormatter.format(desiredDownPaymentKes)}</p>
+                  </>
+                ) : (
+                  <Input
+                    id="financing-down-payment"
+                    inputMode="numeric"
+                    value={desiredDownPaymentAmount}
+                    onChange={(e) => setDesiredDownPaymentAmount(e.target.value)}
+                    onBlur={(e) => validate("desiredDownPayment", e.target.value)}
+                    error={!!errorFor("desiredDownPayment")}
+                  />
+                )}
+                {(errorFor("desiredDownPaymentPercent") || errorFor("desiredDownPayment")) && (
+                  <p className="mt-1 text-sm text-red-600">{errorFor("desiredDownPaymentPercent") || errorFor("desiredDownPayment")}</p>
+                )}
               </div>
 
               <div>
@@ -272,6 +321,24 @@ export function FinancingApplicationButton({
                 </select>
                 {errorFor("desiredTenureMonths") && <p className="mt-1 text-sm text-red-600">{errorFor("desiredTenureMonths")}</p>}
               </div>
+
+              {trackerOptions.length > 0 && (
+                <div>
+                  <FieldLabel htmlFor="financing-tracker">Desired Tracker</FieldLabel>
+                  <select
+                    id="financing-tracker"
+                    value={desiredTrackerDuration}
+                    onChange={(e) => setDesiredTrackerDuration(e.target.value)}
+                    className="w-full rounded-md border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  >
+                    {trackerOptions.map((option) => (
+                      <option key={option.duration} value={option.duration}>
+                        {option.duration} — {currencyFormatter.format(option.price)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div>

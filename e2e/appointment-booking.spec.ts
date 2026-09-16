@@ -11,6 +11,12 @@ const OTHER_OWNER_EMAIL = `e2e-appointment-other-owner-fixture-${unique}@harakag
 const OTHER_OWNER_PASSWORD = "e2e-appointment-other-owner-fixture-password-123";
 const ADMIN_EMAIL = `e2e-appointment-admin-fixture-${unique}@harakagari.local`;
 const ADMIN_PASSWORD = "e2e-appointment-admin-fixture-password-123";
+// A plain signed-in customer (no showroom, no admin role) — booking a test
+// drive now requires an account (client feedback: an anonymous booking's
+// customer_id was null, so it never showed up in that visitor's own
+// dashboard afterwards).
+const CUSTOMER_EMAIL = `e2e-appointment-customer-fixture-${unique}@harakagari.local`;
+const CUSTOMER_PASSWORD = "e2e-appointment-customer-fixture-password-123";
 
 function admin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -70,6 +76,7 @@ test.beforeAll(async () => {
   const otherOwnerId = await ensureFixtureUser(OTHER_OWNER_EMAIL, OTHER_OWNER_PASSWORD);
   const adminId = await ensureFixtureUser(ADMIN_EMAIL, ADMIN_PASSWORD);
   await supabase.from("profiles").update({ role: "ADMIN" }).eq("id", adminId);
+  await ensureFixtureUser(CUSTOMER_EMAIL, CUSTOMER_PASSWORD);
 
   await supabase.from("showrooms").delete().eq("owner_user_id", ownerId);
   await supabase.from("showrooms").delete().eq("owner_user_id", otherOwnerId);
@@ -201,7 +208,16 @@ async function navigateToBookingDate(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: targetDay, exact: true }).click();
 }
 
+async function loginAsCustomer(page: import("@playwright/test").Page) {
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(CUSTOMER_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(CUSTOMER_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to HarakaGari" }).click();
+  await page.waitForURL(/\/account$/);
+}
+
 async function bookSlot(page: import("@playwright/test").Page, slotLabel: string, overrides: Partial<Record<string, string>> = {}) {
+  await loginAsCustomer(page);
   await page.goto(vehiclePath);
   await page.getByRole("button", { name: "Schedule Test Drive" }).click();
   // Step 1 (vehicles) — single-vehicle by default, so just continue.
@@ -210,13 +226,19 @@ async function bookSlot(page: import("@playwright/test").Page, slotLabel: string
   await expect(page.getByRole("button", { name: slotLabel })).toBeVisible({ timeout: 10000 });
   await page.getByRole("button", { name: slotLabel }).click();
 
-  await page.getByLabel("Full Name").fill(overrides.name ?? "Anonymous Applicant");
-  await page.getByLabel("Email").fill(overrides.email ?? `anon-appointment-${unique}@example.com`);
+  await page.getByLabel("Full Name").fill(overrides.name ?? "Signed-In Applicant");
+  await page.getByLabel("Email").fill(overrides.email ?? `signedin-appointment-${unique}@example.com`);
   await page.getByLabel("Phone").fill(overrides.phone ?? "712345678");
   await page.getByRole("button", { name: "Request Appointment" }).click();
 }
 
-test("an anonymous visitor can book a test drive, stored with no customer_id", async ({ page }) => {
+test("a signed-out visitor is sent to /login instead of the booking dialog", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await page.getByRole("button", { name: "Schedule Test Drive" }).click();
+  await page.waitForURL(/\/login$/);
+});
+
+test("a signed-in customer can book a test drive, stored with their customer_id", async ({ page }) => {
   await bookSlot(page, "9:00 am");
 
   await expect(page.getByText("Request sent!")).toBeVisible({ timeout: 10000 });
@@ -226,8 +248,8 @@ test("an anonymous visitor can book a test drive, stored with no customer_id", a
     .select("customer_id, contact_name, contact_phone, status, appointment_date, start_time, booking_reference")
     .eq("showroom_id", showroomId)
     .single();
-  expect(data?.customer_id).toBeNull();
-  expect(data?.contact_name).toBe("Anonymous Applicant");
+  expect(data?.customer_id).not.toBeNull();
+  expect(data?.contact_name).toBe("Signed-In Applicant");
   expect(data?.contact_phone).toBe("+254712345678");
   expect(data?.status).toBe("PENDING");
   expect(data?.appointment_date).toBe(BOOKING_DATE);
@@ -236,6 +258,7 @@ test("an anonymous visitor can book a test drive, stored with no customer_id", a
 });
 
 test("booking 3 cars from the same showroom reserves 3 consecutive slots, not 1 shared slot (APT-003)", async ({ page, context }) => {
+  await loginAsCustomer(page);
   await page.goto(vehiclePath);
   await page.getByRole("button", { name: "Schedule Test Drive" }).click();
 
@@ -343,10 +366,43 @@ test("admin can see the appointment, confirm it, and the customer gets a confirm
   expect(data?.status).toBe("CONFIRMED");
 });
 
+test("admin can confirm an appointment from the detail dialog (not just the row's inline button)", async ({ page }) => {
+  await bookSlot(page, "4:00 pm", { name: "Dialog Confirm Test", email: `dialog-confirm-${unique}@example.com` });
+  await expect(page.getByText("Request sent!")).toBeVisible({ timeout: 10000 });
+
+  await page.context().clearCookies();
+  await page.goto("/admin/login");
+  await page.getByLabel("Email address").fill(ADMIN_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Sign in to admin" }).click();
+  await page.waitForURL(/\/admin$/);
+
+  await page.goto("/admin/appointments");
+  const row = page.getByRole("row", { name: /Dialog Confirm Test/ });
+  await expect(row).toBeVisible();
+
+  // Open the detail dialog (clicking the booking reference cell) and
+  // confirm from inside it, not the row's own inline button — this is the
+  // path where an error used to render behind the modal, invisible to the
+  // admin (client feedback: "Admin was unable to confirm the appointment").
+  await row.getByRole("cell").first().click();
+  const dialog = page.getByRole("dialog", { name: "Appointment Details" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Confirm appointment" }).click();
+  await expect(dialog.getByText("confirmed", { exact: true })).toBeVisible();
+
+  const { data } = await admin().from("appointments").select("status").eq("contact_email", `dialog-confirm-${unique}@example.com`).single();
+  expect(data?.status).toBe("CONFIRMED");
+});
+
 test("owner can decline a pending appointment", async ({ page }) => {
   await bookSlot(page, "12:00 pm", { name: "Decline Test", email: `decline-${unique}@example.com` });
   await expect(page.getByText("Request sent!")).toBeVisible({ timeout: 10000 });
 
+  // Sign out the customer session bookSlot left behind — /login redirects an
+  // already-authenticated visitor straight to their own home path, so the
+  // owner sign-in below would never see the form otherwise.
+  await page.context().clearCookies();
   await page.goto("/login");
   await page.getByLabel("Email address").fill(OWNER_EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
@@ -367,6 +423,7 @@ test("owner can reschedule a pending appointment to a new date/time, and then co
   await bookSlot(page, "4:30 pm", { name: "Reschedule Test", email: `reschedule-${unique}@example.com` });
   await expect(page.getByText("Request sent!")).toBeVisible({ timeout: 10000 });
 
+  await page.context().clearCookies();
   await page.goto("/login");
   await page.getByLabel("Email address").fill(OWNER_EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);

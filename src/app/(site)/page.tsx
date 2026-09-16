@@ -192,7 +192,7 @@ export default async function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
 
-      <HeroSearch showroomCount={showroomCount ?? 0} vehicleCount={vehicleCount ?? 0} showrooms={certifiedShowrooms} />
+      <HeroSearch showrooms={certifiedShowrooms} />
       <BrowseByBrand brands={brandTiles} />
 
       <HighlightSection

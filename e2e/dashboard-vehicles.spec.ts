@@ -120,17 +120,34 @@ async function loginAsPendingOwner(page: import("@playwright/test").Page) {
   await page.waitForURL("**/dashboard");
 }
 
+// There is no Title input on the form any more (removed in favour of an
+// auto-derived "{year} {make} {model}" — see vehicle-form.tsx's own
+// `formData.set("title", ...)`); this is the real title createVehicleViaForm
+// below always produces, since it always picks this same year/brand/model.
+const CREATED_VEHICLE_TITLE = "2019 Toyota Camry";
+
 /**
  * Fills the minimum required fields on /dashboard/vehicles/new, submits,
  * and returns the created vehicle's id (parsed from the edit-page redirect
  * URL). Brand/Model use the real seeded catalog (Toyota/Camry — see
  * supabase/migrations/20260905010002_seed_catalog_data.sql) rather than
  * free text, since the form now sources both from admin-managed dropdowns.
+ * Every caller's own `title` argument is no longer used to identify the
+ * created row (see CREATED_VEHICLE_TITLE) — kept only where a caller still
+ * wants a distinct label for its own purposes.
  */
-async function createVehicleViaForm(page: import("@playwright/test").Page, title: string): Promise<string> {
+async function createVehicleViaForm(page: import("@playwright/test").Page): Promise<string> {
   await page.goto("/dashboard/vehicles/new");
-  await page.locator("#vehicle-title").fill(title);
-  await page.locator("#vehicle-brand").selectOption({ label: "Toyota" });
+  // Brand is the very first interactive control on a freshly-navigated-to
+  // page — same hydration-race window documented elsewhere in this file
+  // (see the Deposit type/Status field notes above): selecting it before
+  // hydration attaches its change handler silently leaves form.brandId
+  // (and therefore the dependent, otherwise-permanently-disabled Model
+  // select) unset, so retry until the DOM genuinely reflects the choice.
+  await expect(async () => {
+    await page.locator("#vehicle-brand").selectOption({ label: "Toyota" });
+    await expect(page.locator("#vehicle-model")).toBeEnabled();
+  }).toPass({ timeout: 10_000 });
   await page.locator("#vehicle-model").selectOption({ label: "Camry" });
   await page.locator("#vehicle-year").fill("2019");
   await page.locator("#vehicle-price").fill("2500000");
@@ -167,13 +184,10 @@ test("a pending showroom sees a review-status message and cannot reach vehicle m
 });
 
 test("an approved owner can create a vehicle, land on its edit page, edit it, and publish it", async ({ page }) => {
-  const unique = Date.now();
-  const title = `E2E Test Vehicle ${unique}`;
-
   await loginAsFixtureOwner(page);
-  await createVehicleViaForm(page, title);
+  await createVehicleViaForm(page);
   await expect(page.getByText("Vehicle created.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await expect(page.getByRole("heading", { name: CREATED_VEHICLE_TITLE })).toBeVisible();
   await expect(page.getByText("Photo gallery")).toBeVisible();
 
   // Edit, right there on the same page
@@ -183,7 +197,7 @@ test("an approved owner can create a vehicle, land on its edit page, edit it, an
 
   // Back on the list, the change and status control are both visible.
   await page.goto("/dashboard/vehicles");
-  const row = page.getByRole("row", { name: new RegExp(title) });
+  const row = page.getByRole("row", { name: new RegExp(CREATED_VEHICLE_TITLE) });
   await expect(row).toBeVisible();
   // Intl.NumberFormat("en-KE", { currency: "KES" }) renders the locale
   // currency symbol "Ksh", not the literal ISO code "KES".
@@ -193,19 +207,30 @@ test("an approved owner can create a vehicle, land on its edit page, edit it, an
   await row.getByRole("combobox").selectOption("ACTIVE");
   await expect(page.getByText("Marked as published.")).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("ACTIVE");
+  await expect(page.getByRole("row", { name: new RegExp(CREATED_VEHICLE_TITLE) }).getByRole("combobox")).toHaveValue("ACTIVE");
 });
 
 test("the vehicle form's own Status field can publish on create and change status on edit", async ({ page }) => {
-  const unique = Date.now();
-  const title = `E2E Status Field Vehicle ${unique}`;
-
   await loginAsFixtureOwner(page);
   await page.goto("/dashboard/vehicles/new");
-  await page.locator("#vehicle-title").fill(title);
   await expect(page.locator("#vehicle-status")).toHaveValue("DRAFT");
-  await page.locator("#vehicle-status").selectOption("ACTIVE");
-  await page.locator("#vehicle-brand").selectOption({ label: "Toyota" });
+  // The Status <select> is present in the very first paint of this
+  // freshly-navigated-to page — same hydration-race window documented
+  // elsewhere in this file (see the Deposit type note above): an
+  // interaction fired the instant the page becomes actionable can land
+  // before hydration attaches its change handler and get silently
+  // overwritten, so retry until the DOM genuinely reflects it.
+  await expect(async () => {
+    await page.locator("#vehicle-status").selectOption("ACTIVE");
+    await expect(page.locator("#vehicle-status")).toHaveValue("ACTIVE");
+  }).toPass({ timeout: 10_000 });
+  // Hydration is confirmed attached by the Status retry above, but Model
+  // still depends on Brand's own change handler having fired — same retry
+  // precaution as createVehicleViaForm.
+  await expect(async () => {
+    await page.locator("#vehicle-brand").selectOption({ label: "Toyota" });
+    await expect(page.locator("#vehicle-model")).toBeEnabled();
+  }).toPass({ timeout: 10_000 });
   await page.locator("#vehicle-model").selectOption({ label: "Camry" });
   await page.locator("#vehicle-year").fill("2019");
   await page.locator("#vehicle-price").fill("2500000");
@@ -231,7 +256,7 @@ test("the vehicle form's own Status field can publish on create and change statu
   await expect(page.getByText("Vehicle updated.")).toBeVisible();
 
   await page.goto("/dashboard/vehicles");
-  await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("SOLD");
+  await expect(page.getByRole("row", { name: new RegExp(CREATED_VEHICLE_TITLE) }).getByRole("combobox")).toHaveValue("SOLD");
 });
 
 test("a second status change in the same edit visit (no reload in between) still persists", async ({ page }) => {
@@ -243,11 +268,8 @@ test("a second status change in the same edit visit (no reload in between) still
   // one just persisted — a Published → Save, then Draft → Save sequence
   // silently failed to revert the second time, while still showing
   // "Vehicle updated." as if it had worked.
-  const unique = Date.now();
-  const title = `E2E Repeat Status Vehicle ${unique}`;
-
   await loginAsFixtureOwner(page);
-  await createVehicleViaForm(page, title);
+  await createVehicleViaForm(page);
   await expect(page.locator("#vehicle-status")).toHaveValue("DRAFT");
 
   // The Status <select> is present in the very first paint of this
@@ -276,20 +298,20 @@ test("required fields show one inline validation message, not a duplicate banner
   // The page must show no validation error before any interaction
   // (regression coverage for the Dialog focus-steal bug fixed in PR #25 —
   // still relevant now that the form lives on a plain page, not a dialog).
-  await expect(page.getByText("Title is required")).toHaveCount(0);
+  // There's no Title input any more (title is auto-derived from
+  // year/make/model — see CREATED_VEHICLE_TITLE's own note), so Year is the
+  // required field this checks instead.
+  await expect(page.getByText("Enter a 4-digit year")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Create vehicle" }).click();
-  await expect(page.getByText("Title is required")).toHaveCount(1);
+  await expect(page.getByText("Enter a 4-digit year")).toHaveCount(1);
   await expect(page.getByText("Vehicle created.")).toHaveCount(0);
   await expect(page).toHaveURL(/\/dashboard\/vehicles\/new$/);
 });
 
 test("specification and financing fields save and reload correctly", async ({ page }) => {
-  const unique = Date.now();
-  const title = `E2E Spec Vehicle ${unique}`;
-
   await loginAsFixtureOwner(page);
-  await createVehicleViaForm(page, title);
+  await createVehicleViaForm(page);
 
   await page.locator("#vehicle-engine").fill("2.0L Turbo Petrol");
   await page.locator("#vehicle-interior").fill("Leather");
@@ -309,7 +331,7 @@ test("specification and financing fields save and reload correctly", async ({ pa
   const depositInputBox = await page.locator("#vehicle-down-payment-value").boundingBox();
   expect(depositInputBox?.width ?? 0).toBeGreaterThan(80);
   await page.locator("#vehicle-down-payment-value").fill("20");
-  await page.locator("#vehicle-interest-rate").fill("13.5");
+  await page.locator("#vehicle-interest-rate-value").fill("13.5");
   await page.locator("#vehicle-insurance-percent").fill("3");
   await page.locator("#vehicle-tracker-1yr").fill("15000");
   await page.getByLabel("24 months").check();
@@ -344,17 +366,27 @@ test("specification and financing fields save and reload correctly", async ({ pa
   await page.reload();
   await expect(page.getByLabel("Deposit type")).toHaveValue("FIXED");
   await expect(page.locator("#vehicle-down-payment-value")).toHaveValue("500000");
+
+  // Same PERCENT/FIXED toggle pattern, applied to Interest rate (client
+  // feedback: "Interest can be add fixed on admin panel as well").
+  await expect(async () => {
+    await page.getByLabel("Interest rate type").selectOption("FIXED");
+    await expect(page.getByLabel("Interest rate type")).toHaveValue("FIXED");
+  }).toPass({ timeout: 10_000 });
+  await page.locator("#vehicle-interest-rate-value").fill("50000");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Interest rate type")).toHaveValue("FIXED");
+  await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("50000");
 });
 
 test("an invalid financing field left over after disabling installment doesn't silently block Save", async ({ page }) => {
-  const unique = Date.now();
-  const title = `E2E Hidden Financing Vehicle ${unique}`;
-
   await loginAsFixtureOwner(page);
-  await createVehicleViaForm(page, title);
+  await createVehicleViaForm(page);
 
   await page.getByLabel("Available on installment (HP)").check();
-  await page.locator("#vehicle-interest-rate").fill("-5");
+  await page.locator("#vehicle-interest-rate-value").fill("-5");
   await page.getByLabel("Available on installment (HP)").uncheck();
   await page.locator("#vehicle-doors").fill("4");
   await page.getByRole("button", { name: "Save changes" }).click();
@@ -362,11 +394,8 @@ test("an invalid financing field left over after disabling installment doesn't s
 });
 
 test("an approved owner can upload a vehicle photo and it becomes the featured image", async ({ page }) => {
-  const unique = Date.now();
-  const title = `E2E Photo Vehicle ${unique}`;
-
   await loginAsFixtureOwner(page);
-  await createVehicleViaForm(page, title);
+  await createVehicleViaForm(page);
 
   await page
     .locator("#vehicle-photo-upload")
@@ -392,11 +421,8 @@ test("an approved owner can upload a vehicle photo and it becomes the featured i
 });
 
 test("uploading a photo larger than Next's 1MB default Server Action body limit still succeeds", async ({ page }) => {
-  const unique = Date.now();
-  const title = `E2E Large Photo Vehicle ${unique}`;
-
   await loginAsFixtureOwner(page);
-  await createVehicleViaForm(page, title);
+  await createVehicleViaForm(page);
 
   // A real PNG signature followed by ~2MB of filler bytes — big enough to
   // exceed Next.js Server Actions' 1MB default body limit (this repo raises
@@ -416,14 +442,11 @@ test("uploading a photo larger than Next's 1MB default Server Action body limit 
 });
 
 test("an approved owner can mark a vehicle sold and deactivate it", async ({ page }) => {
-  const unique = Date.now();
-  const title = `E2E Status Vehicle ${unique}`;
-
   await loginAsFixtureOwner(page);
-  await createVehicleViaForm(page, title);
+  await createVehicleViaForm(page);
   await page.goto("/dashboard/vehicles");
 
-  const row = page.getByRole("row", { name: new RegExp(title) });
+  const row = page.getByRole("row", { name: new RegExp(CREATED_VEHICLE_TITLE) });
   const status = row.getByRole("combobox");
 
   // The status <select> is present in the very first paint after
@@ -436,7 +459,7 @@ test("an approved owner can mark a vehicle sold and deactivate it", async ({ pag
   }).toPass({ timeout: 10_000 });
   await expect(page.getByText("Marked as sold.")).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("SOLD");
+  await expect(page.getByRole("row", { name: new RegExp(CREATED_VEHICLE_TITLE) }).getByRole("combobox")).toHaveValue("SOLD");
 
   await expect(async () => {
     await row.getByRole("combobox").selectOption("INACTIVE");
@@ -444,7 +467,7 @@ test("an approved owner can mark a vehicle sold and deactivate it", async ({ pag
   }).toPass({ timeout: 10_000 });
   await expect(page.getByText("Marked as removed.")).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("row", { name: new RegExp(title) }).getByRole("combobox")).toHaveValue("INACTIVE");
+  await expect(page.getByRole("row", { name: new RegExp(CREATED_VEHICLE_TITLE) }).getByRole("combobox")).toHaveValue("INACTIVE");
 });
 
 test("a vehicle whose make doesn't match any catalog brand keeps its original text on save", async ({ page }) => {

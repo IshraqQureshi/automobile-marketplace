@@ -33,6 +33,17 @@ export const showroomFieldSchemas = {
     .max(100, "Opening hours must be under 100 characters")
     .optional()
     .transform((value) => value || undefined),
+  // Unlike youtubePlaylistUrlSchema below (admin-only — a curated playlist
+  // from HarakaGari's own channel), this is the showroom's own TikTok
+  // account — normal owner-editable profile info, same as businessEmail/
+  // businessPhone/address above, not a separate admin-only concept.
+  tiktokUrl: z
+    .string()
+    .trim()
+    .url("Enter a valid URL")
+    .or(z.literal(""))
+    .optional()
+    .transform((value) => value || undefined),
 };
 
 export const adminShowroomSchema = z.object(showroomFieldSchemas);

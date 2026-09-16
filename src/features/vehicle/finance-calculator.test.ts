@@ -35,6 +35,14 @@ describe("calculateFinanceEstimate", () => {
     expect(result.loanAmount).toBe(1_700_000);
   });
 
+  it("uses a flat interest amount instead of a %/year rate when interestRateType is FIXED", () => {
+    const result = calculateFinanceEstimate({ ...BASE, interestRateType: "FIXED", interestRateAmount: 50_000 });
+    expect(result.totalInterest).toBe(50_000);
+    // Unlike the PERCENT path, a FIXED amount doesn't scale with tenure.
+    const shorterTenure = calculateFinanceEstimate({ ...BASE, interestRateType: "FIXED", interestRateAmount: 50_000, tenureMonths: 12 });
+    expect(shorterTenure.totalInterest).toBe(50_000);
+  });
+
   it("halves total interest when the tenure is halved (interest scales with loan term)", () => {
     const full = calculateFinanceEstimate({ ...BASE, tenureMonths: 24 });
     const half = calculateFinanceEstimate({ ...BASE, tenureMonths: 12 });

@@ -98,6 +98,7 @@ const optionalNonNegativeAmount = (label: string) =>
 export const vehicleDownPaymentPercentSchema = optionalPercent("Down payment");
 export const vehicleDownPaymentAmountSchema = optionalNonNegativeAmount("Down payment amount");
 export const vehicleInterestRateSchema = optionalNonNegativeAmount("Interest rate");
+export const vehicleInterestRateAmountSchema = optionalNonNegativeAmount("Interest amount");
 export const vehicleInsurancePercentSchema = optionalPercent("Insurance");
 export const vehicleFinancingPartnerSchema = optionalTrimmedText(100, "Financing partner");
 export const vehicleTracker1YearPriceSchema = optionalNonNegativeAmount("1-year tracker fee");
@@ -130,6 +131,7 @@ export const vehicleFieldSchemas = {
   financingDownPaymentPercent: vehicleDownPaymentPercentSchema,
   financingDownPaymentAmount: vehicleDownPaymentAmountSchema,
   financingInterestRate: vehicleInterestRateSchema,
+  financingInterestRateAmount: vehicleInterestRateAmountSchema,
   financingInsurancePercent: vehicleInsurancePercentSchema,
   financingPartner: vehicleFinancingPartnerSchema,
   financingTracker1YearPrice: vehicleTracker1YearPriceSchema,
@@ -189,7 +191,11 @@ export const vehicleSchema = z
     financingDownPaymentType: z.enum(DOWN_PAYMENT_TYPES).default("PERCENT"),
     financingDownPaymentPercent: vehicleDownPaymentPercentSchema,
     financingDownPaymentAmount: vehicleDownPaymentAmountSchema,
+    // Reuses DOWN_PAYMENT_TYPES — same PERCENT/FIXED choice, just applied to
+    // the interest rate instead of the down payment.
+    financingInterestRateType: z.enum(DOWN_PAYMENT_TYPES).default("PERCENT"),
     financingInterestRate: vehicleInterestRateSchema,
+    financingInterestRateAmount: vehicleInterestRateAmountSchema,
     financingInsurancePercent: vehicleInsurancePercentSchema,
     financingPartner: vehicleFinancingPartnerSchema,
     financingTenureMonths: tenureMonthsSchema,
@@ -212,6 +218,8 @@ export const vehicleSchema = z
       ...data,
       financingDownPaymentPercent: data.financingDownPaymentType === "PERCENT" ? data.financingDownPaymentPercent : undefined,
       financingDownPaymentAmount: data.financingDownPaymentType === "FIXED" ? data.financingDownPaymentAmount : undefined,
+      financingInterestRate: data.financingInterestRateType === "PERCENT" ? data.financingInterestRate : undefined,
+      financingInterestRateAmount: data.financingInterestRateType === "FIXED" ? data.financingInterestRateAmount : undefined,
       financingTrackerOptions,
     };
   });

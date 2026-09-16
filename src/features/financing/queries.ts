@@ -14,6 +14,7 @@ export interface FinancingApplicationListItem {
   nationalId: string;
   desiredDownPayment: number;
   desiredTenureMonths: number;
+  desiredTrackerDuration: string | null;
   notes: string | null;
   vehicleId: string;
   vehicleTitle: string;
@@ -21,7 +22,7 @@ export interface FinancingApplicationListItem {
 }
 
 const FINANCING_APPLICATION_SELECT_COLUMNS =
-  "id, status, created_at, contact_name, contact_email, contact_phone, employment_status, monthly_income, national_id, desired_down_payment, desired_tenure_months, notes, vehicle_id, vehicles(make, model), showroom_id, showrooms(business_name)";
+  "id, status, created_at, contact_name, contact_email, contact_phone, employment_status, monthly_income, national_id, desired_down_payment, desired_tenure_months, desired_tracker_duration, notes, vehicle_id, vehicles(make, model), showroom_id, showrooms(business_name)";
 
 interface FinancingApplicationRow {
   id: string;
@@ -35,6 +36,7 @@ interface FinancingApplicationRow {
   national_id: string;
   desired_down_payment: number;
   desired_tenure_months: number;
+  desired_tracker_duration: string | null;
   notes: string | null;
   vehicle_id: string;
   vehicles: { make: string; model: string } | null;
@@ -55,6 +57,7 @@ function rowToListItem(row: FinancingApplicationRow): FinancingApplicationListIt
     nationalId: row.national_id,
     desiredDownPayment: row.desired_down_payment,
     desiredTenureMonths: row.desired_tenure_months,
+    desiredTrackerDuration: row.desired_tracker_duration,
     notes: row.notes,
     vehicleId: row.vehicle_id,
     vehicleTitle: row.vehicles ? `${row.vehicles.make} ${row.vehicles.model}` : "Unknown vehicle",

@@ -101,6 +101,16 @@ describe("getYouTubePlaylistEmbedUrl", () => {
   it("returns null for a malformed URL", () => {
     expect(getYouTubePlaylistEmbedUrl("not a url")).toBeNull();
   });
+
+  // Regression: a real production showroom's playlist rendered as "just one
+  // video" rather than a full playlist — confirmed via YouTube's own oembed
+  // API that a 13-character list id like this resolves to a single
+  // unrelated video, not a real playlist (real ones are 34 characters).
+  // Rejecting an obviously-too-short id here means the component falls
+  // back to showing nothing rather than silently embedding the wrong thing.
+  it("returns null for an implausibly short (truncated/malformed) list id", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://www.youtube.com/playlist?list=PLZmdSdGDFTH4")).toBeNull();
+  });
 });
 
 describe("getTikTokEmbedUrl", () => {

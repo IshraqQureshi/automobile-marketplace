@@ -21,6 +21,7 @@ export interface ShowroomProfileFormFields {
   address: FormDataEntryValue | null;
   description: FormDataEntryValue | null;
   openingHours: FormDataEntryValue | null;
+  tiktokUrl: FormDataEntryValue | null;
 }
 
 export function readShowroomProfileFormFields(formData: FormData): ShowroomProfileFormFields {
@@ -32,6 +33,7 @@ export function readShowroomProfileFormFields(formData: FormData): ShowroomProfi
     address: formData.get("address"),
     description: formData.get("description"),
     openingHours: formData.get("openingHours"),
+    tiktokUrl: formData.get("tiktokUrl"),
   };
 }
 
@@ -71,6 +73,7 @@ export async function updateShowroomProfile(
       address: parsed.address ?? null,
       description: parsed.description ?? null,
       opening_hours: parsed.openingHours ?? null,
+      tiktok_url: parsed.tiktokUrl ?? null,
       // youtube_playlist_url is deliberately NOT written here — it's
       // admin-only (prevent_showroom_youtube_playlist_self_edit), and this
       // function is shared with the showroom owner's own profile save. An

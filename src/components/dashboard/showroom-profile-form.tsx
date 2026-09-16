@@ -20,6 +20,7 @@ export interface ShowroomProfileInitialValues {
   address: string;
   description: string;
   openingHours: string;
+  tiktokUrl: string;
   logoUrl: string | null;
 }
 
@@ -39,6 +40,7 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     address: initialValues.address,
     description: initialValues.description,
     openingHours: initialValues.openingHours,
+    tiktokUrl: initialValues.tiktokUrl,
   });
   const [logo, setLogo] = useState<File | null>(null);
   const [logoInputKey, setLogoInputKey] = useState(0);
@@ -55,7 +57,16 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     setFormError(null);
 
     let hasError = false;
-    for (const field of ["businessName", "location", "businessPhone", "businessEmail", "address", "description", "openingHours"] as const) {
+    for (const field of [
+      "businessName",
+      "location",
+      "businessPhone",
+      "businessEmail",
+      "address",
+      "description",
+      "openingHours",
+      "tiktokUrl",
+    ] as const) {
       if (!showroomFieldSchemas[field].safeParse(form[field]).success) {
         validate(field, form[field]);
         hasError = true;
@@ -71,6 +82,7 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
     formData.set("address", form.address);
     formData.set("description", form.description);
     formData.set("openingHours", form.openingHours);
+    formData.set("tiktokUrl", form.tiktokUrl);
     if (logo) formData.set("logo", logo);
     if (removeLogo) formData.set("removeLogo", "true");
 
@@ -301,6 +313,28 @@ export function ShowroomProfileForm({ initialValues }: ShowroomProfileFormProps)
               )}
               <p className="mt-1 text-xs text-neutral-400">
                 Shown as-is on your public showroom page.
+              </p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="showroom-tiktok-url">
+                TikTok (optional)
+              </FieldLabel>
+              <Input
+                id="showroom-tiktok-url"
+                value={form.tiktokUrl}
+                onChange={(e) => setField("tiktokUrl", e.target.value)}
+                onBlur={(e) => validate("tiktokUrl", e.target.value)}
+                placeholder="https://www.tiktok.com/@yourshowroom"
+                error={!!errorFor("tiktokUrl")}
+              />
+              {errorFor("tiktokUrl") && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errorFor("tiktokUrl")}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-neutral-400">
+                Your own TikTok account — shown on your public showroom page.
               </p>
             </div>
           </div>
