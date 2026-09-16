@@ -292,12 +292,23 @@ test("admin can create a showroom for an existing user via the owner search", as
   await dialog.locator("#showroom-location").fill("Nairobi");
   await dialog.locator("#showroom-phone").fill("712345678");
   await dialog.locator("#showroom-email").fill(`${unique}@example.com`);
+  // TikTok fields set at create time, not just edit — createShowroomAction's
+  // own insert previously never referenced tiktok_url/tiktok_video_urls at
+  // all, so anything typed here would be silently discarded even though
+  // the dialog showed no error.
+  await dialog.locator("#showroom-tiktok-url").fill(`https://www.tiktok.com/@${businessName.toLowerCase().replace(/\s+/g, "-")}`);
+  await dialog.locator("#showroom-tiktok-video-1").fill(`https://www.tiktok.com/@e2e-created-showroom/video/7000000000000000099`);
   await dialog.getByRole("button", { name: "Create" }).click();
 
   await expect(page.getByText("Showroom created.")).toBeVisible();
   const row = page.getByRole("row", { name: businessName });
   await expect(row).toBeAttached();
   await expect(row.getByText("Pending")).toBeVisible();
+
+  await row.getByRole("button", { name: "Edit" }).click();
+  const editDialog = page.getByRole("dialog");
+  await expect(editDialog.locator("#showroom-tiktok-url")).toHaveValue(`https://www.tiktok.com/@${businessName.toLowerCase().replace(/\s+/g, "-")}`);
+  await expect(editDialog.locator("#showroom-tiktok-video-1")).toHaveValue("https://www.tiktok.com/@e2e-created-showroom/video/7000000000000000099");
 });
 
 // A minimal valid 1x1 PNG — real image bytes matter here since the browser

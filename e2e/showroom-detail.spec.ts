@@ -249,12 +249,19 @@ test("a showroom owner can paste TikTok video links on their own profile, embedd
   // style above), not that a real video plays.
   await page.locator("#showroom-tiktok-video-1").fill(`https://www.tiktok.com/@e2e-showroom-detail-${unique}/video/7000000000000000001`);
   await page.locator("#showroom-tiktok-video-2").fill(`https://www.tiktok.com/@e2e-showroom-detail-${unique}/video/7000000000000000002`);
+  // A short/shared link carries no numeric video ID in the URL itself
+  // (getTikTokEmbedUrl returns null for these — see its own test in
+  // video-embed.test.ts) — this one must be silently dropped from the
+  // rendered grid, not rendered as a broken iframe.
+  await page.locator("#showroom-tiktok-video-3").fill("https://vm.tiktok.com/ZMabcdefg/");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Showroom profile updated.")).toBeVisible();
 
   await page.goto(showroomPath, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("link", { name: "Follow on TikTok" })).toHaveAttribute("href", `https://www.tiktok.com/@e2e-showroom-detail-${unique}`);
   const videoIframes = page.locator('iframe[src*="tiktok.com/embed"]');
+  // Exactly 2, not 3 — proves the unresolvable short link was dropped,
+  // not just that the two resolvable ones happen to be present.
   await expect(videoIframes).toHaveCount(2);
   await expect(videoIframes.nth(0)).toHaveAttribute("src", "https://www.tiktok.com/embed/v2/7000000000000000001");
   await expect(videoIframes.nth(1)).toHaveAttribute("src", "https://www.tiktok.com/embed/v2/7000000000000000002");

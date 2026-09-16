@@ -225,6 +225,8 @@ export async function createShowroomAction(formData: FormData): Promise<Showroom
       address: parsed.data.address ?? null,
       description: parsed.data.description ?? null,
       opening_hours: parsed.data.openingHours ?? null,
+      tiktok_url: parsed.data.tiktokUrl ?? null,
+      tiktok_video_urls: parsed.data.tiktokVideoUrls.length > 0 ? parsed.data.tiktokVideoUrls : null,
       youtube_playlist_url: playlistParsed.data ?? null,
     })
     .select("id")
