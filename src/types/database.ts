@@ -1103,12 +1103,14 @@ export type Database = {
           financing_down_payment_amount: number | null
           financing_down_payment_percent: number | null
           financing_down_payment_type: string
-          financing_insurance_percent: number | null
+          financing_insurance_percent_private: number | null
+          financing_insurance_percent_psv: number | null
           financing_interest_rate: number | null
           financing_interest_rate_amount: number | null
           financing_interest_rate_type: string
           financing_partner: string | null
           financing_tenure_options_months: number[] | null
+          financing_tracker_3_year_price: number | null
           financing_tracker_options: Json | null
           fuel_type: string | null
           id: string
@@ -1140,12 +1142,14 @@ export type Database = {
           financing_down_payment_amount?: number | null
           financing_down_payment_percent?: number | null
           financing_down_payment_type?: string
-          financing_insurance_percent?: number | null
+          financing_insurance_percent_private?: number | null
+          financing_insurance_percent_psv?: number | null
           financing_interest_rate?: number | null
           financing_interest_rate_amount?: number | null
           financing_interest_rate_type?: string
           financing_partner?: string | null
           financing_tenure_options_months?: number[] | null
+          financing_tracker_3_year_price?: number | null
           financing_tracker_options?: Json | null
           fuel_type?: string | null
           id?: string
@@ -1177,12 +1181,14 @@ export type Database = {
           financing_down_payment_amount?: number | null
           financing_down_payment_percent?: number | null
           financing_down_payment_type?: string
-          financing_insurance_percent?: number | null
+          financing_insurance_percent_private?: number | null
+          financing_insurance_percent_psv?: number | null
           financing_interest_rate?: number | null
           financing_interest_rate_amount?: number | null
           financing_interest_rate_type?: string
           financing_partner?: string | null
           financing_tenure_options_months?: number[] | null
+          financing_tracker_3_year_price?: number | null
           financing_tracker_options?: Json | null
           fuel_type?: string | null
           id?: string

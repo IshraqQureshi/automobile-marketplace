@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateFinanceEstimate } from "./finance-calculator";
+import { calculateFinanceEstimate, trackerDurationToMonths } from "./finance-calculator";
 
 const BASE = {
   price: 2_000_000,
@@ -13,7 +13,7 @@ const BASE = {
 };
 
 describe("calculateFinanceEstimate", () => {
-  it("computes percent-based down payment, loan amount, interest, insurance, and monthly payment", () => {
+  it("computes percent-based down payment, loan amount, interest, and insurance", () => {
     const result = calculateFinanceEstimate(BASE);
     // downPayment = 2,000,000 * 0.20 = 400,000
     expect(result.downPayment).toBe(400_000);
@@ -24,8 +24,9 @@ describe("calculateFinanceEstimate", () => {
     // insurance = 2,000,000 * 0.035 = 70,000
     expect(result.insurance).toBe(70_000);
     expect(result.trackerFee).toBe(15_000);
-    // monthlyPayment = (1,600,000 + 448,000 + 70,000 + 15,000) / 24
-    expect(result.monthlyPayment).toBe(Math.round((1_600_000 + 448_000 + 70_000 + 15_000) / 24));
+    // No trackerDurationMonths supplied → no tracker cost spread into the
+    // monthly figure. monthlyPayment = (1,600,000 + 448,000 + 70,000) / 24
+    expect(result.monthlyPayment).toBe(Math.round((1_600_000 + 448_000 + 70_000) / 24));
     expect(result.totalPayable).toBe(400_000 + 1_600_000 + 448_000 + 70_000 + 15_000);
   });
 
@@ -64,6 +65,7 @@ describe("calculateFinanceEstimate", () => {
     expect(result.loanAmount).toBe(1_000_000);
     expect(result.totalInterest).toBe(0);
     expect(result.insurance).toBe(0);
+    expect(result.trackerMonthlyFee).toBe(0);
     expect(result.monthlyPayment).toBeGreaterThan(0);
     expect(Number.isNaN(result.monthlyPayment)).toBe(false);
   });
@@ -97,5 +99,61 @@ describe("calculateFinanceEstimate", () => {
     const result = calculateFinanceEstimate({ ...BASE, tenureMonths: 0 });
     expect(result.monthlyPayment).toBe(0);
     expect(Number.isFinite(result.monthlyPayment)).toBe(true);
+  });
+
+  describe("tracker fee spread over its own duration in months", () => {
+    it("divides the tracker's fee by its OWN duration, not the loan's tenure", () => {
+      // A 2-year (24-month) tracker fee of 24,000 on a 12-month loan —
+      // spreading over the tracker's real 24-month plan gives 1,000/mo,
+      // not 24,000/12 = 2,000/mo (the old, incorrect behavior that divided
+      // by the unrelated loan tenure).
+      const result = calculateFinanceEstimate({ ...BASE, tenureMonths: 12, trackerFee: 24_000, trackerDurationMonths: 24 });
+      expect(result.trackerMonthlyFee).toBe(1_000);
+    });
+
+    it("adds the tracker's monthly fee on top of the loan-based monthly payment", () => {
+      const withoutTracker = calculateFinanceEstimate({ ...BASE, trackerFee: 0, trackerDurationMonths: 0 });
+      const withTracker = calculateFinanceEstimate({ ...BASE, trackerFee: 36_000, trackerDurationMonths: 36 });
+      // 36,000 / 36 months = 1,000/mo
+      expect(withTracker.trackerMonthlyFee).toBe(1_000);
+      expect(withTracker.monthlyPayment).toBe(withoutTracker.monthlyPayment + 1_000);
+    });
+
+    it("keeps totalPayable as the full real tracker fee, unaffected by the loan tenure", () => {
+      const shortTenure = calculateFinanceEstimate({ ...BASE, tenureMonths: 12, trackerFee: 40_000, trackerDurationMonths: 36 });
+      const longTenure = calculateFinanceEstimate({ ...BASE, tenureMonths: 36, trackerFee: 40_000, trackerDurationMonths: 36 });
+      expect(shortTenure.trackerFee).toBe(40_000);
+      expect(longTenure.trackerFee).toBe(40_000);
+    });
+
+    it("treats a missing/zero trackerDurationMonths as no tracker selected — no divide-by-zero", () => {
+      const result = calculateFinanceEstimate({ ...BASE, trackerFee: 15_000, trackerDurationMonths: 0 });
+      expect(result.trackerMonthlyFee).toBe(0);
+      expect(Number.isFinite(result.monthlyPayment)).toBe(true);
+    });
+  });
+});
+
+describe("trackerDurationToMonths", () => {
+  it("parses '1 Year' as 12 months", () => {
+    expect(trackerDurationToMonths("1 Year")).toBe(12);
+  });
+
+  it("parses '2 Years' as 24 months", () => {
+    expect(trackerDurationToMonths("2 Years")).toBe(24);
+  });
+
+  it("parses '3 Years' as 36 months", () => {
+    expect(trackerDurationToMonths("3 Years")).toBe(36);
+  });
+
+  it("returns 0 for null/undefined/empty (no tracker selected)", () => {
+    expect(trackerDurationToMonths(null)).toBe(0);
+    expect(trackerDurationToMonths(undefined)).toBe(0);
+    expect(trackerDurationToMonths("")).toBe(0);
+  });
+
+  it("returns 0 for an unrecognized label rather than throwing", () => {
+    expect(trackerDurationToMonths("lifetime")).toBe(0);
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { calculateFinanceEstimate } from "@/features/vehicle/finance-calculator";
+import { calculateFinanceEstimate, trackerDurationToMonths } from "@/features/vehicle/finance-calculator";
 import { currencyFormatter } from "@/features/vehicle/types";
 
 export interface FinancingCalculatorProps {
@@ -12,7 +12,8 @@ export interface FinancingCalculatorProps {
   interestRateType: "PERCENT" | "FIXED";
   interestRatePercentPerYear: number;
   interestRateAmount: number | null;
-  insurancePercent: number | null;
+  insurancePercentPsv: number | null;
+  insurancePercentPrivate: number | null;
   trackerOptions: { duration: string; price: number }[];
   tenureOptionsMonths: number[];
 }
@@ -34,14 +35,21 @@ export function FinancingCalculator({
   interestRateType,
   interestRatePercentPerYear,
   interestRateAmount,
-  insurancePercent,
+  insurancePercentPsv,
+  insurancePercentPrivate,
   trackerOptions,
   tenureOptionsMonths,
 }: FinancingCalculatorProps) {
   const [tenureMonths, setTenureMonths] = useState(tenureOptionsMonths[0]!);
   const [trackerIndex, setTrackerIndex] = useState(trackerOptions.length > 0 ? 0 : -1);
+  // Defaults to whichever type the showroom actually configured — PSV takes
+  // priority when both are set, same "first available option" convention as
+  // the tracker/tenure selects above.
+  const [insuranceType, setInsuranceType] = useState<"PSV" | "PRIVATE">(insurancePercentPsv != null ? "PSV" : "PRIVATE");
 
   const selectedTracker = trackerIndex >= 0 ? trackerOptions[trackerIndex] : null;
+  const bothInsuranceTypesAvailable = insurancePercentPsv != null && insurancePercentPrivate != null;
+  const insurancePercent = insuranceType === "PSV" ? insurancePercentPsv : insurancePercentPrivate;
 
   const result = useMemo(
     () =>
@@ -55,6 +63,7 @@ export function FinancingCalculator({
         interestRateAmount,
         insurancePercent,
         trackerFee: selectedTracker?.price ?? 0,
+        trackerDurationMonths: trackerDurationToMonths(selectedTracker?.duration),
         tenureMonths,
       }),
     [
@@ -88,7 +97,26 @@ export function FinancingCalculator({
           <FinanceRow label={downPaymentLabel} sub="Paid upfront" value={currencyFormatter.format(result.downPayment)} />
           <FinanceRow label="Interest" sub={interestSub} value={currencyFormatter.format(result.totalInterest)} />
           {insurancePercent != null && (
-            <FinanceRow label={`Insurance (${insurancePercent}%)`} sub="Annual comprehensive cover" value={currencyFormatter.format(result.insurance)} />
+            <div className="flex items-center justify-between border-b border-neutral-100 py-3.5">
+              <div>
+                <p className="text-sm font-medium text-neutral-700">Insurance ({insurancePercent}%)</p>
+                <p className="mt-0.5 text-[11px] text-neutral-400">Annual comprehensive cover</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {bothInsuranceTypesAvailable && (
+                  <select
+                    value={insuranceType}
+                    onChange={(e) => setInsuranceType(e.target.value as "PSV" | "PRIVATE")}
+                    aria-label="Insurance type"
+                    className="rounded-lg border border-neutral-300 px-2.5 py-1.5 text-xs font-semibold text-neutral-900 outline-none"
+                  >
+                    <option value="PSV">PSV</option>
+                    <option value="PRIVATE">Private</option>
+                  </select>
+                )}
+                <span className="text-sm font-bold text-brand">{currencyFormatter.format(result.insurance)}</span>
+              </div>
+            </div>
           )}
 
           {trackerOptions.length > 0 && (
@@ -110,7 +138,7 @@ export function FinancingCalculator({
                     </option>
                   ))}
                 </select>
-                <span className="text-sm font-bold text-brand">{currencyFormatter.format(selectedTracker?.price ?? 0)}</span>
+                <span className="text-sm font-bold text-brand">{currencyFormatter.format(result.trackerMonthlyFee)}/mo</span>
               </div>
             </div>
           )}
@@ -141,7 +169,12 @@ export function FinancingCalculator({
               <SummaryRow label="Loan Amount" value={currencyFormatter.format(result.loanAmount)} />
               <SummaryRow label={`Interest (× ${tenureMonths} mo)`} value={currencyFormatter.format(result.totalInterest)} />
               {insurancePercent != null && <SummaryRow label="Insurance" value={currencyFormatter.format(result.insurance)} />}
-              {selectedTracker && <SummaryRow label={`Tracker (${selectedTracker.duration})`} value={currencyFormatter.format(result.trackerFee)} />}
+              {selectedTracker && (
+                <SummaryRow
+                  label={`Tracker (${selectedTracker.duration} total, ${currencyFormatter.format(result.trackerMonthlyFee)}/mo)`}
+                  value={currencyFormatter.format(result.trackerFee)}
+                />
+              )}
               <SummaryRow label="Loan Term" value={`${tenureMonths} months`} />
             </div>
           </div>

@@ -62,11 +62,13 @@ function readVehicleFormData(formData: FormData) {
     financingInterestRateType: String(formData.get("financingInterestRateType") ?? "PERCENT"),
     financingInterestRate: financingFieldsActive ? String(formData.get("financingInterestRate") ?? "") : "",
     financingInterestRateAmount: financingFieldsActive ? String(formData.get("financingInterestRateAmount") ?? "") : "",
-    financingInsurancePercent: financingFieldsActive ? String(formData.get("financingInsurancePercent") ?? "") : "",
+    financingInsurancePercentPsv: financingFieldsActive ? String(formData.get("financingInsurancePercentPsv") ?? "") : "",
+    financingInsurancePercentPrivate: financingFieldsActive ? String(formData.get("financingInsurancePercentPrivate") ?? "") : "",
     financingPartner: financingFieldsActive ? String(formData.get("financingPartner") ?? "") : "",
     financingTenureMonths: financingFieldsActive ? formData.getAll("financingTenureMonths").map(String) : [],
     financingTracker1YearPrice: financingFieldsActive ? String(formData.get("financingTracker1YearPrice") ?? "") : "",
     financingTracker2YearPrice: financingFieldsActive ? String(formData.get("financingTracker2YearPrice") ?? "") : "",
+    financingTracker3YearPrice: financingFieldsActive ? String(formData.get("financingTracker3YearPrice") ?? "") : "",
   };
 }
 
@@ -97,7 +99,8 @@ function vehicleRowFromParsed(parsed: ReturnType<typeof vehicleSchema.parse>) {
     financing_interest_rate_type: parsed.financingInterestRateType,
     financing_interest_rate: parsed.financingInterestRate ?? null,
     financing_interest_rate_amount: parsed.financingInterestRateAmount ?? null,
-    financing_insurance_percent: parsed.financingInsurancePercent ?? null,
+    financing_insurance_percent_psv: parsed.financingInsurancePercentPsv ?? null,
+    financing_insurance_percent_private: parsed.financingInsurancePercentPrivate ?? null,
     financing_partner: parsed.financingPartner ?? null,
     financing_tenure_options_months: parsed.financingTenureMonths ?? null,
     financing_tracker_options: parsed.financingTrackerOptions ?? null,

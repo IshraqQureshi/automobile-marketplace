@@ -37,11 +37,13 @@ const validFullVehicle = {
   financingInterestRateType: "PERCENT",
   financingInterestRate: "12.5",
   financingInterestRateAmount: "",
-  financingInsurancePercent: "3",
+  financingInsurancePercentPsv: "4.5",
+  financingInsurancePercentPrivate: "3",
   financingPartner: "KCB Bank",
   financingTenureMonths: ["12", "24"],
   financingTracker1YearPrice: "15000",
   financingTracker2YearPrice: "",
+  financingTracker3YearPrice: "",
 };
 
 describe("vehicleTitleSchema", () => {
@@ -170,11 +172,13 @@ describe("vehicleSchema (full object)", () => {
       financingDownPaymentAmount: "",
       financingInterestRate: "",
       financingInterestRateAmount: "",
-      financingInsurancePercent: "",
+      financingInsurancePercentPsv: "",
+      financingInsurancePercentPrivate: "",
       financingPartner: "",
       financingTenureMonths: [],
       financingTracker1YearPrice: "",
       financingTracker2YearPrice: "",
+      financingTracker3YearPrice: "",
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -222,13 +226,28 @@ describe("vehicleSchema (full object)", () => {
       ...validFullVehicle,
       financingTracker1YearPrice: "15000",
       financingTracker2YearPrice: "28000",
+      financingTracker3YearPrice: "40000",
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.financingTrackerOptions).toEqual([
         { duration: "1 Year", price: 15000 },
         { duration: "2 Years", price: 28000 },
+        { duration: "3 Years", price: 40000 },
       ]);
+    }
+  });
+
+  it("keeps PSV and Private insurance rates as two independent fields", () => {
+    const result = vehicleSchema.safeParse({
+      ...validFullVehicle,
+      financingInsurancePercentPsv: "4.5",
+      financingInsurancePercentPrivate: "3",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.financingInsurancePercentPsv).toBe(4.5);
+      expect(result.data.financingInsurancePercentPrivate).toBe(3);
     }
   });
 

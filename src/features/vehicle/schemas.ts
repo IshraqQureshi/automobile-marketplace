@@ -99,10 +99,12 @@ export const vehicleDownPaymentPercentSchema = optionalPercent("Down payment");
 export const vehicleDownPaymentAmountSchema = optionalNonNegativeAmount("Down payment amount");
 export const vehicleInterestRateSchema = optionalNonNegativeAmount("Interest rate");
 export const vehicleInterestRateAmountSchema = optionalNonNegativeAmount("Interest amount");
-export const vehicleInsurancePercentSchema = optionalPercent("Insurance");
+export const vehicleInsurancePercentPsvSchema = optionalPercent("Insurance (PSV)");
+export const vehicleInsurancePercentPrivateSchema = optionalPercent("Insurance (Private)");
 export const vehicleFinancingPartnerSchema = optionalTrimmedText(100, "Financing partner");
 export const vehicleTracker1YearPriceSchema = optionalNonNegativeAmount("1-year tracker fee");
 export const vehicleTracker2YearPriceSchema = optionalNonNegativeAmount("2-year tracker fee");
+export const vehicleTracker3YearPriceSchema = optionalNonNegativeAmount("3-year tracker fee");
 
 export const DOWN_PAYMENT_TYPES = ["PERCENT", "FIXED"] as const;
 export type DownPaymentType = (typeof DOWN_PAYMENT_TYPES)[number];
@@ -132,10 +134,12 @@ export const vehicleFieldSchemas = {
   financingDownPaymentAmount: vehicleDownPaymentAmountSchema,
   financingInterestRate: vehicleInterestRateSchema,
   financingInterestRateAmount: vehicleInterestRateAmountSchema,
-  financingInsurancePercent: vehicleInsurancePercentSchema,
+  financingInsurancePercentPsv: vehicleInsurancePercentPsvSchema,
+  financingInsurancePercentPrivate: vehicleInsurancePercentPrivateSchema,
   financingPartner: vehicleFinancingPartnerSchema,
   financingTracker1YearPrice: vehicleTracker1YearPriceSchema,
   financingTracker2YearPrice: vehicleTracker2YearPriceSchema,
+  financingTracker3YearPrice: vehicleTracker3YearPriceSchema,
 };
 
 // Full-object schema for the server action's authoritative parse. Fuel
@@ -196,21 +200,24 @@ export const vehicleSchema = z
     financingInterestRateType: z.enum(DOWN_PAYMENT_TYPES).default("PERCENT"),
     financingInterestRate: vehicleInterestRateSchema,
     financingInterestRateAmount: vehicleInterestRateAmountSchema,
-    financingInsurancePercent: vehicleInsurancePercentSchema,
+    financingInsurancePercentPsv: vehicleInsurancePercentPsvSchema,
+    financingInsurancePercentPrivate: vehicleInsurancePercentPrivateSchema,
     financingPartner: vehicleFinancingPartnerSchema,
     financingTenureMonths: tenureMonthsSchema,
     financingTracker1YearPrice: vehicleTracker1YearPriceSchema,
     financingTracker2YearPrice: vehicleTracker2YearPriceSchema,
+    financingTracker3YearPrice: vehicleTracker3YearPriceSchema,
   })
   .transform((data) => {
     // Only the active down-payment figure (per financingDownPaymentType) is
     // kept — the inactive one is dropped rather than persisted stale, since
     // the UI only ever shows one of the two inputs at a time.
     const financingTrackerOptions =
-      data.financingTracker1YearPrice != null || data.financingTracker2YearPrice != null
+      data.financingTracker1YearPrice != null || data.financingTracker2YearPrice != null || data.financingTracker3YearPrice != null
         ? [
             ...(data.financingTracker1YearPrice != null ? [{ duration: "1 Year", price: data.financingTracker1YearPrice }] : []),
             ...(data.financingTracker2YearPrice != null ? [{ duration: "2 Years", price: data.financingTracker2YearPrice }] : []),
+            ...(data.financingTracker3YearPrice != null ? [{ duration: "3 Years", price: data.financingTracker3YearPrice }] : []),
           ]
         : undefined;
 

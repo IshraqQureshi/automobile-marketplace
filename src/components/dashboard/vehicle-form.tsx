@@ -61,11 +61,13 @@ interface VehicleFormState {
   financingInterestRateType: DownPaymentType;
   financingInterestRate: string;
   financingInterestRateAmount: string;
-  financingInsurancePercent: string;
+  financingInsurancePercentPsv: string;
+  financingInsurancePercentPrivate: string;
   financingPartner: string;
   financingTenureMonths: string[];
   financingTracker1YearPrice: string;
   financingTracker2YearPrice: string;
+  financingTracker3YearPrice: string;
 }
 
 function emptyForm(): VehicleFormState {
@@ -100,11 +102,13 @@ function emptyForm(): VehicleFormState {
     financingInterestRateType: "PERCENT",
     financingInterestRate: "",
     financingInterestRateAmount: "",
-    financingInsurancePercent: "",
+    financingInsurancePercentPsv: "",
+    financingInsurancePercentPrivate: "",
     financingPartner: "",
     financingTenureMonths: [],
     financingTracker1YearPrice: "",
     financingTracker2YearPrice: "",
+    financingTracker3YearPrice: "",
   };
 }
 
@@ -144,11 +148,13 @@ function formFromVehicle(vehicle: VehicleListItem, brands: CatalogOption[]): Veh
     financingInterestRateType: vehicle.financingInterestRateType,
     financingInterestRate: vehicle.financingInterestRate != null ? String(vehicle.financingInterestRate) : "",
     financingInterestRateAmount: vehicle.financingInterestRateAmount != null ? String(vehicle.financingInterestRateAmount) : "",
-    financingInsurancePercent: vehicle.financingInsurancePercent != null ? String(vehicle.financingInsurancePercent) : "",
+    financingInsurancePercentPsv: vehicle.financingInsurancePercentPsv != null ? String(vehicle.financingInsurancePercentPsv) : "",
+    financingInsurancePercentPrivate: vehicle.financingInsurancePercentPrivate != null ? String(vehicle.financingInsurancePercentPrivate) : "",
     financingPartner: vehicle.financingPartner ?? "",
     financingTenureMonths: (vehicle.financingTenureMonths ?? []).map(String),
     financingTracker1YearPrice: String(vehicle.financingTrackerOptions?.find((t) => t.duration === "1 Year")?.price ?? ""),
     financingTracker2YearPrice: String(vehicle.financingTrackerOptions?.find((t) => t.duration === "2 Years")?.price ?? ""),
+    financingTracker3YearPrice: String(vehicle.financingTrackerOptions?.find((t) => t.duration === "3 Years")?.price ?? ""),
   };
 }
 
@@ -179,10 +185,12 @@ const FINANCING_VALIDATED_FIELDS = [
   "financingDownPaymentAmount",
   "financingInterestRate",
   "financingInterestRateAmount",
-  "financingInsurancePercent",
+  "financingInsurancePercentPsv",
+  "financingInsurancePercentPrivate",
   "financingPartner",
   "financingTracker1YearPrice",
   "financingTracker2YearPrice",
+  "financingTracker3YearPrice",
 ] as const;
 
 interface VehicleFormProps {
@@ -282,11 +290,13 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
     formData.set("financingInterestRateType", form.financingInterestRateType);
     formData.set("financingInterestRate", form.financingInterestRate);
     formData.set("financingInterestRateAmount", form.financingInterestRateAmount);
-    formData.set("financingInsurancePercent", form.financingInsurancePercent);
+    formData.set("financingInsurancePercentPsv", form.financingInsurancePercentPsv);
+    formData.set("financingInsurancePercentPrivate", form.financingInsurancePercentPrivate);
     formData.set("financingPartner", form.financingPartner);
     for (const months of form.financingTenureMonths) formData.append("financingTenureMonths", months);
     formData.set("financingTracker1YearPrice", form.financingTracker1YearPrice);
     formData.set("financingTracker2YearPrice", form.financingTracker2YearPrice);
+    formData.set("financingTracker3YearPrice", form.financingTracker3YearPrice);
 
     startTransition(async () => {
       if (mode === "create") {
@@ -698,17 +708,33 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
             </div>
 
             <div>
-              <FieldLabel htmlFor="vehicle-insurance-percent">Insurance, % of price</FieldLabel>
+              <FieldLabel htmlFor="vehicle-insurance-percent-psv">Insurance — PSV, % of price</FieldLabel>
               <Input
-                id="vehicle-insurance-percent"
+                id="vehicle-insurance-percent-psv"
                 inputMode="decimal"
-                value={form.financingInsurancePercent}
-                onChange={(e) => setField("financingInsurancePercent", e.target.value)}
-                onBlur={(e) => validate("financingInsurancePercent", e.target.value)}
-                placeholder="e.g. 3.5"
-                error={!!errorFor("financingInsurancePercent")}
+                value={form.financingInsurancePercentPsv}
+                onChange={(e) => setField("financingInsurancePercentPsv", e.target.value)}
+                onBlur={(e) => validate("financingInsurancePercentPsv", e.target.value)}
+                placeholder="e.g. 4.5"
+                error={!!errorFor("financingInsurancePercentPsv")}
               />
-              {errorFor("financingInsurancePercent") && <p className="mt-1 text-sm text-red-600">{errorFor("financingInsurancePercent")}</p>}
+              {errorFor("financingInsurancePercentPsv") && <p className="mt-1 text-sm text-red-600">{errorFor("financingInsurancePercentPsv")}</p>}
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="vehicle-insurance-percent-private">Insurance — Private, % of price</FieldLabel>
+              <Input
+                id="vehicle-insurance-percent-private"
+                inputMode="decimal"
+                value={form.financingInsurancePercentPrivate}
+                onChange={(e) => setField("financingInsurancePercentPrivate", e.target.value)}
+                onBlur={(e) => validate("financingInsurancePercentPrivate", e.target.value)}
+                placeholder="e.g. 3.5"
+                error={!!errorFor("financingInsurancePercentPrivate")}
+              />
+              {errorFor("financingInsurancePercentPrivate") && (
+                <p className="mt-1 text-sm text-red-600">{errorFor("financingInsurancePercentPrivate")}</p>
+              )}
             </div>
 
             <div>
@@ -737,6 +763,20 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
                 error={!!errorFor("financingTracker2YearPrice")}
               />
               {errorFor("financingTracker2YearPrice") && <p className="mt-1 text-sm text-red-600">{errorFor("financingTracker2YearPrice")}</p>}
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="vehicle-tracker-3yr">Tracker fee — 3 years (KES, optional)</FieldLabel>
+              <Input
+                id="vehicle-tracker-3yr"
+                inputMode="decimal"
+                value={form.financingTracker3YearPrice}
+                onChange={(e) => setField("financingTracker3YearPrice", e.target.value)}
+                onBlur={(e) => validate("financingTracker3YearPrice", e.target.value)}
+                placeholder="e.g. 40000"
+                error={!!errorFor("financingTracker3YearPrice")}
+              />
+              {errorFor("financingTracker3YearPrice") && <p className="mt-1 text-sm text-red-600">{errorFor("financingTracker3YearPrice")}</p>}
             </div>
 
             <div>

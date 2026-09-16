@@ -332,8 +332,10 @@ test("specification and financing fields save and reload correctly", async ({ pa
   expect(depositInputBox?.width ?? 0).toBeGreaterThan(80);
   await page.locator("#vehicle-down-payment-value").fill("20");
   await page.locator("#vehicle-interest-rate-value").fill("13.5");
-  await page.locator("#vehicle-insurance-percent").fill("3");
+  await page.locator("#vehicle-insurance-percent-psv").fill("4.5");
+  await page.locator("#vehicle-insurance-percent-private").fill("3");
   await page.locator("#vehicle-tracker-1yr").fill("15000");
+  await page.locator("#vehicle-tracker-3yr").fill("40000");
   await page.getByLabel("24 months").check();
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Vehicle updated.")).toBeVisible();
@@ -344,7 +346,10 @@ test("specification and financing fields save and reload correctly", async ({ pa
   await expect(page.locator("#vehicle-seats")).toHaveValue("5");
   await expect(page.getByLabel("Available on installment (HP)")).toBeChecked();
   await expect(page.locator("#vehicle-down-payment-value")).toHaveValue("20");
+  await expect(page.locator("#vehicle-insurance-percent-psv")).toHaveValue("4.5");
+  await expect(page.locator("#vehicle-insurance-percent-private")).toHaveValue("3");
   await expect(page.locator("#vehicle-tracker-1yr")).toHaveValue("15000");
+  await expect(page.locator("#vehicle-tracker-3yr")).toHaveValue("40000");
   await expect(page.getByLabel("24 months")).toBeChecked();
 
   // Switching deposit type to Fixed swaps in a fresh fixed-amount input at
