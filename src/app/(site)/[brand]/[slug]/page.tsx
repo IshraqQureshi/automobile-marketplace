@@ -17,6 +17,7 @@ import { getVehicleBrandSlug, getVehicleDetailPath, parseVehicleIdFromSlug, slug
 import { getShowroomDetailPath } from "@/features/showroom/slug";
 import { buildWhatsAppLink } from "@/features/showroom/whatsapp";
 import { extractClientIp, hashClientIp } from "@/features/vehicle/view-tracking";
+import { mimeTypeFromStoragePath, probeImageDimensions } from "@/lib/og-image";
 import { buildBreadcrumbListJsonLd } from "@/lib/structured-data";
 import { createClient } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
@@ -66,6 +67,7 @@ export async function generateMetadata({ params }: VehicleDetailPageProps): Prom
   const title = `${vehicle.year} ${vehicle.make} ${vehicle.model} — HarakaGari`;
   const description = `${currencyFormatter.format(vehicle.price)} — ${vehicle.mileage != null ? `${mileageFormatter.format(vehicle.mileage)} km` : "Mileage n/a"} — listed by ${vehicle.showroomName}.`;
   const primaryPhoto = vehicle.photos[0];
+  const dimensions = primaryPhoto ? await probeImageDimensions(primaryPhoto.url) : null;
   return {
     title,
     description,
@@ -74,29 +76,15 @@ export async function generateMetadata({ params }: VehicleDetailPageProps): Prom
       title,
       description,
       url: getVehicleDetailPath(vehicle),
-      // WhatsApp's own link-preview crawler is known to be pickier than
-      // Facebook's/Twitter's about rendering an og:image thumbnail when
-      // width/height/type hints are missing — a plain string URL (as this
-      // was before) omits all three. `type` reflects the real uploaded
-      // file's own extension (not guessed). Per-photo pixel dimensions
-      // aren't stored anywhere, so width/height are a best-effort
-      // landscape-photo hint rather than this exact photo's real size —
-      // crawlers use this as a layout hint, not a strict assertion, and
-      // supplying a reasonable hint is still meaningfully better than
-      // supplying none at all (a plain string image URL, as before).
+      // See probeImageDimensions/mimeTypeFromStoragePath (src/lib/og-image.ts)
+      // for why these come from the real file rather than a guess.
       images: primaryPhoto
-        ? [{ url: primaryPhoto.url, width: 1200, height: 900, type: mimeTypeFromStoragePath(primaryPhoto.url) }]
+        ? [{ url: primaryPhoto.url, ...(dimensions ?? {}), type: mimeTypeFromStoragePath(primaryPhoto.url) }]
         : undefined,
     },
   };
 }
 
-function mimeTypeFromStoragePath(url: string): string {
-  const extension = url.split(".").pop()?.toLowerCase().split(/[?#]/)[0];
-  if (extension === "png") return "image/png";
-  if (extension === "webp") return "image/webp";
-  return "image/jpeg";
-}
 
 export default async function VehicleDetailPage({ params }: VehicleDetailPageProps) {
   const { brand, slug } = await params;
