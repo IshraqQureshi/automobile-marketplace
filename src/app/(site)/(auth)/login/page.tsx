@@ -15,6 +15,11 @@ const HOW_IT_WORKS = [
   { step: "01", title: "Find a Car", description: ["Explore cars from showrooms and dealers on our platform."] },
   { step: "02", title: "Book a Visit", description: ["Book an appointment directly with your selected showroom."] },
   { step: "03", title: "Buy & Lock", description: ["Purchase your selected vehicle and register your transaction with us."] },
+  {
+    step: "04",
+    title: "Upload & Earn",
+    description: ["Buy through our platform. Submit your purchase. Get rewarded."],
+  },
 ] as const;
 
 const REWARD_LINES = ["First Service FREE", "Get KSh 5,000 worth of petrol FREE"] as const;
