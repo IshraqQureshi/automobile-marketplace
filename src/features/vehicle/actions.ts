@@ -38,9 +38,13 @@ function readVehicleFormData(formData: FormData) {
   // added). Down payment/interest/tenure/insurance/tracker are shared
   // config for BOTH installment and bank finance, not installment-only —
   // keying this off installmentEnabled alone wiped them to blank on every
-  // save while installment was off, even with bank finance (which defaults
-  // on) still enabled, silently breaking "Apply for Financing" on the
-  // public page (its own hasRealFinancing check needs this same data).
+  // save while installment was off, even with bank finance still enabled,
+  // silently breaking "Apply for Financing" on the public page (its own
+  // hasRealFinancing check needs this same data). Note: bankFinanceEnabled
+  // defaulting true is only the dashboard form's own new-vehicle default
+  // (vehicle-form.tsx's emptyForm()) — the vehicles.bank_finance_enabled
+  // column itself defaults false, so a vehicle can genuinely have it off
+  // (e.g. a row inserted directly, bypassing the form).
   const financingFieldsActive = installmentEnabled === "true" || bankFinanceEnabled === "true";
 
   return {

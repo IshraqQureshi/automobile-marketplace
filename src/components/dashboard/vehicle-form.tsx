@@ -621,9 +621,11 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
 
         {/* Down payment/interest/tenure/insurance/tracker are shared
             configuration for BOTH HP installment and bank finance, not
-            installment-only — bankFinanceEnabled defaults true (admin-only,
-            no owner checkbox), so this stays visible/editable even with
-            installment off, matching the public page's own
+            installment-only — bankFinanceEnabled defaults true on a new
+            vehicle (emptyForm(), no owner checkbox to change it; note the
+            underlying DB column itself defaults false), so on a normal new
+            listing this stays visible/editable even with installment off,
+            matching the public page's own
             (bankFinanceEnabled || installmentEnabled) gating exactly. */}
         {(form.installmentEnabled || form.bankFinanceEnabled) && (
           <div className="mt-5 grid grid-cols-1 gap-4 border-t border-neutral-100 pt-5 sm:grid-cols-3">

@@ -424,6 +424,51 @@ test("toggling installment off preserves the shared financing fields instead of 
   await expect(page.getByLabel("24 months")).toBeChecked();
 });
 
+// Edge case the previous test can't reach: bank_finance_enabled's real
+// column default is false (the dashboard form's own new-vehicle default of
+// true is a client-side convenience, not a schema-level guarantee — see
+// financingFieldsActive's own comment in src/features/vehicle/actions.ts),
+// so a vehicle can exist with installment on and bank finance genuinely
+// off — e.g. inserted directly, or created before a future admin-only
+// bank-finance toggle exists. Turning installment off here SHOULD hide the
+// Financing section (nothing keeps it active any more), and Save must
+// still succeed cleanly, not get stuck on a stale/invisible field.
+test("a vehicle with bank finance genuinely off can still have installment toggled off and saved, hiding the Financing section", async ({ page }) => {
+  const { data: vehicle, error } = await admin()
+    .from("vehicles")
+    .insert({
+      showroom_id: showroomId,
+      title: "Bank Finance Off Fixture",
+      make: "Fixture",
+      model: "NoBankFinance",
+      year: 2022,
+      price: 1_200_000,
+      installment_enabled: true,
+      bank_finance_enabled: false,
+      financing_down_payment_type: "PERCENT",
+      financing_down_payment_percent: 15,
+      financing_interest_rate: 11,
+      financing_tenure_options_months: [12],
+    })
+    .select("id")
+    .single();
+  if (error || !vehicle) throw error ?? new Error("vehicle not created");
+
+  await loginAsFixtureOwner(page);
+  await page.goto(`/dashboard/vehicles/${vehicle.id}/edit`);
+  await expect(page.getByLabel("Available on installment (HP)")).toBeChecked();
+  await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("11");
+
+  await page.getByLabel("Available on installment (HP)").uncheck();
+  await expect(page.locator("#vehicle-interest-rate-value")).toHaveCount(0);
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Available on installment (HP)")).not.toBeChecked();
+  await expect(page.locator("#vehicle-interest-rate-value")).toHaveCount(0);
+});
+
 test("an approved owner can upload a vehicle photo and it becomes the featured image", async ({ page }) => {
   await loginAsFixtureOwner(page);
   await createVehicleViaForm(page);
