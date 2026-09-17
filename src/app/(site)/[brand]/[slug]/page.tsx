@@ -368,7 +368,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                         className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand hover:bg-[#e0f9f2]"
                       >
                         <BankIcon />
-                        Bank Finance
+                        Apply For Financing
                       </ScrollToSectionLink>
                     )}
                   </div>
