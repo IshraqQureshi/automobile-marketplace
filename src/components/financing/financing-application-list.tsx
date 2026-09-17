@@ -151,6 +151,12 @@ export function FinancingApplicationList({ items, showShowroomColumn = false }: 
                   <p className="text-neutral-800">{selected.desiredTrackerDuration}</p>
                 </div>
               )}
+              {selected.desiredInsuranceType && (
+                <div>
+                  <p className="text-xs font-semibold text-neutral-400 uppercase">Desired Insurance</p>
+                  <p className="text-neutral-800">{selected.desiredInsuranceType === "PSV" ? "PSV" : "Private"}</p>
+                </div>
+              )}
               <div>
                 <p className="text-xs font-semibold text-neutral-400 uppercase">Received</p>
                 <p className="text-neutral-800">{dateFormatter.format(new Date(selected.createdAt))}</p>

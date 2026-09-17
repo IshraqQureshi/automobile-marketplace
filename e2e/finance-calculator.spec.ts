@@ -185,7 +185,9 @@ test("changing loan term and tracker duration recalculates the estimate instantl
   expect(parseCurrency(totalPayableText ?? "")).toBe(expected.totalPayable);
 });
 
-test("a vehicle with no financing configured shows the honest empty state, not a fabricated estimate", async ({ page }) => {
+test("a vehicle with installment enabled but no other financing data configured shows the honest empty state, not a fabricated estimate", async ({
+  page,
+}) => {
   const supabase = admin();
   const { data: plainVehicle, error } = await supabase
     .from("vehicles")
@@ -197,6 +199,7 @@ test("a vehicle with no financing configured shows the honest empty state, not a
       year: 2020,
       price: 1_500_000,
       status: "ACTIVE",
+      installment_enabled: true,
     })
     .select("id")
     .single();
@@ -208,5 +211,57 @@ test("a vehicle with no financing configured shows the honest empty state, not a
     await expect(page.getByText("Financing details not provided for this listing")).toBeVisible();
   } finally {
     await supabase.from("vehicles").delete().eq("id", plainVehicle.id);
+  }
+});
+
+// Client feedback: "If Finance calculator is disable from the showroom
+// admin panel then on frontend its section should be hidden" —
+// installmentEnabled (the dashboard's "Available on installment (HP)"
+// checkbox) is that toggle. Before this fix, the section stayed visible
+// whenever bankFinanceEnabled was also on (it defaults true, admin-only),
+// even with installment explicitly off.
+test("the Financing Calculator section is hidden entirely (not an empty state) when installment is disabled, even with bank finance still enabled", async ({
+  page,
+}) => {
+  const supabase = admin();
+  const { data: installmentOffVehicle, error } = await supabase
+    .from("vehicles")
+    .insert({
+      showroom_id: showroomId,
+      title: `E2E Finance Installment Off Vehicle ${unique}`,
+      make: `E2efinanceoff${unique}`,
+      model: "Epsilon",
+      year: 2021,
+      price: 1_800_000,
+      status: "ACTIVE",
+      installment_enabled: false,
+      bank_finance_enabled: true,
+      financing_down_payment_type: "PERCENT",
+      financing_down_payment_percent: DOWN_PAYMENT_PERCENT,
+      financing_interest_rate: INTEREST_RATE,
+      financing_tenure_options_months: TENURE_OPTIONS,
+    })
+    .select("id")
+    .single();
+  if (error || !installmentOffVehicle) throw error ?? new Error("installment-off vehicle not created");
+
+  try {
+    await page.goto(`/e2efinanceoff${unique}/epsilon-${installmentOffVehicle.id}`);
+    // Section (including its own heading) is absent entirely — not the
+    // "not provided" empty state, which would be misleading here since
+    // financing genuinely IS configured, just not via HP installment.
+    await expect(page.getByRole("heading", { name: "Financing Calculator" })).toHaveCount(0);
+    await expect(page.getByText("Financing details not provided for this listing")).toHaveCount(0);
+
+    // Apply for Financing must stay visible — bank finance is still on.
+    await expect(page.getByRole("button", { name: "Apply for Financing" })).toBeVisible();
+    // Bank Finance still scrolls somewhere real (the Apply section), not to
+    // a now-missing #financing-calculator anchor.
+    await page.getByRole("link", { name: "Bank Finance", exact: true }).click();
+    await expect(async () => {
+      expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    }).toPass({ timeout: 2000 });
+  } finally {
+    await supabase.from("vehicles").delete().eq("id", installmentOffVehicle.id);
   }
 });

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   financingDesiredDownPaymentSchema,
+  financingDesiredInsuranceTypeSchema,
   financingDesiredTenureMonthsSchema,
+  financingDesiredTrackerDurationSchema,
   financingEmploymentStatusSchema,
   financingMonthlyIncomeSchema,
   financingNationalIdSchema,
@@ -117,5 +119,53 @@ describe("financingNotesSchema", () => {
 
   it("rejects notes over 1000 characters", () => {
     expect(financingNotesSchema.safeParse("a".repeat(1001)).success).toBe(false);
+  });
+});
+
+describe("financingDesiredInsuranceTypeSchema", () => {
+  it("accepts PSV", () => {
+    const result = financingDesiredInsuranceTypeSchema.safeParse("PSV");
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBe("PSV");
+  });
+
+  it("accepts PRIVATE", () => {
+    const result = financingDesiredInsuranceTypeSchema.safeParse("PRIVATE");
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBe("PRIVATE");
+  });
+
+  it("treats a blank string as unset (undefined), not an error — a vehicle with only one insurance rate configured has nothing to pick", () => {
+    const result = financingDesiredInsuranceTypeSchema.safeParse("");
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBeUndefined();
+  });
+
+  it("treats a missing value as unset, not an error", () => {
+    const result = financingDesiredInsuranceTypeSchema.safeParse(undefined);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBeUndefined();
+  });
+
+  it("rejects an invalid insurance type", () => {
+    expect(financingDesiredInsuranceTypeSchema.safeParse("COMPREHENSIVE").success).toBe(false);
+  });
+});
+
+// Regression guard: this schema shipped before the one above, in the exact
+// same optional-label shape — asserting both stay consistent so a future
+// edit to one doesn't accidentally diverge the other's "blank means unset"
+// convention.
+describe("financingDesiredTrackerDurationSchema", () => {
+  it("treats a blank string as unset", () => {
+    const result = financingDesiredTrackerDurationSchema.safeParse("");
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBeUndefined();
+  });
+
+  it("accepts a real duration label", () => {
+    const result = financingDesiredTrackerDurationSchema.safeParse("2 Years");
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBe("2 Years");
   });
 });

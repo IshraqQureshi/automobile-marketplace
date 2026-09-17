@@ -359,8 +359,12 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                       </ScrollToSectionLink>
                     )}
                     {vehicle.bankFinanceEnabled && (
+                      // Targets the Apply section, not financing-calculator
+                      // — that section only renders when installmentEnabled
+                      // is on (see above), so a bank-finance-only listing
+                      // would have nothing for this link to scroll to.
                       <ScrollToSectionLink
-                        targetId="financing-calculator"
+                        targetId="apply-for-financing"
                         className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand hover:bg-[#e0f9f2]"
                       >
                         <BankIcon />
@@ -403,31 +407,41 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
             </section>
           )}
 
-          <section id="financing-calculator" className="mb-10 scroll-mt-20">
-            <h2 className="mb-5 text-lg font-bold tracking-tight text-neutral-900">Financing Calculator</h2>
-            {hasRealFinancing ? (
-              <FinancingCalculator
-                price={vehicle.price}
-                downPaymentType={vehicle.financingDownPaymentType}
-                downPaymentPercent={vehicle.financingDownPaymentPercent}
-                downPaymentAmount={vehicle.financingDownPaymentAmount}
-                interestRateType={vehicle.financingInterestRateType}
-                interestRatePercentPerYear={vehicle.financingInterestRate ?? 0}
-                interestRateAmount={vehicle.financingInterestRateAmount}
-                insurancePercentPsv={vehicle.financingInsurancePercentPsv}
-                insurancePercentPrivate={vehicle.financingInsurancePercentPrivate}
-                trackerOptions={vehicle.financingTrackerOptions ?? []}
-                tenureOptionsMonths={vehicle.financingTenureMonths!}
-              />
-            ) : (
-              <div className="rounded-xl border border-dashed border-neutral-300 bg-white px-6 py-10 text-center">
-                <p className="text-sm font-medium text-neutral-500">Financing details not provided for this listing</p>
-                <p className="mt-1 text-xs text-neutral-400">Contact the showroom directly to ask about financing options.</p>
-              </div>
-            )}
-          </section>
+          {/* The calculator specifically models the HP/installment scenario
+              (down payment + tracker + insurance apportioned over a loan
+              term) — gated on installmentEnabled alone, not bankFinanceEnabled
+              too, so a showroom that only offers bank finance (installment
+              off) doesn't show an HP-shaped estimate that doesn't apply to
+              them. Apply for Financing below is intentionally NOT gated by
+              installmentEnabled — a bank-finance-only listing can still take
+              applications, per direct client feedback. */}
+          {vehicle.installmentEnabled && (
+            <section id="financing-calculator" className="mb-10 scroll-mt-20">
+              <h2 className="mb-5 text-lg font-bold tracking-tight text-neutral-900">Financing Calculator</h2>
+              {hasRealFinancing ? (
+                <FinancingCalculator
+                  price={vehicle.price}
+                  downPaymentType={vehicle.financingDownPaymentType}
+                  downPaymentPercent={vehicle.financingDownPaymentPercent}
+                  downPaymentAmount={vehicle.financingDownPaymentAmount}
+                  interestRateType={vehicle.financingInterestRateType}
+                  interestRatePercentPerYear={vehicle.financingInterestRate ?? 0}
+                  interestRateAmount={vehicle.financingInterestRateAmount}
+                  insurancePercentPsv={vehicle.financingInsurancePercentPsv}
+                  insurancePercentPrivate={vehicle.financingInsurancePercentPrivate}
+                  trackerOptions={vehicle.financingTrackerOptions ?? []}
+                  tenureOptionsMonths={vehicle.financingTenureMonths!}
+                />
+              ) : (
+                <div className="rounded-xl border border-dashed border-neutral-300 bg-white px-6 py-10 text-center">
+                  <p className="text-sm font-medium text-neutral-500">Financing details not provided for this listing</p>
+                  <p className="mt-1 text-xs text-neutral-400">Contact the showroom directly to ask about financing options.</p>
+                </div>
+              )}
+            </section>
+          )}
 
-          <section className="mb-10">
+          <section id="apply-for-financing" className="mb-10 scroll-mt-20">
             <div
               className="flex flex-col items-start justify-between gap-6 rounded-xl p-6 sm:flex-row sm:items-center"
               style={{ background: "linear-gradient(135deg, #004d49 0%, #007f77 100%)" }}
@@ -450,6 +464,11 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                   downPaymentType={vehicle.financingDownPaymentType}
                   downPaymentPercent={vehicle.financingDownPaymentPercent}
                   defaultDesiredDownPayment={defaultDesiredDownPayment}
+                  interestRateType={vehicle.financingInterestRateType}
+                  interestRatePercentPerYear={vehicle.financingInterestRate ?? 0}
+                  interestRateAmount={vehicle.financingInterestRateAmount}
+                  insurancePercentPsv={vehicle.financingInsurancePercentPsv}
+                  insurancePercentPrivate={vehicle.financingInsurancePercentPrivate}
                   tenureOptionsMonths={vehicle.financingTenureMonths!}
                   trackerOptions={vehicle.financingTrackerOptions ?? []}
                 />

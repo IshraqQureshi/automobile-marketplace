@@ -251,6 +251,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           desired_down_payment: number
+          desired_insurance_type: string | null
           desired_tenure_months: number
           desired_tracker_duration: string | null
           employment_status: string
@@ -269,6 +270,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           desired_down_payment: number
+          desired_insurance_type?: string | null
           desired_tenure_months: number
           desired_tracker_duration?: string | null
           employment_status: string
@@ -287,6 +289,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           desired_down_payment?: number
+          desired_insurance_type?: string | null
           desired_tenure_months?: number
           desired_tracker_duration?: string | null
           employment_status?: string

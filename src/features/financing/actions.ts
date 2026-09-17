@@ -43,6 +43,7 @@ export async function submitFinancingApplicationAction(formData: FormData): Prom
   const desiredDownPaymentResult = financingApplicationFieldSchemas.desiredDownPayment.safeParse(formData.get("desiredDownPayment"));
   const desiredTenureMonthsResult = financingApplicationFieldSchemas.desiredTenureMonths.safeParse(formData.get("desiredTenureMonths"));
   const desiredTrackerDurationResult = financingApplicationFieldSchemas.desiredTrackerDuration.safeParse(formData.get("desiredTrackerDuration"));
+  const desiredInsuranceTypeResult = financingApplicationFieldSchemas.desiredInsuranceType.safeParse(formData.get("desiredInsuranceType"));
   const notesResult = financingApplicationFieldSchemas.notes.safeParse(formData.get("notes"));
 
   const fieldErrors: Record<string, string> = {};
@@ -104,6 +105,7 @@ export async function submitFinancingApplicationAction(formData: FormData): Prom
     desired_down_payment: desiredDownPaymentResult.data,
     desired_tenure_months: desiredTenureMonthsResult.data,
     desired_tracker_duration: desiredTrackerDurationResult.data ?? null,
+    desired_insurance_type: desiredInsuranceTypeResult.data ?? null,
     notes: notesResult.data ?? null,
   });
   if (insertError) {

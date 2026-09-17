@@ -24,6 +24,11 @@ interface FinancingApplicationButtonProps {
   downPaymentType: "PERCENT" | "FIXED";
   downPaymentPercent: number | null;
   defaultDesiredDownPayment: number;
+  interestRateType: "PERCENT" | "FIXED";
+  interestRatePercentPerYear: number;
+  interestRateAmount: number | null;
+  insurancePercentPsv: number | null;
+  insurancePercentPrivate: number | null;
   tenureOptionsMonths: number[];
   trackerOptions: { duration: string; price: number }[];
 }
@@ -55,6 +60,11 @@ export function FinancingApplicationButton({
   downPaymentType,
   downPaymentPercent,
   defaultDesiredDownPayment,
+  interestRateType,
+  interestRatePercentPerYear,
+  interestRateAmount,
+  insurancePercentPsv,
+  insurancePercentPrivate,
   tenureOptionsMonths,
   trackerOptions,
 }: FinancingApplicationButtonProps) {
@@ -77,6 +87,10 @@ export function FinancingApplicationButton({
   const [desiredDownPaymentAmount, setDesiredDownPaymentAmount] = useState(String(Math.round(defaultDesiredDownPayment)));
   const [desiredTenureMonths, setDesiredTenureMonths] = useState(String(tenureOptionsMonths[0] ?? ""));
   const [desiredTrackerDuration, setDesiredTrackerDuration] = useState(trackerOptions[0]?.duration ?? "");
+  const bothInsuranceTypesAvailable = insurancePercentPsv != null && insurancePercentPrivate != null;
+  const hasInsurance = insurancePercentPsv != null || insurancePercentPrivate != null;
+  // Same "PSV wins when both are configured" default as FinancingCalculator.
+  const [insuranceType, setInsuranceType] = useState<"PSV" | "PRIVATE">(insurancePercentPsv != null ? "PSV" : "PRIVATE");
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string>>({});
@@ -135,6 +149,7 @@ export function FinancingApplicationButton({
     formData.set("desiredDownPayment", String(desiredDownPaymentKes));
     formData.set("desiredTenureMonths", desiredTenureMonths);
     formData.set("desiredTrackerDuration", desiredTrackerDuration);
+    formData.set("desiredInsuranceType", hasInsurance ? insuranceType : "");
     formData.set("notes", notes);
 
     startTransition(async () => {
@@ -340,6 +355,38 @@ export function FinancingApplicationButton({
                   </select>
                 </div>
               )}
+
+              {hasInsurance && (
+                <div>
+                  <FieldLabel htmlFor="financing-insurance-type">Desired Insurance</FieldLabel>
+                  {bothInsuranceTypesAvailable ? (
+                    <select
+                      id="financing-insurance-type"
+                      value={insuranceType}
+                      onChange={(e) => setInsuranceType(e.target.value as "PSV" | "PRIVATE")}
+                      className="w-full rounded-md border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                    >
+                      <option value="PSV">PSV — {insurancePercentPsv}%</option>
+                      <option value="PRIVATE">Private — {insurancePercentPrivate}%</option>
+                    </select>
+                  ) : (
+                    <p className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-700">
+                      {insurancePercentPsv != null ? `PSV — ${insurancePercentPsv}%` : `Private — ${insurancePercentPrivate}%`}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Interest isn't a choice the applicant makes (it's the
+                  showroom's own fixed rate for this vehicle, same as the
+                  calculator's own display) — shown read-only so the
+                  application reflects the exact rate they were quoted. */}
+              <div>
+                <FieldLabel htmlFor="financing-interest-rate">Interest Rate</FieldLabel>
+                <p id="financing-interest-rate" className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-700">
+                  {interestRateType === "PERCENT" ? `${interestRatePercentPerYear}% per year` : currencyFormatter.format(interestRateAmount ?? 0)}
+                </p>
+              </div>
             </div>
 
             <div>

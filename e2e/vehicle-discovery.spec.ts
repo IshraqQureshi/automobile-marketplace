@@ -197,9 +197,13 @@ test("clicking a vehicle card opens its /{brand}/{slug} detail page with real sp
   await expect(page.getByRole("button", { name: "Send Message" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "WhatsApp" })).toBeDisabled();
 
-  // Real, honest empty state — no fabricated financing figures for a
-  // listing that never had financing fields configured.
-  await expect(page.getByText("Financing details not provided for this listing")).toBeVisible();
+  // The Financing Calculator section is gated on installmentEnabled (see
+  // e2e/finance-calculator.spec.ts's own dedicated "hidden entirely when
+  // installment is disabled" test) — this fixture vehicle never enabled
+  // it, so the section (including its heading) is absent entirely rather
+  // than showing an empty-state placeholder.
+  await expect(page.getByRole("heading", { name: "Financing Calculator" })).toHaveCount(0);
+  await expect(page.getByText("Financing details not provided for this listing")).toHaveCount(0);
 });
 
 test("the Share button opens a popover with every direct-share option", async ({ page }) => {
