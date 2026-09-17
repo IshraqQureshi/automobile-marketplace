@@ -225,20 +225,26 @@ test("the desired insurance type (matching the calculator's own selector) can be
   expect(data?.desired_insurance_type).toBe("PRIVATE");
 });
 
-test("the interest rate is shown read-only, matching the vehicle's own configured rate, and isn't a real form field", async ({ page }) => {
+test("the interest rate is a fixed 24% standard rate, not the vehicle's own configured calculator rate, and isn't a real form field", async ({
+  page,
+}) => {
   await page.goto(vehiclePath);
   await page.getByRole("button", { name: "Apply for Financing" }).click();
 
-  // The fixture vehicle's financing_interest_rate is 13 (PERCENT type,
-  // the default) — a static display, not an <input>/<select> the
-  // applicant can change.
-  await expect(page.getByText("13% per year", { exact: true })).toBeVisible();
+  // Client feedback: the application should always quote a flat 24% rate
+  // regardless of the vehicle's own configured rate (the fixture's
+  // financing_interest_rate is 13, which the calculator on the same page
+  // still correctly shows — only the application form is fixed at 24%) —
+  // a static display, not an <input>/<select> the applicant can change.
+  await expect(page.getByRole("dialog").getByText("24% per year", { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog").getByText("13% per year", { exact: true })).toHaveCount(0);
 
   // Client feedback: the percentage alone wasn't enough — the computed
   // total-interest KES amount must show too, using the same real formula
-  // the calculator itself uses (loanAmount × rate × tenure/12). Defaults:
-  // 10% down payment (loan 1,800,000) × 13% × (12/12 months) = 234,000.
-  await expect(page.getByRole("dialog").getByText("Ksh 234,000", { exact: false })).toBeVisible();
+  // the calculator itself uses (loanAmount × rate × tenure/12), with the
+  // fixed 24% rate. Defaults: 10% down payment (loan 1,800,000) × 24% ×
+  // (12/12 months) = 432,000.
+  await expect(page.getByRole("dialog").getByText("Ksh 432,000", { exact: false })).toBeVisible();
 });
 
 test("a blank desired down payment percent is rejected, not silently treated as 0%", async ({ page }) => {
