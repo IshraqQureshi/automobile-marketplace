@@ -467,10 +467,16 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                   interestRateType={vehicle.financingInterestRateType}
                   interestRatePercentPerYear={vehicle.financingInterestRate ?? 0}
                   interestRateAmount={vehicle.financingInterestRateAmount}
-                  insurancePercentPsv={vehicle.financingInsurancePercentPsv}
-                  insurancePercentPrivate={vehicle.financingInsurancePercentPrivate}
+                  // Tracker and insurance are HP/installment add-ons the
+                  // Financing Calculator introduced — when installment is
+                  // off (calculator hidden, see above), a bank-finance-only
+                  // applicant shouldn't be offered choices that don't apply
+                  // to them, even though Apply for Financing itself stays
+                  // available.
+                  insurancePercentPsv={vehicle.installmentEnabled ? vehicle.financingInsurancePercentPsv : null}
+                  insurancePercentPrivate={vehicle.installmentEnabled ? vehicle.financingInsurancePercentPrivate : null}
                   tenureOptionsMonths={vehicle.financingTenureMonths!}
-                  trackerOptions={vehicle.financingTrackerOptions ?? []}
+                  trackerOptions={vehicle.installmentEnabled ? (vehicle.financingTrackerOptions ?? []) : []}
                 />
               ) : (
                 <button
