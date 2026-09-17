@@ -240,6 +240,12 @@ test("the Financing Calculator section is hidden entirely (not an empty state) w
       financing_down_payment_percent: DOWN_PAYMENT_PERCENT,
       financing_interest_rate: INTEREST_RATE,
       financing_tenure_options_months: TENURE_OPTIONS,
+      // Configured deliberately, to prove Desired Tracker/Desired
+      // Insurance don't show on Apply for Financing when installment is
+      // off — not merely absent because this vehicle never had them.
+      financing_insurance_percent_psv: INSURANCE_PERCENT_PSV,
+      financing_insurance_percent_private: INSURANCE_PERCENT_PRIVATE,
+      financing_tracker_options: TRACKER_OPTIONS,
     })
     .select("id")
     .single();
@@ -261,6 +267,19 @@ test("the Financing Calculator section is hidden entirely (not an empty state) w
     await expect(async () => {
       expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     }).toPass({ timeout: 2000 });
+
+    // Client feedback: "if financing calculator is disable from backend
+    // then apply for finance form should not show the Desired Tracker and
+    // Desired Insurance fields" — this vehicle has both configured, but
+    // they're HP-installment add-ons the calculator introduced, so a
+    // bank-finance-only applicant shouldn't see them. Down payment,
+    // tenure, and interest rate are unaffected.
+    await page.getByRole("button", { name: "Apply for Financing" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel("Desired Tracker")).toHaveCount(0);
+    await expect(dialog.getByLabel("Desired Insurance")).toHaveCount(0);
+    await expect(dialog.getByLabel("Desired Loan Term")).toBeVisible();
+    await expect(dialog.locator("#financing-interest-rate")).toBeVisible();
   } finally {
     await supabase.from("vehicles").delete().eq("id", installmentOffVehicle.id);
   }
