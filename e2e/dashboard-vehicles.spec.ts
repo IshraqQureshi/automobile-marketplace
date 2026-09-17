@@ -386,18 +386,17 @@ test("specification and financing fields save and reload correctly", async ({ pa
   await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("50000");
 });
 
-// Client feedback: "when Available on installment (HP) is disable from the
-// backend the Apply for finance option is also disable make it enable" —
-// root cause was that the Financing section (down payment/interest/
-// tenure/insurance/tracker) used to be shown/saved only while installment
-// was checked, so unchecking it blanked those shared fields on the very
-// next save even though bank finance (which defaults on, no owner
-// checkbox) was still enabled — and the public page's Apply for Financing
-// needs that same data. The section now stays visible/active whenever
-// EITHER installment or bank finance is on, so this data survives.
-test("toggling installment off preserves the shared financing fields instead of wiping them, since bank finance stays on by default", async ({
-  page,
-}) => {
+// Client feedback (direct follow-up, reverting an earlier fix's UI choice):
+// "When this option is unchecked the financing field should be hidden."
+// Unchecking "Available on installment (HP)" hides the whole Financing
+// section again (its inputs are gone from the DOM, not just visually
+// dimmed) — but this is a pure UI change, not a data-loss one: the
+// server-side blanking guard (financingFieldsActive in
+// src/features/vehicle/actions.ts) still keys off installmentEnabled OR
+// bankFinanceEnabled, so a vehicle with bank finance still on keeps its
+// saved values even while the section is hidden — re-checking the box
+// brings them back, unchanged.
+test("unchecking installment hides the Financing section, but re-checking it brings the saved values back unchanged", async ({ page }) => {
   await loginAsFixtureOwner(page);
   await createVehicleViaForm(page);
 
@@ -409,16 +408,19 @@ test("toggling installment off preserves the shared financing fields instead of 
   await expect(page.getByText("Vehicle updated.")).toBeVisible();
 
   await page.getByLabel("Available on installment (HP)").uncheck();
-  // The Financing section — and the values already in it — must stay
-  // visible and intact (bank finance is still on), not disappear/reset.
-  await expect(page.locator("#vehicle-interest-rate-value")).toBeVisible();
-  await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("13.5");
+  await expect(page.locator("#vehicle-interest-rate-value")).toHaveCount(0);
   await page.locator("#vehicle-doors").fill("4");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Vehicle updated.")).toBeVisible();
 
   await page.reload();
   await expect(page.getByLabel("Available on installment (HP)")).not.toBeChecked();
+  await expect(page.locator("#vehicle-interest-rate-value")).toHaveCount(0);
+
+  // Bank finance (default on, no owner checkbox) kept the underlying data
+  // alive server-side — re-checking installment re-reveals the exact
+  // values saved before, proving they were never wiped.
+  await page.getByLabel("Available on installment (HP)").check();
   await expect(page.locator("#vehicle-down-payment-value")).toHaveValue("20");
   await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("13.5");
   await expect(page.getByLabel("24 months")).toBeChecked();

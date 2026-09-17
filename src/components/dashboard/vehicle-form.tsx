@@ -175,12 +175,13 @@ const VALIDATED_FIELDS = [
 ] as const;
 
 // Validated separately, and only when the Financing section is actually
-// visible (installmentEnabled or bankFinanceEnabled — see
-// financingFieldsActive in handleSubmit) — these fields' only inputs and
-// error text live inside that conditionally-rendered section, so
-// validating them unconditionally could block Save on a field the user can
-// no longer see or fix (confirmed live: toggling installment off after
-// typing an invalid value there left Save silently doing nothing).
+// visible (form.installmentEnabled) — these fields' only inputs and error
+// text live inside that conditionally-rendered section, so validating them
+// unconditionally could block Save on a field the user can no longer see
+// or fix (confirmed live: toggling installment off after typing an invalid
+// value there left Save silently doing nothing). financingPartner isn't
+// listed here — its own input is hidden entirely (direct request), so it's
+// never user-visible to validate.
 const FINANCING_VALIDATED_FIELDS = [
   "financingDownPaymentPercent",
   "financingDownPaymentAmount",
@@ -188,7 +189,6 @@ const FINANCING_VALIDATED_FIELDS = [
   "financingInterestRateAmount",
   "financingInsurancePercentPsv",
   "financingInsurancePercentPrivate",
-  "financingPartner",
   "financingTracker1YearPrice",
   "financingTracker2YearPrice",
   "financingTracker3YearPrice",
@@ -250,8 +250,11 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
     setFormError(null);
 
     let hasError = false;
-    const financingFieldsActive = form.installmentEnabled || form.bankFinanceEnabled;
-    const fieldsToValidate: readonly ((typeof VALIDATED_FIELDS)[number] | (typeof FINANCING_VALIDATED_FIELDS)[number])[] = financingFieldsActive
+    // Only validates fields whose inputs are actually visible right now
+    // (see the Financing section's own render gate above) — form.* still
+    // holds whatever was last saved for a hidden field, but the user has
+    // no way to see or fix a validation error on it.
+    const fieldsToValidate: readonly ((typeof VALIDATED_FIELDS)[number] | (typeof FINANCING_VALIDATED_FIELDS)[number])[] = form.installmentEnabled
       ? [...VALIDATED_FIELDS, ...FINANCING_VALIDATED_FIELDS]
       : VALIDATED_FIELDS;
     for (const field of fieldsToValidate) {
@@ -619,15 +622,16 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
           </label>
         </div>
 
-        {/* Down payment/interest/tenure/insurance/tracker are shared
-            configuration for BOTH HP installment and bank finance, not
-            installment-only — bankFinanceEnabled defaults true on a new
-            vehicle (emptyForm(), no owner checkbox to change it; note the
-            underlying DB column itself defaults false), so on a normal new
-            listing this stays visible/editable even with installment off,
-            matching the public page's own
-            (bankFinanceEnabled || installmentEnabled) gating exactly. */}
-        {(form.installmentEnabled || form.bankFinanceEnabled) && (
+        {/* Direct request: hide these fields entirely when installment is
+            unchecked, not just when bank finance is also off. The
+            underlying saved values are NOT wiped by hiding them — they
+            stay in React state (form.*) and are still submitted as-is on
+            Save (see financingFieldsActive's own comment in
+            src/features/vehicle/actions.ts, which independently keys the
+            server-side blanking guard off installmentEnabled OR
+            bankFinanceEnabled) — so Apply for Financing on the public page
+            still has the data it needs even while this section is hidden. */}
+        {form.installmentEnabled && (
           <div className="mt-5 grid grid-cols-1 gap-4 border-t border-neutral-100 pt-5 sm:grid-cols-3">
             <div className="sm:col-span-2">
               <FieldLabel htmlFor="vehicle-down-payment-value">Deposit</FieldLabel>
@@ -717,36 +721,10 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
               )}
             </div>
 
-            <div>
-              <FieldLabel htmlFor="vehicle-insurance-percent-psv">Insurance — PSV, % of price</FieldLabel>
-              <Input
-                id="vehicle-insurance-percent-psv"
-                inputMode="decimal"
-                value={form.financingInsurancePercentPsv}
-                onChange={(e) => setField("financingInsurancePercentPsv", e.target.value)}
-                onBlur={(e) => validate("financingInsurancePercentPsv", e.target.value)}
-                placeholder="e.g. 4.5"
-                error={!!errorFor("financingInsurancePercentPsv")}
-              />
-              {errorFor("financingInsurancePercentPsv") && <p className="mt-1 text-sm text-red-600">{errorFor("financingInsurancePercentPsv")}</p>}
-            </div>
-
-            <div>
-              <FieldLabel htmlFor="vehicle-insurance-percent-private">Insurance — Private, % of price</FieldLabel>
-              <Input
-                id="vehicle-insurance-percent-private"
-                inputMode="decimal"
-                value={form.financingInsurancePercentPrivate}
-                onChange={(e) => setField("financingInsurancePercentPrivate", e.target.value)}
-                onBlur={(e) => validate("financingInsurancePercentPrivate", e.target.value)}
-                placeholder="e.g. 3.5"
-                error={!!errorFor("financingInsurancePercentPrivate")}
-              />
-              {errorFor("financingInsurancePercentPrivate") && (
-                <p className="mt-1 text-sm text-red-600">{errorFor("financingInsurancePercentPrivate")}</p>
-              )}
-            </div>
-
+            {/* Reordered (moved up from after Insurance) so all three
+                tracker fields land together in one row of this 3-column
+                grid — direct request — rather than splitting across two
+                rows as an artifact of the Deposit field's own col-span-2. */}
             <div>
               <FieldLabel htmlFor="vehicle-tracker-1yr">Tracker fee — 1 year (KES, optional)</FieldLabel>
               <Input
@@ -790,17 +768,39 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
             </div>
 
             <div>
-              <FieldLabel htmlFor="vehicle-financing-partner">Financing partner (optional)</FieldLabel>
+              <FieldLabel htmlFor="vehicle-insurance-percent-psv">Insurance — PSV, % of price</FieldLabel>
               <Input
-                id="vehicle-financing-partner"
-                value={form.financingPartner}
-                onChange={(e) => setField("financingPartner", e.target.value)}
-                onBlur={(e) => validate("financingPartner", e.target.value)}
-                placeholder="e.g. KCB Bank"
-                error={!!errorFor("financingPartner")}
+                id="vehicle-insurance-percent-psv"
+                inputMode="decimal"
+                value={form.financingInsurancePercentPsv}
+                onChange={(e) => setField("financingInsurancePercentPsv", e.target.value)}
+                onBlur={(e) => validate("financingInsurancePercentPsv", e.target.value)}
+                placeholder="e.g. 4.5"
+                error={!!errorFor("financingInsurancePercentPsv")}
               />
-              {errorFor("financingPartner") && <p className="mt-1 text-sm text-red-600">{errorFor("financingPartner")}</p>}
+              {errorFor("financingInsurancePercentPsv") && <p className="mt-1 text-sm text-red-600">{errorFor("financingInsurancePercentPsv")}</p>}
             </div>
+
+            <div>
+              <FieldLabel htmlFor="vehicle-insurance-percent-private">Insurance — Private, % of price</FieldLabel>
+              <Input
+                id="vehicle-insurance-percent-private"
+                inputMode="decimal"
+                value={form.financingInsurancePercentPrivate}
+                onChange={(e) => setField("financingInsurancePercentPrivate", e.target.value)}
+                onBlur={(e) => validate("financingInsurancePercentPrivate", e.target.value)}
+                placeholder="e.g. 3.5"
+                error={!!errorFor("financingInsurancePercentPrivate")}
+              />
+              {errorFor("financingInsurancePercentPrivate") && (
+                <p className="mt-1 text-sm text-red-600">{errorFor("financingInsurancePercentPrivate")}</p>
+              )}
+            </div>
+
+            {/* Financing partner field is hidden per direct request — its
+                state/schema/DB column are untouched, so any value a vehicle
+                already has keeps saving/loading correctly, it's just no
+                longer user-editable through this form. */}
 
             <div className="sm:col-span-3">
               <FieldLabel htmlFor="vehicle-tenure-12">Loan term (optional)</FieldLabel>
