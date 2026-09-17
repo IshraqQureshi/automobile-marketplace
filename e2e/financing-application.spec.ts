@@ -202,7 +202,16 @@ test("the desired insurance type (matching the calculator's own selector) can be
   // Both PSV (4.5%) and Private (3%) are configured on the fixture vehicle
   // — defaults to PSV, matching FinancingCalculator's own default.
   await expect(page.getByLabel("Desired Insurance")).toHaveValue("PSV");
+  // Client feedback: the percentage alone wasn't enough — the computed KES
+  // amount (price 2,000,000 × 4.5%) must show too, same as Desired Down
+  // Payment's own "≈ Ksh X" convention. Scoped to the dialog specifically
+  // — the Financing Calculator on the same page can coincidentally show
+  // the same figure for its own (independent) default selection.
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Ksh 90,000", { exact: false })).toBeVisible();
   await page.getByLabel("Desired Insurance").selectOption("PRIVATE");
+  // Recomputes instantly when the selection changes (2,000,000 × 3%).
+  await expect(dialog.getByText("Ksh 60,000", { exact: false })).toBeVisible();
   await fillFinancingForm(page, { email: `insurance-choice-${unique}@example.com` });
   await page.getByRole("button", { name: "Submit Application" }).click();
 
@@ -224,6 +233,12 @@ test("the interest rate is shown read-only, matching the vehicle's own configure
   // the default) — a static display, not an <input>/<select> the
   // applicant can change.
   await expect(page.getByText("13% per year", { exact: true })).toBeVisible();
+
+  // Client feedback: the percentage alone wasn't enough — the computed
+  // total-interest KES amount must show too, using the same real formula
+  // the calculator itself uses (loanAmount × rate × tenure/12). Defaults:
+  // 10% down payment (loan 1,800,000) × 13% × (12/12 months) = 234,000.
+  await expect(page.getByRole("dialog").getByText("Ksh 234,000", { exact: false })).toBeVisible();
 });
 
 test("a blank desired down payment percent is rejected, not silently treated as 0%", async ({ page }) => {

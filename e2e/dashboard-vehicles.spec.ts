@@ -386,16 +386,42 @@ test("specification and financing fields save and reload correctly", async ({ pa
   await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("50000");
 });
 
-test("an invalid financing field left over after disabling installment doesn't silently block Save", async ({ page }) => {
+// Client feedback: "when Available on installment (HP) is disable from the
+// backend the Apply for finance option is also disable make it enable" —
+// root cause was that the Financing section (down payment/interest/
+// tenure/insurance/tracker) used to be shown/saved only while installment
+// was checked, so unchecking it blanked those shared fields on the very
+// next save even though bank finance (which defaults on, no owner
+// checkbox) was still enabled — and the public page's Apply for Financing
+// needs that same data. The section now stays visible/active whenever
+// EITHER installment or bank finance is on, so this data survives.
+test("toggling installment off preserves the shared financing fields instead of wiping them, since bank finance stays on by default", async ({
+  page,
+}) => {
   await loginAsFixtureOwner(page);
   await createVehicleViaForm(page);
 
   await page.getByLabel("Available on installment (HP)").check();
-  await page.locator("#vehicle-interest-rate-value").fill("-5");
+  await page.locator("#vehicle-down-payment-value").fill("20");
+  await page.locator("#vehicle-interest-rate-value").fill("13.5");
+  await page.getByLabel("24 months").check();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
   await page.getByLabel("Available on installment (HP)").uncheck();
+  // The Financing section — and the values already in it — must stay
+  // visible and intact (bank finance is still on), not disappear/reset.
+  await expect(page.locator("#vehicle-interest-rate-value")).toBeVisible();
+  await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("13.5");
   await page.locator("#vehicle-doors").fill("4");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Vehicle updated.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Available on installment (HP)")).not.toBeChecked();
+  await expect(page.locator("#vehicle-down-payment-value")).toHaveValue("20");
+  await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("13.5");
+  await expect(page.getByLabel("24 months")).toBeChecked();
 });
 
 test("an approved owner can upload a vehicle photo and it becomes the featured image", async ({ page }) => {

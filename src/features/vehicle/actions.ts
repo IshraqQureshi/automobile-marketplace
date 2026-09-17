@@ -28,13 +28,20 @@ const NO_SHOWROOM_ERROR = "No showroom found for your account.";
 
 function readVehicleFormData(formData: FormData) {
   const installmentEnabled = String(formData.get("installmentEnabled") ?? "");
+  const bankFinanceEnabled = String(formData.get("bankFinanceEnabled") ?? "");
   // The Financing section (and its own validation errors) is only rendered
-  // in the UI while "Available on installment" is checked — a value left
-  // over from before the owner unchecked it must not block saving, or the
-  // server would reject a submission the user has no visible field left to
-  // fix (confirmed live: an invalid financing value + installment
-  // unchecked silently failed to save before this blanking was added).
-  const financingFieldsActive = installmentEnabled === "true";
+  // in the UI while EITHER "Available on installment" or bank finance is
+  // on — a value left over from a state where neither is active must not
+  // block saving, or the server would reject a submission the user has no
+  // visible field left to fix (confirmed live: an invalid financing value +
+  // installment unchecked silently failed to save before this blanking was
+  // added). Down payment/interest/tenure/insurance/tracker are shared
+  // config for BOTH installment and bank finance, not installment-only —
+  // keying this off installmentEnabled alone wiped them to blank on every
+  // save while installment was off, even with bank finance (which defaults
+  // on) still enabled, silently breaking "Apply for Financing" on the
+  // public page (its own hasRealFinancing check needs this same data).
+  const financingFieldsActive = installmentEnabled === "true" || bankFinanceEnabled === "true";
 
   return {
     title: String(formData.get("title") ?? ""),
