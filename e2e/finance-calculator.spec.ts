@@ -255,9 +255,9 @@ test("the Financing Calculator section is hidden entirely (not an empty state) w
 
     // Apply for Financing must stay visible — bank finance is still on.
     await expect(page.getByRole("button", { name: "Apply for Financing" })).toBeVisible();
-    // Bank Finance still scrolls somewhere real (the Apply section), not to
-    // a now-missing #financing-calculator anchor.
-    await page.getByRole("link", { name: "Bank Finance", exact: true }).click();
+    // The "Apply For Financing" quick-link still scrolls somewhere real
+    // (the Apply section), not to a now-missing #financing-calculator anchor.
+    await page.getByRole("link", { name: "Apply For Financing", exact: true }).click();
     await expect(async () => {
       expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     }).toPass({ timeout: 2000 });
