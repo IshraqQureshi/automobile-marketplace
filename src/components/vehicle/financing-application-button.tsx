@@ -25,9 +25,6 @@ interface FinancingApplicationButtonProps {
   downPaymentType: "PERCENT" | "FIXED";
   downPaymentPercent: number | null;
   defaultDesiredDownPayment: number;
-  interestRateType: "PERCENT" | "FIXED";
-  interestRatePercentPerYear: number;
-  interestRateAmount: number | null;
   insurancePercentPsv: number | null;
   insurancePercentPrivate: number | null;
   tenureOptionsMonths: number[];
@@ -41,6 +38,13 @@ interface FinancingApplicationButtonProps {
 // leave a vehicle's financing unconfigured, but an applicant filling out
 // this form has no equivalent "leave it blank" case.
 const FORM_FIELD_SCHEMAS = { ...financingApplicationFieldSchemas, desiredDownPaymentPercent: financingDesiredDownPaymentPercentSchema };
+
+// Deliberately a fixed standard rate shown on every application,
+// independent of the vehicle's own financingInterestRate/Type/Amount
+// (which the Financing Calculator continues to show as-is) — direct
+// client request: applications should quote this flat rate regardless of
+// a specific listing's configured calculator rate.
+const APPLICATION_INTEREST_RATE_PERCENT = 24;
 
 /**
  * Real "Apply for Financing" flow (previously a disabled placeholder) —
@@ -61,9 +65,6 @@ export function FinancingApplicationButton({
   downPaymentType,
   downPaymentPercent,
   defaultDesiredDownPayment,
-  interestRateType,
-  interestRatePercentPerYear,
-  interestRateAmount,
   insurancePercentPsv,
   insurancePercentPrivate,
   tenureOptionsMonths,
@@ -122,7 +123,9 @@ export function FinancingApplicationButton({
   // Reuses the exact same formula the calculator itself uses (not a
   // reimplementation) so "Desired Insurance"/"Interest Rate" show real
   // computed amounts matching whatever the applicant has actually selected
-  // above, not just a bare percentage.
+  // above — except the rate itself, which is the fixed standard
+  // APPLICATION_INTEREST_RATE_PERCENT rather than the vehicle's own
+  // calculator rate (see that constant's own comment).
   const estimate = useMemo(
     () =>
       calculateFinanceEstimate({
@@ -130,26 +133,15 @@ export function FinancingApplicationButton({
         downPaymentType,
         downPaymentPercent: downPaymentType === "PERCENT" ? Number(desiredDownPaymentPercent) || 0 : null,
         downPaymentAmount: downPaymentType === "FIXED" ? Number(desiredDownPaymentAmount) || 0 : null,
-        interestRateType,
-        interestRatePercentPerYear,
-        interestRateAmount,
+        interestRateType: "PERCENT",
+        interestRatePercentPerYear: APPLICATION_INTEREST_RATE_PERCENT,
+        interestRateAmount: null,
         insurancePercent,
         trackerFee: selectedTracker?.price ?? 0,
         trackerDurationMonths: trackerDurationToMonths(selectedTracker?.duration),
         tenureMonths: Number(desiredTenureMonths) || 0,
       }),
-    [
-      price,
-      downPaymentType,
-      desiredDownPaymentPercent,
-      desiredDownPaymentAmount,
-      interestRateType,
-      interestRatePercentPerYear,
-      interestRateAmount,
-      insurancePercent,
-      selectedTracker,
-      desiredTenureMonths,
-    ],
+    [price, downPaymentType, desiredDownPaymentPercent, desiredDownPaymentAmount, insurancePercent, selectedTracker, desiredTenureMonths],
   );
 
   function handleSubmit(e: React.FormEvent) {
@@ -415,14 +407,14 @@ export function FinancingApplicationButton({
                 </div>
               )}
 
-              {/* Interest isn't a choice the applicant makes (it's the
-                  showroom's own fixed rate for this vehicle, same as the
-                  calculator's own display) — shown read-only so the
-                  application reflects the exact rate they were quoted. */}
+              {/* Interest isn't a choice the applicant makes, and — unlike
+                  the calculator, which shows this vehicle's own configured
+                  rate — the application always quotes the fixed standard
+                  APPLICATION_INTEREST_RATE_PERCENT, shown read-only. */}
               <div>
                 <FieldLabel htmlFor="financing-interest-rate">Interest Rate</FieldLabel>
                 <p id="financing-interest-rate" className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-700">
-                  {interestRateType === "PERCENT" ? `${interestRatePercentPerYear}% per year` : currencyFormatter.format(interestRateAmount ?? 0)}
+                  {APPLICATION_INTEREST_RATE_PERCENT}% per year
                 </p>
                 <p className="mt-1 text-xs text-neutral-400">≈ {currencyFormatter.format(estimate.totalInterest)} total interest</p>
               </div>

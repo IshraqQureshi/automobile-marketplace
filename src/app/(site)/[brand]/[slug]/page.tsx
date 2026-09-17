@@ -464,9 +464,6 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                   downPaymentType={vehicle.financingDownPaymentType}
                   downPaymentPercent={vehicle.financingDownPaymentPercent}
                   defaultDesiredDownPayment={defaultDesiredDownPayment}
-                  interestRateType={vehicle.financingInterestRateType}
-                  interestRatePercentPerYear={vehicle.financingInterestRate ?? 0}
-                  interestRateAmount={vehicle.financingInterestRateAmount}
                   // Tracker and insurance are HP/installment add-ons the
                   // Financing Calculator introduced — when installment is
                   // off (calculator hidden, see above), a bank-finance-only
