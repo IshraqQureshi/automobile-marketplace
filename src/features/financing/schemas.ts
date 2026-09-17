@@ -80,6 +80,16 @@ export const financingDesiredTrackerDurationSchema = z
   .optional()
   .transform((value) => value || undefined);
 
+// Mirrors financingDesiredTrackerDurationSchema's own optional shape —
+// only shown/collected at all when the vehicle has insurance configured
+// (see FinancingApplicationButton), same convention as the tracker option
+// above. A plain optional enum (not required) since a vehicle with only
+// one insurance rate configured has nothing for the applicant to pick.
+export const financingDesiredInsuranceTypeSchema = z
+  .union([z.literal(""), z.enum(["PSV", "PRIVATE"])])
+  .optional()
+  .transform((value) => value || undefined);
+
 export const financingApplicationFieldSchemas = {
   name: inquiryNameSchema,
   email: inquiryEmailSchema,
@@ -90,5 +100,6 @@ export const financingApplicationFieldSchemas = {
   desiredDownPayment: financingDesiredDownPaymentSchema,
   desiredTenureMonths: financingDesiredTenureMonthsSchema,
   desiredTrackerDuration: financingDesiredTrackerDurationSchema,
+  desiredInsuranceType: financingDesiredInsuranceTypeSchema,
   notes: financingNotesSchema,
 };

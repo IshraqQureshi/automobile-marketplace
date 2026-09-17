@@ -92,6 +92,8 @@ test.beforeAll(async () => {
       financing_down_payment_type: "PERCENT",
       financing_down_payment_percent: 10,
       financing_interest_rate: 13,
+      financing_insurance_percent_psv: 4.5,
+      financing_insurance_percent_private: 3,
       financing_tenure_options_months: [12, 24, 36],
       financing_tracker_options: [
         { duration: "1 Year", price: 15_000 },
@@ -191,6 +193,37 @@ test("the desired tracker option (matching the calculator's own options) can be 
     .eq("contact_email", `tracker-choice-${unique}@example.com`)
     .single();
   expect(data?.desired_tracker_duration).toBe("2 Years");
+});
+
+test("the desired insurance type (matching the calculator's own selector) can be selected and is stored", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await page.getByRole("button", { name: "Apply for Financing" }).click();
+
+  // Both PSV (4.5%) and Private (3%) are configured on the fixture vehicle
+  // — defaults to PSV, matching FinancingCalculator's own default.
+  await expect(page.getByLabel("Desired Insurance")).toHaveValue("PSV");
+  await page.getByLabel("Desired Insurance").selectOption("PRIVATE");
+  await fillFinancingForm(page, { email: `insurance-choice-${unique}@example.com` });
+  await page.getByRole("button", { name: "Submit Application" }).click();
+
+  await expect(page.getByText("Application submitted!")).toBeVisible({ timeout: 10000 });
+
+  const { data } = await admin()
+    .from("financing_applications")
+    .select("desired_insurance_type")
+    .eq("contact_email", `insurance-choice-${unique}@example.com`)
+    .single();
+  expect(data?.desired_insurance_type).toBe("PRIVATE");
+});
+
+test("the interest rate is shown read-only, matching the vehicle's own configured rate, and isn't a real form field", async ({ page }) => {
+  await page.goto(vehiclePath);
+  await page.getByRole("button", { name: "Apply for Financing" }).click();
+
+  // The fixture vehicle's financing_interest_rate is 13 (PERCENT type,
+  // the default) — a static display, not an <input>/<select> the
+  // applicant can change.
+  await expect(page.getByText("13% per year", { exact: true })).toBeVisible();
 });
 
 test("a blank desired down payment percent is rejected, not silently treated as 0%", async ({ page }) => {
