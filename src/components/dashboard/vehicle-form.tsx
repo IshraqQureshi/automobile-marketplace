@@ -175,11 +175,12 @@ const VALIDATED_FIELDS = [
 ] as const;
 
 // Validated separately, and only when the Financing section is actually
-// visible (form.installmentEnabled) — these fields' only inputs and error
-// text live inside that conditionally-rendered section, so validating them
-// unconditionally could block Save on a field the user can no longer see
-// or fix (confirmed live: toggling installment off after typing an invalid
-// value there left Save silently doing nothing).
+// visible (installmentEnabled or bankFinanceEnabled — see
+// financingFieldsActive in handleSubmit) — these fields' only inputs and
+// error text live inside that conditionally-rendered section, so
+// validating them unconditionally could block Save on a field the user can
+// no longer see or fix (confirmed live: toggling installment off after
+// typing an invalid value there left Save silently doing nothing).
 const FINANCING_VALIDATED_FIELDS = [
   "financingDownPaymentPercent",
   "financingDownPaymentAmount",
@@ -249,7 +250,8 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
     setFormError(null);
 
     let hasError = false;
-    const fieldsToValidate: readonly ((typeof VALIDATED_FIELDS)[number] | (typeof FINANCING_VALIDATED_FIELDS)[number])[] = form.installmentEnabled
+    const financingFieldsActive = form.installmentEnabled || form.bankFinanceEnabled;
+    const fieldsToValidate: readonly ((typeof VALIDATED_FIELDS)[number] | (typeof FINANCING_VALIDATED_FIELDS)[number])[] = financingFieldsActive
       ? [...VALIDATED_FIELDS, ...FINANCING_VALIDATED_FIELDS]
       : VALIDATED_FIELDS;
     for (const field of fieldsToValidate) {
@@ -617,7 +619,15 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
           </label>
         </div>
 
-        {form.installmentEnabled && (
+        {/* Down payment/interest/tenure/insurance/tracker are shared
+            configuration for BOTH HP installment and bank finance, not
+            installment-only — bankFinanceEnabled defaults true on a new
+            vehicle (emptyForm(), no owner checkbox to change it; note the
+            underlying DB column itself defaults false), so on a normal new
+            listing this stays visible/editable even with installment off,
+            matching the public page's own
+            (bankFinanceEnabled || installmentEnabled) gating exactly. */}
+        {(form.installmentEnabled || form.bankFinanceEnabled) && (
           <div className="mt-5 grid grid-cols-1 gap-4 border-t border-neutral-100 pt-5 sm:grid-cols-3">
             <div className="sm:col-span-2">
               <FieldLabel htmlFor="vehicle-down-payment-value">Deposit</FieldLabel>

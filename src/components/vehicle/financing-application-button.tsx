@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useFieldValidation } from "@/features/auth/use-field-validation";
 import { submitFinancingApplicationAction } from "@/features/financing/actions";
 import { EMPLOYMENT_STATUS_OPTIONS, financingApplicationFieldSchemas, financingDesiredDownPaymentPercentSchema } from "@/features/financing/schemas";
+import { calculateFinanceEstimate, trackerDurationToMonths } from "@/features/vehicle/finance-calculator";
 import { currencyFormatter } from "@/features/vehicle/types";
 import { stripKenyaPrefix } from "@/lib/validation/kenya-phone";
 
@@ -114,6 +115,42 @@ export function FinancingApplicationButton({
     const percent = Number(desiredDownPaymentPercent);
     return Number.isFinite(percent) ? Math.round(price * (percent / 100)) : 0;
   }, [downPaymentType, desiredDownPaymentPercent, desiredDownPaymentAmount, price]);
+
+  const selectedTracker = trackerOptions.find((option) => option.duration === desiredTrackerDuration) ?? null;
+  const insurancePercent = hasInsurance ? (insuranceType === "PSV" ? insurancePercentPsv : insurancePercentPrivate) : null;
+
+  // Reuses the exact same formula the calculator itself uses (not a
+  // reimplementation) so "Desired Insurance"/"Interest Rate" show real
+  // computed amounts matching whatever the applicant has actually selected
+  // above, not just a bare percentage.
+  const estimate = useMemo(
+    () =>
+      calculateFinanceEstimate({
+        price,
+        downPaymentType,
+        downPaymentPercent: downPaymentType === "PERCENT" ? Number(desiredDownPaymentPercent) || 0 : null,
+        downPaymentAmount: downPaymentType === "FIXED" ? Number(desiredDownPaymentAmount) || 0 : null,
+        interestRateType,
+        interestRatePercentPerYear,
+        interestRateAmount,
+        insurancePercent,
+        trackerFee: selectedTracker?.price ?? 0,
+        trackerDurationMonths: trackerDurationToMonths(selectedTracker?.duration),
+        tenureMonths: Number(desiredTenureMonths) || 0,
+      }),
+    [
+      price,
+      downPaymentType,
+      desiredDownPaymentPercent,
+      desiredDownPaymentAmount,
+      interestRateType,
+      interestRatePercentPerYear,
+      interestRateAmount,
+      insurancePercent,
+      selectedTracker,
+      desiredTenureMonths,
+    ],
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -374,6 +411,7 @@ export function FinancingApplicationButton({
                       {insurancePercentPsv != null ? `PSV — ${insurancePercentPsv}%` : `Private — ${insurancePercentPrivate}%`}
                     </p>
                   )}
+                  <p className="mt-1 text-xs text-neutral-400">≈ {currencyFormatter.format(estimate.insurance)}</p>
                 </div>
               )}
 
@@ -386,6 +424,7 @@ export function FinancingApplicationButton({
                 <p id="financing-interest-rate" className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-700">
                   {interestRateType === "PERCENT" ? `${interestRatePercentPerYear}% per year` : currencyFormatter.format(interestRateAmount ?? 0)}
                 </p>
+                <p className="mt-1 text-xs text-neutral-400">≈ {currencyFormatter.format(estimate.totalInterest)} total interest</p>
               </div>
             </div>
 
