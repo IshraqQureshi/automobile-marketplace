@@ -2,8 +2,12 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "HarakaGari — Kenya's Premium Car Marketplace",
-    short_name: "HarakaGari",
+    name: "Haraka Gari — Kenya's Premium Car Marketplace",
+    // What actually shows under the home-screen icon once installed as a
+    // PWA (client-reported: "when PWA app is installed on mobile its name
+    // show HarakaGari just want a space") — the site's own <title>/header
+    // wordmark elsewhere stays "HarakaGari" (one word), unaffected.
+    short_name: "Haraka Gari",
     description: "Kenya's premium automobile marketplace — verified showrooms, bank finance, and HP installments.",
     start_url: "/",
     display: "standalone",
