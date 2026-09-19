@@ -61,6 +61,13 @@ describe("parseHeadSnippet", () => {
     ["an unterminated tag", `<script src="x"`, `missing its closing ">"`],
     ["an unclosed comment", `<!-- oops <script></script>`, "Unclosed HTML comment"],
     ["an inline event handler", `<link rel="x" onload="alert(1)">`, "event handler"],
+    ["a style attribute (crashes React at render)", `<meta style="color:red" name="x">`, `"style" attribute isn't supported`],
+    ["a children attribute (crashes React at render)", `<script children="x">1</script>`, `"children" attribute isn't supported`],
+    ["a dangerouslysetinnerhtml attribute", `<script dangerouslysetinnerhtml="x">1</script>`, "isn't supported"],
+    ["an attribute not valid for the tag", `<meta src="x">`, `"src" attribute isn't supported on <meta>`],
+    ["<!-- inside script data", `<script>var a='<!--<script>';</script>`, `can't contain "<!--"`],
+    ["<!-- inside style data", `<style>/* <!-- */ a{}</style>`, `can't contain "<!--"`],
+    ["a closing tag missing its >", `<script>1</script x`, `missing its ">"`],
   ])("rejects %s", (_label, input, message) => {
     const result = parseHeadSnippet(input);
     expect(result.ok).toBe(false);
@@ -81,11 +88,24 @@ describe("toReactProps", () => {
 });
 
 describe("shouldInjectHeadScripts", () => {
-  it.each(["/", "/listing", "/honda/accord-123", "/showrooms/abc", "/privacy", "/register-showroom"])("injects on the public page %s", (path) => {
+  it.each(["/", "/listing", "/honda/accord-123", "/showrooms/abc", "/privacy", "/ready-to-sell"])("injects on the public page %s", (path) => {
     expect(shouldInjectHeadScripts(path)).toBe(true);
   });
 
-  it.each(["/admin", "/admin/settings", "/dashboard", "/dashboard/vehicles/1/edit", "/login", "/forgot-password", "/reset-password", "/api/cron/x", "/auth/callback"])(
+  it.each([
+    "/admin",
+    "/admin/settings",
+    "/dashboard",
+    "/dashboard/vehicles/1/edit",
+    "/account",
+    "/account/favorites",
+    "/login",
+    "/register-showroom",
+    "/forgot-password",
+    "/reset-password",
+    "/api/cron/x",
+    "/auth/callback",
+  ])(
     "does not inject on %s",
     (path) => {
       expect(shouldInjectHeadScripts(path)).toBe(false);
@@ -99,5 +119,47 @@ describe("shouldInjectHeadScripts", () => {
 
   it("doesn't over-match a public path that merely starts with an excluded word", () => {
     expect(shouldInjectHeadScripts("/administration-costs")).toBe(true);
+  });
+});
+
+describe("raw-text termination matches how browsers end the element", () => {
+  // A browser closes <script> at "</script" followed by whitespace, "/" or
+  // ">". These used to validate as one script whose *content* held markup,
+  // which the browser then parsed as real elements in <head>.
+  it.each([
+    ["</script x>", `<script>a="</script x><h1>hi</h1>";</script>`],
+    ["</script/>", `<script>a="</script/><iframe src=//e.x></iframe>";</script>`],
+  ])("treats %s as the end of the script, so the trailing markup is validated (and rejected) rather than smuggled in as content", (_label, input) => {
+    const result = parseHeadSnippet(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/isn't allowed|Only HTML tags|missing its closing/);
+  });
+
+  it("is case-insensitive for the closing tag", () => {
+    expect(parseHeadSnippet(`<script>1</SCRIPT>`).ok).toBe(true);
+  });
+
+  it("does not end a script early on a tag that merely starts with the same letters", () => {
+    const result = parseHeadSnippet(`<script>var s = "</scripts>";</script>`);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.elements[0] as { inline: string }).inline).toBe('var s = "</scripts>";');
+  });
+});
+
+describe("attribute values", () => {
+  it("decodes entities once so React's own escaping doesn't double-encode", () => {
+    const result = parseHeadSnippet(`<meta name="x" content="a&amp;b &lt;c&gt; &quot;d&quot; &#39;e&#x27;">`);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.elements[0] as { attrs: Record<string, string> }).attrs.content).toBe(`a&b <c> "d" 'e'`);
+  });
+
+  it("reads unquoted values to the next whitespace like a browser (URLs with = and & stay whole)", () => {
+    const result = parseHeadSnippet(`<script async src=https://example.com/a?id=G-1&l=2></script>`);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.elements[0] as { attrs: Record<string, unknown> }).attrs.src).toBe("https://example.com/a?id=G-1&l=2");
+  });
+
+  it("allows data-* and aria-* on any tag (Plausible/Umami-style data attributes)", () => {
+    expect(parseHeadSnippet(`<script defer data-domain="harakagari.co.ke" src="https://plausible.io/js/script.js"></script>`).ok).toBe(true);
   });
 });

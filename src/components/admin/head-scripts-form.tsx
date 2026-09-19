@@ -58,8 +58,9 @@ export function HeadScriptsForm({ customHeadScripts }: HeadScriptsFormProps) {
         />
         {errorFor("customHeadScripts") && <p className="mt-1 text-sm text-red-600">{errorFor("customHeadScripts")}</p>}
         <p className="mt-1.5 text-xs text-neutral-400">
-          Allowed tags: &lt;script&gt;, &lt;style&gt;, &lt;meta&gt;, &lt;link&gt;, &lt;noscript&gt;. Not added to the admin panel, showroom dashboard, or
-          login/password pages. Leave empty to remove.
+          Allowed tags: &lt;script&gt;, &lt;style&gt;, &lt;meta&gt;, &lt;link&gt;, &lt;noscript&gt;. Added to public pages when a visitor loads them — not to the
+          admin panel, showroom dashboard, customer account, or login, registration and password pages. It&apos;s decided on each full page load, so a
+          visitor moving between those page types without reloading may keep (or not yet have) the scripts until their next load. Leave empty to remove.
         </p>
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           These scripts run for every visitor. Only paste code from a source you trust — a malicious script could read what visitors type or redirect them.

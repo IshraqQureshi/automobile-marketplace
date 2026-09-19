@@ -86,10 +86,22 @@ test("an admin can save a head snippet, and it renders in the <head> of public p
   await page.goto("/");
   expect(await page.evaluate(() => (window as unknown as { __e2eHead?: string }).__e2eHead)).toBe(marker);
 
-  // Not on the admin login, the showroom dashboard, or customer login.
-  for (const path of ["/admin/login", "/dashboard", "/login"]) {
+  // Not on the pages excluded for handling sessions/PII/passwords. (An
+  // anonymous /dashboard or /account request just redirects to /login, so
+  // those aren't asserted here — the path guard itself is unit-tested for
+  // them; these are the excluded pages reachable without a session.)
+  for (const path of ["/admin/login", "/login", "/register-showroom", "/forgot-password"]) {
     expect(await headOf(request, path)).not.toContain(marker);
   }
+});
+
+test("a client-supplied x-pathname header cannot switch the injection on for an excluded page", async ({ request }) => {
+  const marker = `spoof-${unique}`;
+  await admin().from("system_settings").update({ value: `<meta name="spoof-check" content="${marker}">` }).eq("key", "custom_head_scripts");
+
+  expect(await headOf(request, "/")).toContain(marker);
+  const spoofed = await (await request.get("/login", { headers: { "x-pathname": "/" } })).text();
+  expect(spoofed.slice(0, spoofed.indexOf("</head>"))).not.toContain(marker);
 });
 
 test("a saved snippet persists in the settings form after reload", async ({ page }) => {
@@ -111,6 +123,23 @@ test("a snippet with a disallowed tag is rejected with a reason and not saved", 
   const { data } = await admin().from("system_settings").select("value").eq("key", "custom_head_scripts").single();
   expect(data?.value).toBe("");
   expect(await headOf(request, "/")).not.toContain("evil.example");
+});
+
+// Attributes React refuses at render (style="...", children) used to pass
+// validation and then crash the root layout — taking down every public page.
+// They must be rejected at save, and the site must keep rendering.
+test("a snippet that would crash React at render is rejected at save, and public pages keep working", async ({ page, request }) => {
+  await clearSetting();
+  await loginAsAdmin(page);
+  await openSettings(page);
+
+  await page.getByLabel("Head snippet").fill('<meta name="x" style="color:red">');
+  await page.getByRole("button", { name: "Save head scripts" }).click();
+  await expect(page.getByText(/"style" attribute isn't supported on <meta>/)).toBeVisible();
+
+  const { data } = await admin().from("system_settings").select("value").eq("key", "custom_head_scripts").single();
+  expect(data?.value).toBe("");
+  expect((await request.get("/")).status()).toBe(200);
 });
 
 test("clearing the field removes the injection", async ({ page, request }) => {
