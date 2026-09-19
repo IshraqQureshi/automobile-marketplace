@@ -763,6 +763,39 @@ describe("RLS authorization (integration)", () => {
       await admin.from("system_settings").update({ value: "false" }).eq("key", "maintenance_mode");
     });
 
+    // The head-scripts snippet runs as arbitrary JS for every public visitor,
+    // so the write boundary matters more here than for any other setting.
+    describe("custom_head_scripts (site-wide script injection)", () => {
+      const PAYLOAD = '<script>window.__pwned = 1;</script>';
+
+      it("anon can read it (it's emitted in every public page's HTML anyway)", async () => {
+        const { data, error } = await anon.from("system_settings").select("value").eq("key", "custom_head_scripts").single();
+        expect(error).toBeNull();
+        expect(typeof data?.value).toBe("string");
+      });
+
+      it("a customer cannot change it", async () => {
+        const { data, error } = await customerA.client.from("system_settings").update({ value: PAYLOAD }).eq("key", "custom_head_scripts").select();
+        expect(error).toBeNull();
+        expect(data).toEqual([]);
+      });
+
+      it("anon cannot change it", async () => {
+        const { data, error } = await anon.from("system_settings").update({ value: PAYLOAD }).eq("key", "custom_head_scripts").select();
+        expect(error).toBeNull();
+        expect(data).toEqual([]);
+        const { data: after } = await admin.from("system_settings").select("value").eq("key", "custom_head_scripts").single();
+        expect(after?.value).not.toBe(PAYLOAD);
+      });
+
+      it("an admin can change it", async () => {
+        const { data, error } = await adminUser.client.from("system_settings").update({ value: "<!-- rls test -->" }).eq("key", "custom_head_scripts").select("id");
+        expect(error).toBeNull();
+        expect(data).toHaveLength(1);
+        await admin.from("system_settings").update({ value: "" }).eq("key", "custom_head_scripts");
+      });
+    });
+
     it("nobody can insert a new setting key through the client — no insert policy exists", async () => {
       const { error } = await adminUser.client
         .from("system_settings")
