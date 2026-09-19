@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
-import { generalSettingsFieldSchemas } from "./settings-schemas";
+import { customHeadScriptsSchema, generalSettingsFieldSchemas } from "./settings-schemas";
 
 export interface SettingsActionResult {
   error?: string;
@@ -49,5 +49,38 @@ export async function updateGeneralSettingsAction(formData: FormData): Promise<S
   if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
 
   revalidatePath("/admin/settings");
+  return {};
+}
+
+/**
+ * Updates the global `custom_head_scripts` system_settings row — admin-only
+ * and is_editable-only via RLS (system_settings_update_admin_editable_only),
+ * same convention and same 0-rows-means-rejected check as
+ * updateGeneralSettingsAction above. The value is arbitrary script content
+ * that runs for every public visitor, so the RLS admin gate is the security
+ * boundary here — never a client-side check. Revalidates the whole site
+ * layout since the snippet renders from the root layout.
+ */
+export async function updateHeadScriptsAction(formData: FormData): Promise<SettingsActionResult> {
+  const parsed = customHeadScriptsSchema.safeParse(String(formData.get("customHeadScripts") ?? ""));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid snippet." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from("system_settings")
+    .update({ value: parsed.data.trim(), updated_by: user?.id ?? null })
+    .eq("key", "custom_head_scripts")
+    .select("id");
+  if (error) {
+    logger.error("Failed to update the custom head scripts setting", error);
+    return { error: "Failed to update this setting." };
+  }
+  if (!data || data.length === 0) return { error: NOT_FOUND_ERROR };
+
+  revalidatePath("/", "layout");
   return {};
 }

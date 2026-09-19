@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { MAX_HEAD_SNIPPET_LENGTH, parseHeadSnippet } from "@/lib/head-scripts";
 import { kenyaLocalPhoneOptionalSchema } from "@/lib/validation/kenya-phone";
 
 // General site-wide settings (system_settings, category 'general'). The
@@ -11,4 +13,20 @@ import { kenyaLocalPhoneOptionalSchema } from "@/lib/validation/kenya-phone";
 // rather than linking nowhere).
 export const generalSettingsFieldSchemas = {
   whatsappContactNumber: kenyaLocalPhoneOptionalSchema,
+};
+
+// Validated with the exact parser the root layout renders with, so a snippet
+// that saves is guaranteed to render — and one that can't render is rejected
+// here with a specific reason instead of silently vanishing from the site.
+// Empty is valid (clears the setting).
+export const customHeadScriptsSchema = z
+  .string()
+  .max(MAX_HEAD_SNIPPET_LENGTH, `Keep the snippet under ${MAX_HEAD_SNIPPET_LENGTH.toLocaleString("en-US")} characters.`)
+  .superRefine((value, ctx) => {
+    const result = parseHeadSnippet(value);
+    if (!result.ok) ctx.addIssue({ code: "custom", message: result.error });
+  });
+
+export const headScriptsFieldSchemas = {
+  customHeadScripts: customHeadScriptsSchema,
 };

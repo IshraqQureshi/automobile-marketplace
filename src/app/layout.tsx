@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import { CustomHeadScripts } from "@/components/layout/custom-head-scripts";
 import { publicEnv } from "@/lib/env";
 
 // Deliberately no title.template here — every existing page already sets
@@ -42,6 +43,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <CustomHeadScripts />
+      </head>
       <body>
         {children}
         <Analytics />
