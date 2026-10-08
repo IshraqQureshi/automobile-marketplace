@@ -111,6 +111,30 @@ describe("getYouTubePlaylistEmbedUrl", () => {
   it("returns null for an implausibly short (truncated/malformed) list id", () => {
     expect(getYouTubePlaylistEmbedUrl("https://www.youtube.com/playlist?list=PLZmdSdGDFTH4")).toBeNull();
   });
+
+  // Regression: a youtu.be share link carrying a real list= param (the form
+  // YouTube itself generates when sharing a video from within a playlist)
+  // was rejected outright because the hostname check only matched
+  // "youtube.com" — even though it satisfies the field's own stated rule
+  // ("must include a list= parameter").
+  it("extracts the list id from a youtu.be link that carries a list param", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://youtu.be/abc123?list=PL1234567890abcdefghij")).toBe(
+      "https://www.youtube.com/embed/videoseries?list=PL1234567890abcdefghij",
+    );
+  });
+
+  it("returns null for a youtu.be link with no list param", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://youtu.be/abc123")).toBeNull();
+  });
+
+  // Regression: hostname.endsWith("youtube.com") also matches a spoofed
+  // domain like "fake-youtube.com", since that string literally ends with
+  // "youtube.com". The embed src itself was never attacker-controlled (it's
+  // rebuilt from a validated list id), but the validator shouldn't accept a
+  // URL that isn't actually hosted on youtube.com.
+  it("returns null for a domain that merely ends with 'youtube.com'", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://fake-youtube.com/playlist?list=PL1234567890abcdefghij")).toBeNull();
+  });
 });
 
 describe("getTikTokEmbedUrl", () => {
