@@ -102,14 +102,21 @@ describe("getYouTubePlaylistEmbedUrl", () => {
     expect(getYouTubePlaylistEmbedUrl("not a url")).toBeNull();
   });
 
-  // Regression: a real production showroom's playlist rendered as "just one
-  // video" rather than a full playlist — confirmed via YouTube's own oembed
-  // API that a 13-character list id like this resolves to a single
-  // unrelated video, not a real playlist (real ones are 34 characters).
-  // Rejecting an obviously-too-short id here means the component falls
-  // back to showing nothing rather than silently embedding the wrong thing.
-  it("returns null for an implausibly short (truncated/malformed) list id", () => {
-    expect(getYouTubePlaylistEmbedUrl("https://www.youtube.com/playlist?list=PLZmdSdGDFTH4")).toBeNull();
+  // Correction: this id (and "PLFmOkym82kps" below) were previously assumed
+  // to be truncated/malformed because they're only 13 characters and
+  // YouTube's oEmbed API describes a list= URL using a single video's
+  // title/type. Checked directly against youtube.com's own page data on
+  // 2026-10-08: both are genuine multi-video playlists (distinct videoId
+  // entries at index 0, 1, ... under the same playlistId) — the oEmbed
+  // response shape was never real evidence either way, and a real admin
+  // showroom's actual playlist link was being rejected because of it.
+  it("accepts a real short list id rather than assuming it's truncated", () => {
+    expect(getYouTubePlaylistEmbedUrl("https://www.youtube.com/playlist?list=PLZmdSdGDFTH4")).toBe(
+      "https://www.youtube.com/embed/videoseries?list=PLZmdSdGDFTH4",
+    );
+    expect(getYouTubePlaylistEmbedUrl("https://www.youtube.com/playlist?list=PLFmOkym82kps")).toBe(
+      "https://www.youtube.com/embed/videoseries?list=PLFmOkym82kps",
+    );
   });
 
   // Regression: a youtu.be share link carrying a real list= param (the form
