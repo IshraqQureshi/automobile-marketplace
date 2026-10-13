@@ -71,17 +71,17 @@ export function getYouTubeEmbedUrl(url: string, options: { autoplay?: boolean } 
 const YOUTUBE_PLAYLIST_ID_PATTERN = /^[A-Za-z0-9_-]{2,64}$/;
 
 /**
- * Derives a playable YouTube playlist embed URL (the "videoseries" embed
- * form) from an admin-pasted playlist URL — the playlist's own page
- * (youtube.com/playlist?list=ID), a video-within-playlist URL
- * (youtube.com/watch?v=...&list=ID), or the same video-within-playlist
- * link in youtu.be short form (youtu.be/VIDEO_ID?list=ID) — all of which
- * carry the id in the same `list` query param. Returns null when it can't
- * be confidently extracted, so the caller can fall back to a plain "watch
- * on YouTube" link rather than rendering a broken iframe — same
- * convention as getYouTubeEmbedUrl above.
+ * Extracts the raw YouTube playlist id from an admin-pasted playlist URL —
+ * the playlist's own page (youtube.com/playlist?list=ID), a
+ * video-within-playlist URL (youtube.com/watch?v=...&list=ID), or the same
+ * video-within-playlist link in youtu.be short form
+ * (youtu.be/VIDEO_ID?list=ID) — all of which carry the id in the same
+ * `list` query param. Returns null when it can't be confidently extracted.
+ * Shared by getYouTubePlaylistEmbedUrl (below) and by
+ * fetchYouTubePlaylistVideos (src/lib/youtube-playlist.ts), which needs the
+ * raw id itself to call the YouTube Data API.
  */
-export function getYouTubePlaylistEmbedUrl(url: string): string | null {
+export function getYouTubePlaylistId(url: string): string | null {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -95,7 +95,19 @@ export function getYouTubePlaylistEmbedUrl(url: string): string | null {
   if (!isYouTubeHost) return null;
 
   const id = parsed.searchParams.get("list");
-  return id && YOUTUBE_PLAYLIST_ID_PATTERN.test(id) ? `https://www.youtube.com/embed/videoseries?list=${id}` : null;
+  return id && YOUTUBE_PLAYLIST_ID_PATTERN.test(id) ? id : null;
+}
+
+/**
+ * Derives a playable YouTube playlist embed URL (the "videoseries" embed
+ * form) from an admin-pasted playlist URL. Returns null when the id can't
+ * be confidently extracted, so the caller can fall back to a plain "watch
+ * on YouTube" link rather than rendering a broken iframe — same
+ * convention as getYouTubeEmbedUrl above.
+ */
+export function getYouTubePlaylistEmbedUrl(url: string): string | null {
+  const id = getYouTubePlaylistId(url);
+  return id ? `https://www.youtube.com/embed/videoseries?list=${id}` : null;
 }
 
 /**

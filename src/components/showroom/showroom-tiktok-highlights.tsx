@@ -7,7 +7,7 @@ import { fetchTikTokOEmbed } from "@/lib/tiktok-oembed";
  * Resolves a showroom's pasted TikTok video links into real, renderable
  * highlight cards — split out from the presentational component below so
  * the caller (the showroom detail page) can see the REAL resolved count
- * before deciding whether ShowroomPlaylistSection's own "Follow on
+ * before deciding whether ShowroomTikTokFollowBanner's own "Follow on
  * TikTok" button is redundant. Using video URL *presence* for that
  * decision instead of actual resolution success was a real bug found in
  * code review: if every configured video fails to resolve (deleted/

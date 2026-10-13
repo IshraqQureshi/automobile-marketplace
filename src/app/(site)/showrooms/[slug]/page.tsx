@@ -4,8 +4,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { ShowroomVehicleBrowser } from "@/components/showroom/showroom-vehicle-browser";
-import { ShowroomPlaylistSection } from "@/components/showroom/showroom-playlist-section";
+import { ShowroomTikTokFollowBanner } from "@/components/showroom/showroom-tiktok-follow-banner";
 import { resolveShowroomTikTokHighlights, ShowroomTikTokHighlights } from "@/components/showroom/showroom-tiktok-highlights";
+import { resolveShowroomYoutubeHighlights, ShowroomYoutubeHighlights } from "@/components/showroom/showroom-youtube-highlights";
 import { getShowroomDetailPath, parseShowroomIdFromSlug } from "@/features/showroom/slug";
 import { buildWhatsAppLink } from "@/features/showroom/whatsapp";
 import { VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -144,7 +145,10 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
   // real bug: if every configured video fails to resolve (deleted/
   // private/a TikTok API hiccup), both sections would disappear, leaving
   // no way to reach a showroom's TikTok at all despite a valid tiktok_url.
-  const tiktokHighlightItems = await resolveShowroomTikTokHighlights(showroom.tiktok_video_urls);
+  const [tiktokHighlightItems, youtubeHighlightItems] = await Promise.all([
+    resolveShowroomTikTokHighlights(showroom.tiktok_video_urls),
+    resolveShowroomYoutubeHighlights(showroom.youtube_playlist_url),
+  ]);
 
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
@@ -246,9 +250,9 @@ export default async function ShowroomDetailPage({ params }: ShowroomDetailPageP
         </div>
       </section>
 
-      <ShowroomPlaylistSection
+      <ShowroomYoutubeHighlights businessName={showroom.business_name} playlistUrl={showroom.youtube_playlist_url} items={youtubeHighlightItems} />
+      <ShowroomTikTokFollowBanner
         businessName={showroom.business_name}
-        playlistUrl={showroom.youtube_playlist_url}
         tiktokUrl={showroom.tiktok_url}
         hasVideoHighlights={tiktokHighlightItems.length > 0}
       />
