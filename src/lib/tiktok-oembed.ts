@@ -7,6 +7,42 @@ export interface TikTokOEmbedResult {
 
 export const TIKTOK_FALLBACK_TITLE = "TikTok video";
 
+// Only ever render an image from TikTok's own CDN — the URL comes out of
+// scraped HTML, so it's checked before it can reach an <img src>.
+function isTikTokCdnImage(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && /(^|\.)tiktokcdn(-us)?\.com$/.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * TikTok's oEmbed no longer returns a thumbnail, but the public video page
+ * still embeds the video's cover image (a signed tiktokcdn.com URL that
+ * stays valid for ~2 days — hence the short revalidate window, so a cached
+ * URL is refreshed well before it expires). Best-effort like everything
+ * else here: any failure returns null and the card shows its placeholder.
+ */
+export async function fetchTikTokCoverUrl(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(4000),
+      headers: { "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" },
+      next: { revalidate: 3600 },
+    });
+    if (!response.ok) return null;
+    const html = await response.text();
+    const match = html.match(/"cover":"([^"]+)"/);
+    if (!match?.[1]) return null;
+    const decoded: unknown = JSON.parse(`"${match[1]}"`);
+    return typeof decoded === "string" && isTikTokCdnImage(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetches a TikTok video's real title/thumbnail from TikTok's own public
  * oEmbed endpoint — used to render a showroom's pasted video links as real
@@ -40,7 +76,7 @@ export async function fetchTikTokOEmbed(url: string): Promise<TikTokOEmbedResult
     const thumbnailUrl = "thumbnail_url" in data && typeof data.thumbnail_url === "string" && data.thumbnail_url ? data.thumbnail_url : null;
     if (type !== "video" && typeof html !== "string" && !rawTitle && !thumbnailUrl) return null;
     const title = rawTitle || TIKTOK_FALLBACK_TITLE;
-    return { title, thumbnailUrl };
+    return { title, thumbnailUrl: thumbnailUrl ?? (await fetchTikTokCoverUrl(url)) };
   } catch {
     return null;
   }

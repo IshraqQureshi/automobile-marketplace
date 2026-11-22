@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchTikTokOEmbed } from "./tiktok-oembed";
+import { fetchTikTokCoverUrl, fetchTikTokOEmbed } from "./tiktok-oembed";
 
 describe("fetchTikTokOEmbed", () => {
   afterEach(() => {
@@ -34,7 +34,21 @@ describe("fetchTikTokOEmbed", () => {
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, json: async () => ({ type: "video", html: "<iframe src='https://www.tiktok.com/player/v1/123'></iframe>" }) }),
     );
+    // The cover-image fallback (a 2nd fetch of the video page) also fails here.
     expect(await fetchTikTokOEmbed("https://www.tiktok.com/@showroom/video/123")).toEqual({ title: "TikTok video", thumbnailUrl: null });
+  });
+
+  it("falls back to the cover image from the video page when oEmbed has no thumbnail", async () => {
+    const cover = "https:\\u002F\\u002Fp19-common-sign.tiktokcdn.com\\u002Fx.image?x-expires=1";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ type: "video", html: "<iframe></iframe>" }) })
+        .mockResolvedValueOnce({ ok: true, text: async () => `{"cover":"${cover}"}` }),
+    );
+    const result = await fetchTikTokOEmbed("https://www.tiktok.com/@showroom/video/123");
+    expect(result?.thumbnailUrl).toBe("https://p19-common-sign.tiktokcdn.com/x.image?x-expires=1");
   });
 
   it("returns null (not a guess) when the video doesn't exist", async () => {
@@ -50,5 +64,23 @@ describe("fetchTikTokOEmbed", () => {
   it("returns null when the response shape is unexpected", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ message: "Something went wrong", code: 400 }) }));
     expect(await fetchTikTokOEmbed("https://www.tiktok.com/@showroom/video/123")).toBeNull();
+  });
+});
+
+describe("fetchTikTokCoverUrl", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("only accepts images served from TikTok's own CDN", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: async () => '{"cover":"https://evil.example.com/x.jpg"}' }));
+    expect(await fetchTikTokCoverUrl("https://www.tiktok.com/@a/video/1")).toBeNull();
+  });
+
+  it("returns null when the page has no cover or the request fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: async () => "<html></html>" }));
+    expect(await fetchTikTokCoverUrl("https://www.tiktok.com/@a/video/1")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("boom")));
+    expect(await fetchTikTokCoverUrl("https://www.tiktok.com/@a/video/1")).toBeNull();
   });
 });
