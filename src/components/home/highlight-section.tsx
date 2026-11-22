@@ -8,7 +8,8 @@ export interface HighlightCardItem {
   id: string;
   title: string;
   videoUrl: string;
-  thumbnailUrl: string;
+  // null when the platform gave us no preview image (e.g. TikTok oEmbed).
+  thumbnailUrl: string | null;
 }
 
 interface HighlightSectionProps {
@@ -87,8 +88,16 @@ export function HighlightSection({
               className="group relative block overflow-hidden rounded-xl bg-[#1a1f2e] text-left"
               style={{ aspectRatio: "9 / 16", maxHeight: "420px" }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element -- admin-supplied Storage thumbnail, no build-time-known dimensions */}
-              <img src={item.thumbnailUrl} alt={item.title} className="h-full w-full object-cover" />
+              {item.thumbnailUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- admin-supplied Storage thumbnail, no build-time-known dimensions
+                <img src={item.thumbnailUrl} alt={item.title} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center" style={{ background: "linear-gradient(160deg, #2a3040 0%, #11141d 100%)" }}>
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/40 bg-white/10">
+                    <PlayIcon />
+                  </span>
+                </div>
+              )}
               <div
                 className="absolute inset-0"
                 style={{ background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 55%, transparent 100%)", opacity: 0.7 }}

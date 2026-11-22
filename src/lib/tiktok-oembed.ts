@@ -1,7 +1,11 @@
 export interface TikTokOEmbedResult {
   title: string;
-  thumbnailUrl: string;
+  // TikTok's oEmbed no longer returns a thumbnail for many videos, so this
+  // is genuinely optional — the card renders a placeholder tile instead.
+  thumbnailUrl: string | null;
 }
+
+export const TIKTOK_FALLBACK_TITLE = "TikTok video";
 
 /**
  * Fetches a TikTok video's real title/thumbnail from TikTok's own public
@@ -25,17 +29,18 @@ export async function fetchTikTokOEmbed(url: string): Promise<TikTokOEmbedResult
     });
     if (!response.ok) return null;
     const data: unknown = await response.json();
-    if (
-      typeof data !== "object" ||
-      data === null ||
-      !("title" in data) ||
-      !("thumbnail_url" in data) ||
-      typeof data.title !== "string" ||
-      typeof data.thumbnail_url !== "string"
-    ) {
-      return null;
-    }
-    return { title: data.title, thumbnailUrl: data.thumbnail_url };
+    if (typeof data !== "object" || data === null) return null;
+    // A real video answers with { type: "video", html: "<iframe…>" }; an
+    // error body ({ message, code }) has neither. title/thumbnail_url used
+    // to be required here, but TikTok stopped sending them — requiring them
+    // made every valid video resolve to null and the whole section vanish.
+    const type = "type" in data ? data.type : undefined;
+    const html = "html" in data ? data.html : undefined;
+    const rawTitle = "title" in data && typeof data.title === "string" ? data.title.trim() : "";
+    const thumbnailUrl = "thumbnail_url" in data && typeof data.thumbnail_url === "string" && data.thumbnail_url ? data.thumbnail_url : null;
+    if (type !== "video" && typeof html !== "string" && !rawTitle && !thumbnailUrl) return null;
+    const title = rawTitle || TIKTOK_FALLBACK_TITLE;
+    return { title, thumbnailUrl };
   } catch {
     return null;
   }

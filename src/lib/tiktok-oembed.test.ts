@@ -29,6 +29,14 @@ describe("fetchTikTokOEmbed", () => {
     );
   });
 
+  it("still resolves a valid video when TikTok omits the title and thumbnail (current oEmbed behaviour)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ type: "video", html: "<iframe src='https://www.tiktok.com/player/v1/123'></iframe>" }) }),
+    );
+    expect(await fetchTikTokOEmbed("https://www.tiktok.com/@showroom/video/123")).toEqual({ title: "TikTok video", thumbnailUrl: null });
+  });
+
   it("returns null (not a guess) when the video doesn't exist", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400 }));
     expect(await fetchTikTokOEmbed("https://www.tiktok.com/@showroom/video/999")).toBeNull();
