@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { bulkImportCatalogAction, type BulkImportResult } from "@/features/admin/catalog-actions";
@@ -16,6 +16,12 @@ import {
 import { DialogFormActions, FieldLabel } from "./admin-ui";
 
 const MAX_FILE_BYTES = 1024 * 1024;
+const CSV_MIME_TYPES = ["", "text/csv", "application/csv", "application/vnd.ms-excel"];
+
+function isCsvFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".csv") && CSV_MIME_TYPES.includes(file.type);
+}
+
 const KINDS = Object.keys(BULK_KIND_CONFIG) as CatalogBulkKind[];
 
 export function CatalogBulkUpload() {
@@ -26,6 +32,7 @@ export function CatalogBulkUpload() {
   const [result, setResult] = useState<BulkImportResult | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Validated live so the admin sees problems before anything is sent.
   const parsed: CatalogBulkParseResult = text.trim() ? parseCatalogCsv(text, kind) : { rows: [], issues: [] };
@@ -41,6 +48,14 @@ export function CatalogBulkUpload() {
     setFileError(null);
     setResult(null);
     if (!file) return;
+    // The picker's `accept` is only a hint (users can switch it to "All
+    // files"), so the type is enforced here too. Windows reports CSVs as
+    // application/vnd.ms-excel, and some systems give an empty type.
+    if (!isCsvFile(file)) {
+      setFileError("Only .csv files are accepted. Save your sheet as CSV and try again.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     if (file.size > MAX_FILE_BYTES) {
       setFileError("File is too large (max 1 MB).");
       return;
@@ -97,7 +112,7 @@ export function CatalogBulkUpload() {
         open={open}
         onClose={close}
         title="Bulk upload"
-        description="Add many brands, models or types from a CSV. Existing records are skipped, never duplicated."
+        description="Add many brands, models or types from a CSV file. Existing records are skipped, never duplicated."
         size="lg"
       >
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
@@ -131,8 +146,9 @@ export function CatalogBulkUpload() {
             <FieldLabel htmlFor="bulk-file">CSV file</FieldLabel>
             <input
               id="bulk-file"
+              ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv,text/plain"
+              accept=".csv,text/csv"
               onChange={(e) => void onFile(e.target.files?.[0])}
               className="block w-full text-sm"
             />
