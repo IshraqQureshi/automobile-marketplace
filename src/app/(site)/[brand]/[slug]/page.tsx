@@ -302,7 +302,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
             </div>
           </div>
 
-          <div className="mb-10 grid grid-cols-1 items-start gap-6 md:grid-cols-[3fr_2fr]">
+          <div className="mb-10 grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             <VehicleGallery photos={vehicle.photos} title={vehicle.title} />
 
             <div className="flex flex-col gap-4 lg:sticky lg:top-20">
@@ -352,7 +352,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                     {vehicle.installmentEnabled && (
                       <ScrollToSectionLink
                         targetId="financing-calculator"
-                        className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand hover:bg-[#e0f9f2]"
+                        className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] px-2 py-2 text-xs whitespace-nowrap font-semibold text-brand hover:bg-[#e0f9f2]"
                       >
                         <InstallmentIcon />
                         HP Installments
@@ -365,7 +365,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                       // would have nothing for this link to scroll to.
                       <ScrollToSectionLink
                         targetId="apply-for-financing"
-                        className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] py-2 text-xs font-semibold text-brand hover:bg-[#e0f9f2]"
+                        className="flex items-center justify-center gap-1.5 rounded-md border border-[#99e6df] bg-[#f0fdf9] px-2 py-2 text-xs whitespace-nowrap font-semibold text-brand hover:bg-[#e0f9f2]"
                       >
                         <BankIcon />
                         Apply For Financing

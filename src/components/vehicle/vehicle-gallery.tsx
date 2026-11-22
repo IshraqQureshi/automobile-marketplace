@@ -28,7 +28,7 @@ export function VehicleGallery({ photos, title }: VehicleGalleryProps) {
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="relative mb-3 aspect-video w-full overflow-hidden rounded-[10px] bg-neutral-200">
         {/* Blurred copy fills the letterbox so any size/aspect ratio looks intentional. */}
         <Image src={activePhoto.url} alt="" aria-hidden fill unoptimized className="scale-110 object-cover opacity-60 blur-2xl" />
