@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { CatalogBulkUpload } from "@/components/admin/catalog-bulk-upload";
 import { CatalogBrandsList } from "@/components/admin/catalog-brands-list";
 import { CatalogList } from "@/components/admin/catalog-list";
 import { CatalogModelsList } from "@/components/admin/catalog-models-list";
@@ -69,6 +70,7 @@ export default async function AdminCatalogPage() {
     <>
       <AdminTopbar title="Catalog" />
       <main className="flex-1 px-7 py-6">
+        <CatalogBulkUpload />
         <CatalogTabs
           brandCount={brandItems.length}
           brands={

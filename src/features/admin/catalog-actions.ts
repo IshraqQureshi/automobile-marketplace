@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 import { uploadEntityLogo, validateLogoFile } from "./logo-upload";
 import { catalogNameSchema } from "./catalog-schemas";
+import { MAX_BULK_ROWS, type CatalogBulkKind, type CatalogBulkRow } from "./catalog-bulk";
 
 export interface CatalogActionResult {
   error?: string;
@@ -227,4 +228,111 @@ export async function deleteVehicleTypeAction(id: string): Promise<CatalogAction
 
   revalidatePath("/admin/catalog");
   return {};
+}
+
+export interface BulkImportResult {
+  error?: string;
+  added: number;
+  skippedDuplicates: number;
+  // Rows that failed server-side validation (e.g. a model whose brand doesn't exist).
+  rejected: { name: string; brand?: string; reason: string }[];
+}
+
+const emptyBulk = (error: string): BulkImportResult => ({ error, added: 0, skippedDuplicates: 0, rejected: [] });
+
+/**
+ * Bulk-adds brands, models or types. The client already parsed the CSV, but
+ * nothing from it is trusted: every row is re-validated here, rows that
+ * already exist (compared case-insensitively, so "toyota" never sits next to
+ * "Toyota") are skipped instead of failing the whole upload, and the insert
+ * uses ON CONFLICT DO NOTHING as a last guard against a concurrent upload.
+ * Admin-only writes are still enforced by RLS, same as the single-row actions.
+ */
+export async function bulkImportCatalogAction(kind: CatalogBulkKind, rows: CatalogBulkRow[]): Promise<BulkImportResult> {
+  if (kind !== "brands" && kind !== "models" && kind !== "types") return emptyBulk("Unknown catalog type.");
+  if (!Array.isArray(rows) || rows.length === 0) return emptyBulk("No rows to import.");
+  if (rows.length > MAX_BULK_ROWS) return emptyBulk(`Too many rows — upload at most ${MAX_BULK_ROWS} at a time.`);
+
+  const supabase = await createClient();
+  const rejected: BulkImportResult["rejected"] = [];
+
+  // Re-validate + dedupe within the payload.
+  const valid: CatalogBulkRow[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const name = catalogNameSchema.safeParse(row?.name);
+    const brand = kind === "models" ? catalogNameSchema.safeParse(row?.brand) : null;
+    if (!name.success || (brand && !brand.success)) {
+      rejected.push({ name: String(row?.name ?? ""), brand: row?.brand, reason: "Invalid name or brand." });
+      continue;
+    }
+    const key = `${brand?.data.toLowerCase() ?? ""}\u0000${name.data.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    valid.push(kind === "models" ? { brand: brand!.data, name: name.data } : { name: name.data });
+  }
+
+  let added = 0;
+  let skippedDuplicates = 0;
+
+  if (kind === "models") {
+    const [{ data: brands, error: brandsError }, { data: models, error: modelsError }] = await Promise.all([
+      supabase.from("brands").select("id, name"),
+      supabase.from("models").select("brand_id, name"),
+    ]);
+    if (brandsError || modelsError) {
+      logger.error("Bulk import: failed to load catalog", brandsError ?? modelsError);
+      return emptyBulk("Failed to read the existing catalog.");
+    }
+    const brandIdByName = new Map((brands ?? []).map((b) => [b.name.toLowerCase(), b.id]));
+    const existing = new Set((models ?? []).map((m) => `${m.brand_id}\u0000${m.name.toLowerCase()}`));
+
+    const toInsert: { brand_id: string; name: string }[] = [];
+    for (const row of valid) {
+      const brandId = brandIdByName.get(row.brand!.toLowerCase());
+      if (!brandId) {
+        rejected.push({ name: row.name, brand: row.brand, reason: `Brand "${row.brand}" doesn't exist — add it first.` });
+        continue;
+      }
+      if (existing.has(`${brandId}\u0000${row.name.toLowerCase()}`)) {
+        skippedDuplicates++;
+        continue;
+      }
+      toInsert.push({ brand_id: brandId, name: row.name });
+    }
+    if (toInsert.length > 0) {
+      const { data, error } = await supabase
+        .from("models")
+        .upsert(toInsert, { onConflict: "brand_id,name", ignoreDuplicates: true })
+        .select("id");
+      if (error) {
+        logger.error("Bulk import: failed to insert models", error);
+        return emptyBulk("Failed to import models.");
+      }
+      added = data?.length ?? 0;
+      skippedDuplicates += toInsert.length - added;
+    }
+  } else {
+    const table = kind === "brands" ? "brands" : "vehicle_types";
+    const { data: existingRows, error: readError } = await supabase.from(table).select("name");
+    if (readError) {
+      logger.error(`Bulk import: failed to load ${table}`, readError);
+      return emptyBulk("Failed to read the existing catalog.");
+    }
+    const existing = new Set((existingRows ?? []).map((r) => r.name.toLowerCase()));
+    const toInsert = valid.filter((row) => !existing.has(row.name.toLowerCase())).map((row) => ({ name: row.name }));
+    skippedDuplicates = valid.length - toInsert.length;
+    if (toInsert.length > 0) {
+      const { data, error } = await supabase.from(table).upsert(toInsert, { onConflict: "name", ignoreDuplicates: true }).select("id");
+      if (error) {
+        logger.error(`Bulk import: failed to insert ${table}`, error);
+        return emptyBulk(`Failed to import ${kind}.`);
+      }
+      added = data?.length ?? 0;
+      skippedDuplicates += toInsert.length - added;
+    }
+  }
+
+  revalidatePath("/admin/catalog");
+  return { added, skippedDuplicates, rejected };
 }
