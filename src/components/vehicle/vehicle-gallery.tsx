@@ -30,7 +30,9 @@ export function VehicleGallery({ photos, title }: VehicleGalleryProps) {
   return (
     <div>
       <div className="relative mb-3 aspect-video w-full overflow-hidden rounded-[10px] bg-neutral-200">
-        <Image src={activePhoto.url} alt={title} fill unoptimized className="object-cover" priority />
+        {/* Blurred copy fills the letterbox so any size/aspect ratio looks intentional. */}
+        <Image src={activePhoto.url} alt="" aria-hidden fill unoptimized className="scale-110 object-cover opacity-60 blur-2xl" />
+        <Image src={activePhoto.url} alt={title} fill unoptimized className="object-contain" priority />
         {photos.length > 1 && (
           <>
             <span className="absolute right-3 bottom-3 rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ backgroundColor: "rgba(0,0,0,0.62)" }}>
