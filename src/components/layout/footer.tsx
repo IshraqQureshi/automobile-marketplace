@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FacebookIcon, InstagramIcon, TikTokIcon, XIcon } from "@/components/ui/social-icons";
-import { buildBrandCatalogLinks, buildModelCatalogLinks, buildTypeCatalogLinks, type NavCatalog } from "@/features/vehicle/nav-catalog-links";
+import { buildBrandCatalogLinks, buildModelCatalogLinks, type NavCatalog } from "@/features/vehicle/nav-catalog-links";
 
 export interface FooterSocialLinks {
   facebookUrl: string;
@@ -16,7 +16,7 @@ interface FooterProps {
   isSignedIn: boolean;
 }
 
-const FOOTER_COLUMN_TITLES = { brands: "Brands", models: "Model", types: "Type" } as const;
+const FOOTER_COLUMN_TITLES = { brands: "Brands", models: "Model" } as const;
 
 // The original design shipped exactly 10 static items per column — capping
 // here keeps that shape as the real catalog grows (models in particular
@@ -36,21 +36,19 @@ const SOCIAL_PLATFORMS = [
 
 export function Footer({ navCatalog, socialLinks, isSignedIn }: FooterProps) {
   // Real SEO-friendly links now (previously static inert text) — same
-  // brand/model/type catalog + href-building logic the header's own nav
+  // brand/model catalog + href-building logic the header's own nav
   // dropdowns use, so the two can't silently resolve differently.
   const brandLinks = buildBrandCatalogLinks(navCatalog.brands).slice(0, FOOTER_COLUMN_LIMIT);
   const modelLinks = buildModelCatalogLinks(navCatalog.models).slice(0, FOOTER_COLUMN_LIMIT);
-  const typeLinks = buildTypeCatalogLinks(navCatalog.types).slice(0, FOOTER_COLUMN_LIMIT);
 
   const activeSocialLinks = SOCIAL_PLATFORMS.filter((platform) => socialLinks[platform.key]);
 
   return (
     <footer className="bg-ink text-white">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
           <FooterLinkColumn title={FOOTER_COLUMN_TITLES.brands} items={brandLinks} />
           <FooterLinkColumn title={FOOTER_COLUMN_TITLES.models} items={modelLinks} />
-          <FooterLinkColumn title={FOOTER_COLUMN_TITLES.types} items={typeLinks} />
 
           <div>
             <h3 className="text-xs font-semibold tracking-wide text-white/50">FOLLOW US</h3>

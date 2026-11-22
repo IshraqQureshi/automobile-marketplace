@@ -184,7 +184,7 @@ test("admin can set Facebook/X/Instagram links, and the footer's Follow Us icons
   await expect(footer.getByRole("link", { name: "Register Showroom" })).toHaveCount(0);
 });
 
-test("the footer's Brands/Model/Type columns link to real SEO listing pages", async ({ page }) => {
+test("the footer's Brands/Model columns link to real SEO listing pages", async ({ page }) => {
   await page.goto("/");
   const footer = page.locator("footer");
   const brandLink = footer.getByRole("link").filter({ hasText: /^(BMW|Mercedes-Benz|Audi|Toyota|Porsche|Tesla|Honda|Hyundai|Volkswagen|Range Rover)$/ });
