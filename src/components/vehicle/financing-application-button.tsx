@@ -412,7 +412,7 @@ export function FinancingApplicationButton({
                   rate — the application always quotes the fixed standard
                   APPLICATION_INTEREST_RATE_PERCENT, shown read-only. */}
               <div>
-                <FieldLabel htmlFor="financing-interest-rate">Interest Rate</FieldLabel>
+                <FieldLabel htmlFor="financing-interest-rate">Extra</FieldLabel>
                 <p id="financing-interest-rate" className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-700">
                   {APPLICATION_INTEREST_RATE_PERCENT}% per year
                 </p>

@@ -678,10 +678,10 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
             </div>
 
             <div>
-              <FieldLabel htmlFor="vehicle-interest-rate-value">Interest</FieldLabel>
+              <FieldLabel htmlFor="vehicle-interest-rate-value">Extra</FieldLabel>
               <div className="flex gap-2">
                 <select
-                  aria-label="Interest rate type"
+                  aria-label="Extra type"
                   value={form.financingInterestRateType}
                   onChange={(e) => setField("financingInterestRateType", e.target.value as DownPaymentType)}
                   className={`${selectClassName} w-28 shrink-0`}

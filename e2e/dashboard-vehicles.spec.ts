@@ -375,14 +375,14 @@ test("specification and financing fields save and reload correctly", async ({ pa
   // Same PERCENT/FIXED toggle pattern, applied to Interest rate (client
   // feedback: "Interest can be add fixed on admin panel as well").
   await expect(async () => {
-    await page.getByLabel("Interest rate type").selectOption("FIXED");
-    await expect(page.getByLabel("Interest rate type")).toHaveValue("FIXED");
+    await page.getByLabel("Extra type").selectOption("FIXED");
+    await expect(page.getByLabel("Extra type")).toHaveValue("FIXED");
   }).toPass({ timeout: 10_000 });
   await page.locator("#vehicle-interest-rate-value").fill("50000");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Vehicle updated.")).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Interest rate type")).toHaveValue("FIXED");
+  await expect(page.getByLabel("Extra type")).toHaveValue("FIXED");
   await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("50000");
 });
 

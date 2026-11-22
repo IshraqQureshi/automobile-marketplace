@@ -97,8 +97,8 @@ const optionalNonNegativeAmount = (label: string) =>
 
 export const vehicleDownPaymentPercentSchema = optionalPercent("Down payment");
 export const vehicleDownPaymentAmountSchema = optionalNonNegativeAmount("Down payment amount");
-export const vehicleInterestRateSchema = optionalNonNegativeAmount("Interest rate");
-export const vehicleInterestRateAmountSchema = optionalNonNegativeAmount("Interest amount");
+export const vehicleInterestRateSchema = optionalNonNegativeAmount("Extra");
+export const vehicleInterestRateAmountSchema = optionalNonNegativeAmount("Extra amount");
 export const vehicleInsurancePercentPsvSchema = optionalPercent("Insurance (PSV)");
 export const vehicleInsurancePercentPrivateSchema = optionalPercent("Insurance (Private)");
 export const vehicleFinancingPartnerSchema = optionalTrimmedText(100, "Financing partner");

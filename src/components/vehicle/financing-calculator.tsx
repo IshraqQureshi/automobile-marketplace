@@ -95,7 +95,7 @@ export function FinancingCalculator({
           </div>
 
           <FinanceRow label={downPaymentLabel} sub="Paid upfront" value={currencyFormatter.format(result.downPayment)} />
-          <FinanceRow label="Interest" sub={interestSub} value={currencyFormatter.format(result.totalInterest)} />
+          <FinanceRow label="Extra" sub={interestSub} value={currencyFormatter.format(result.totalInterest)} />
           {insurancePercent != null && (
             <div className="flex items-center justify-between border-b border-neutral-100 py-3.5">
               <div>
@@ -167,7 +167,7 @@ export function FinancingCalculator({
               <SummaryRow label="Car Price" value={currencyFormatter.format(price)} />
               <SummaryRow label={downPaymentLabel} value={currencyFormatter.format(result.downPayment)} />
               <SummaryRow label="Loan Amount" value={currencyFormatter.format(result.loanAmount)} />
-              <SummaryRow label={`Interest (× ${tenureMonths} mo)`} value={currencyFormatter.format(result.totalInterest)} />
+              <SummaryRow label={`Extra (× ${tenureMonths} mo)`} value={currencyFormatter.format(result.totalInterest)} />
               {insurancePercent != null && <SummaryRow label="Insurance" value={currencyFormatter.format(result.insurance)} />}
               {selectedTracker && (
                 <SummaryRow
