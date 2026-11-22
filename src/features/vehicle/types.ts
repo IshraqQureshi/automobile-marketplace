@@ -34,9 +34,13 @@ export interface VehicleListItem {
   financingDownPaymentType: "PERCENT" | "FIXED";
   financingDownPaymentPercent: number | null;
   financingDownPaymentAmount: number | null;
-  financingInterestRateType: "PERCENT" | "FIXED";
+  // "PERCENT" is legacy (no longer offered or saved) but old rows still carry it.
+  financingInterestRateType: "PERCENT" | "FIXED" | "YEARLY";
   financingInterestRate: number | null;
   financingInterestRateAmount: number | null;
+  financingInterestAmount1Year: number | null;
+  financingInterestAmount2Years: number | null;
+  financingInterestAmount3Years: number | null;
   financingInsurancePercentPsv: number | null;
   financingInsurancePercentPrivate: number | null;
   financingPartner: string | null;
@@ -95,7 +99,7 @@ export interface ModelOption extends CatalogOption {
 // The exact select() column list both vehicle pages (list, edit) query —
 // kept alongside the mapper below so the two can't silently drift apart.
 export const VEHICLE_SELECT_COLUMNS =
-  "id, title, make, model, variant, year, price, mileage, fuel_type, transmission, body_type, color, description, engine, interior, doors, seats, country_of_origin, installment_enabled, bank_finance_enabled, financing_down_payment_type, financing_down_payment_percent, financing_down_payment_amount, financing_interest_rate_type, financing_interest_rate, financing_interest_rate_amount, financing_insurance_percent_psv, financing_insurance_percent_private, financing_partner, financing_tenure_options_months, financing_tracker_options, status, created_at, view_count, vehicle_media(id, storage_path, is_primary, sort_order)";
+  "id, title, make, model, variant, year, price, mileage, fuel_type, transmission, body_type, color, description, engine, interior, doors, seats, country_of_origin, installment_enabled, bank_finance_enabled, financing_down_payment_type, financing_down_payment_percent, financing_down_payment_amount, financing_interest_rate_type, financing_interest_rate, financing_interest_rate_amount, financing_interest_amount_1yr, financing_interest_amount_2yr, financing_interest_amount_3yr, financing_insurance_percent_psv, financing_insurance_percent_private, financing_partner, financing_tenure_options_months, financing_tracker_options, status, created_at, view_count, vehicle_media(id, storage_path, is_primary, sort_order)";
 
 interface VehicleRow {
   id: string;
@@ -124,6 +128,9 @@ interface VehicleRow {
   financing_interest_rate_type: string;
   financing_interest_rate: number | null;
   financing_interest_rate_amount: number | null;
+  financing_interest_amount_1yr: number | null;
+  financing_interest_amount_2yr: number | null;
+  financing_interest_amount_3yr: number | null;
   financing_insurance_percent_psv: number | null;
   financing_insurance_percent_private: number | null;
   financing_partner: string | null;
@@ -168,9 +175,12 @@ export function vehicleRowToListItem(vehicle: VehicleRow, getPhotoUrl: (storageP
     financingDownPaymentType: vehicle.financing_down_payment_type as "PERCENT" | "FIXED",
     financingDownPaymentPercent: vehicle.financing_down_payment_percent,
     financingDownPaymentAmount: vehicle.financing_down_payment_amount,
-    financingInterestRateType: vehicle.financing_interest_rate_type as "PERCENT" | "FIXED",
+    financingInterestRateType: vehicle.financing_interest_rate_type as "PERCENT" | "FIXED" | "YEARLY",
     financingInterestRate: vehicle.financing_interest_rate,
     financingInterestRateAmount: vehicle.financing_interest_rate_amount,
+    financingInterestAmount1Year: vehicle.financing_interest_amount_1yr,
+    financingInterestAmount2Years: vehicle.financing_interest_amount_2yr,
+    financingInterestAmount3Years: vehicle.financing_interest_amount_3yr,
     financingInsurancePercentPsv: vehicle.financing_insurance_percent_psv,
     financingInsurancePercentPrivate: vehicle.financing_insurance_percent_private,
     financingPartner: vehicle.financing_partner,

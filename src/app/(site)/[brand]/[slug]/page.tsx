@@ -10,6 +10,7 @@ import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
 import { ScheduleTestDriveButton } from "@/components/vehicle/schedule-test-drive-button";
 import { ScrollToSectionLink } from "@/components/vehicle/scroll-to-section-link";
 import { ShareButton } from "@/components/vehicle/share-button";
+import { selectableTenuresForExtra } from "@/features/vehicle/finance-calculator";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
 import { VehicleInquiryButton } from "@/components/vehicle/vehicle-inquiry-button";
 import { currencyFormatter, VEHICLE_SELECT_COLUMNS, vehicleRowToListItem, type VehicleWithShowroom } from "@/features/vehicle/types";
@@ -210,9 +211,22 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
     },
   };
 
+  const yearlyExtraAmounts = {
+    year1: vehicle.financingInterestAmount1Year,
+    year2: vehicle.financingInterestAmount2Years,
+    year3: vehicle.financingInterestAmount3Years,
+  };
+  // For a Yearly extra, a loan term only counts when its year has an amount.
+  const selectableTenureMonths = selectableTenuresForExtra(vehicle.financingInterestRateType, yearlyExtraAmounts, vehicle.financingTenureMonths ?? []);
+  const hasExtraConfigured =
+    vehicle.financingInterestRateType === "FIXED"
+      ? vehicle.financingInterestRateAmount != null
+      : vehicle.financingInterestRateType === "YEARLY"
+        ? selectableTenureMonths.length > 0
+        : vehicle.financingInterestRate != null;
   const hasRealFinancing =
     (vehicle.bankFinanceEnabled || vehicle.installmentEnabled) &&
-    (vehicle.financingInterestRateType === "FIXED" ? vehicle.financingInterestRateAmount != null : vehicle.financingInterestRate != null) &&
+    hasExtraConfigured &&
     vehicle.financingTenureMonths != null &&
     vehicle.financingTenureMonths.length > 0;
 
@@ -427,6 +441,7 @@ export default async function VehicleDetailPage({ params }: VehicleDetailPagePro
                   interestRateType={vehicle.financingInterestRateType}
                   interestRatePercentPerYear={vehicle.financingInterestRate ?? 0}
                   interestRateAmount={vehicle.financingInterestRateAmount}
+                  interestYearlyAmounts={yearlyExtraAmounts}
                   insurancePercentPsv={vehicle.financingInsurancePercentPsv}
                   insurancePercentPrivate={vehicle.financingInsurancePercentPrivate}
                   trackerOptions={vehicle.financingTrackerOptions ?? []}

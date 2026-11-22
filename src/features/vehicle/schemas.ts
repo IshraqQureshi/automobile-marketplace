@@ -97,8 +97,10 @@ const optionalNonNegativeAmount = (label: string) =>
 
 export const vehicleDownPaymentPercentSchema = optionalPercent("Down payment");
 export const vehicleDownPaymentAmountSchema = optionalNonNegativeAmount("Down payment amount");
-export const vehicleInterestRateSchema = optionalNonNegativeAmount("Extra");
 export const vehicleInterestRateAmountSchema = optionalNonNegativeAmount("Extra amount");
+export const vehicleInterestAmount1YearSchema = optionalNonNegativeAmount("1-year extra");
+export const vehicleInterestAmount2YearsSchema = optionalNonNegativeAmount("2-year extra");
+export const vehicleInterestAmount3YearsSchema = optionalNonNegativeAmount("3-year extra");
 export const vehicleInsurancePercentPsvSchema = optionalPercent("Insurance (PSV)");
 export const vehicleInsurancePercentPrivateSchema = optionalPercent("Insurance (Private)");
 export const vehicleFinancingPartnerSchema = optionalTrimmedText(100, "Financing partner");
@@ -107,6 +109,12 @@ export const vehicleTracker2YearPriceSchema = optionalNonNegativeAmount("2-year 
 export const vehicleTracker3YearPriceSchema = optionalNonNegativeAmount("3-year tracker fee");
 
 export const DOWN_PAYMENT_TYPES = ["PERCENT", "FIXED"] as const;
+// What a showroom can SAVE for Extra: one flat amount, or a separate amount
+// for 1/2/3 years. The old "PERCENT" (%/year) is retired for new saves —
+// existing rows that still carry it keep working (see the calculator) until
+// the showroom re-saves them.
+export const EXTRA_TYPES = ["FIXED", "YEARLY"] as const;
+export type ExtraTypeOption = (typeof EXTRA_TYPES)[number];
 export type DownPaymentType = (typeof DOWN_PAYMENT_TYPES)[number];
 export const LOAN_TENURE_OPTIONS_MONTHS = [12, 24, 36] as const;
 
@@ -132,8 +140,10 @@ export const vehicleFieldSchemas = {
   countryOfOrigin: vehicleCountryOfOriginSchema,
   financingDownPaymentPercent: vehicleDownPaymentPercentSchema,
   financingDownPaymentAmount: vehicleDownPaymentAmountSchema,
-  financingInterestRate: vehicleInterestRateSchema,
   financingInterestRateAmount: vehicleInterestRateAmountSchema,
+  financingInterestAmount1Year: vehicleInterestAmount1YearSchema,
+  financingInterestAmount2Years: vehicleInterestAmount2YearsSchema,
+  financingInterestAmount3Years: vehicleInterestAmount3YearsSchema,
   financingInsurancePercentPsv: vehicleInsurancePercentPsvSchema,
   financingInsurancePercentPrivate: vehicleInsurancePercentPrivateSchema,
   financingPartner: vehicleFinancingPartnerSchema,
@@ -195,11 +205,11 @@ export const vehicleSchema = z
     financingDownPaymentType: z.enum(DOWN_PAYMENT_TYPES).default("PERCENT"),
     financingDownPaymentPercent: vehicleDownPaymentPercentSchema,
     financingDownPaymentAmount: vehicleDownPaymentAmountSchema,
-    // Reuses DOWN_PAYMENT_TYPES — same PERCENT/FIXED choice, just applied to
-    // the interest rate instead of the down payment.
-    financingInterestRateType: z.enum(DOWN_PAYMENT_TYPES).default("PERCENT"),
-    financingInterestRate: vehicleInterestRateSchema,
+    financingInterestRateType: z.enum(EXTRA_TYPES).default("FIXED"),
     financingInterestRateAmount: vehicleInterestRateAmountSchema,
+    financingInterestAmount1Year: vehicleInterestAmount1YearSchema,
+    financingInterestAmount2Years: vehicleInterestAmount2YearsSchema,
+    financingInterestAmount3Years: vehicleInterestAmount3YearsSchema,
     financingInsurancePercentPsv: vehicleInsurancePercentPsvSchema,
     financingInsurancePercentPrivate: vehicleInsurancePercentPrivateSchema,
     financingPartner: vehicleFinancingPartnerSchema,
@@ -208,7 +218,20 @@ export const vehicleSchema = z
     financingTracker2YearPrice: vehicleTracker2YearPriceSchema,
     financingTracker3YearPrice: vehicleTracker3YearPriceSchema,
   })
-  .transform((data) => {
+  .transform((data, ctx) => {
+    // A Yearly Extra with no amount at all would leave the public calculator
+    // with nothing to show, so it's rejected while financing is on.
+    if (
+      (data.installmentEnabled || data.bankFinanceEnabled) &&
+      data.financingInterestRateType === "YEARLY" &&
+      data.financingInterestAmount1Year == null &&
+      data.financingInterestAmount2Years == null &&
+      data.financingInterestAmount3Years == null
+    ) {
+      ctx.addIssue({ code: "custom", message: "Enter an extra amount for at least one year", path: ["financingInterestAmount1Year"] });
+      return z.NEVER;
+    }
+
     // Only the active down-payment figure (per financingDownPaymentType) is
     // kept — the inactive one is dropped rather than persisted stale, since
     // the UI only ever shows one of the two inputs at a time.
@@ -225,8 +248,12 @@ export const vehicleSchema = z
       ...data,
       financingDownPaymentPercent: data.financingDownPaymentType === "PERCENT" ? data.financingDownPaymentPercent : undefined,
       financingDownPaymentAmount: data.financingDownPaymentType === "FIXED" ? data.financingDownPaymentAmount : undefined,
-      financingInterestRate: data.financingInterestRateType === "PERCENT" ? data.financingInterestRate : undefined,
+      // Only the active Extra figures are kept (same rule as the down
+      // payment). The legacy %/year rate is always cleared on save.
       financingInterestRateAmount: data.financingInterestRateType === "FIXED" ? data.financingInterestRateAmount : undefined,
+      financingInterestAmount1Year: data.financingInterestRateType === "YEARLY" ? data.financingInterestAmount1Year : undefined,
+      financingInterestAmount2Years: data.financingInterestRateType === "YEARLY" ? data.financingInterestAmount2Years : undefined,
+      financingInterestAmount3Years: data.financingInterestRateType === "YEARLY" ? data.financingInterestAmount3Years : undefined,
       financingTrackerOptions,
     };
   });

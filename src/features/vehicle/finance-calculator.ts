@@ -7,6 +7,35 @@
 // disclaimer (matches the design's own copy) — not a claim of amortization-
 // schedule precision.
 
+export type ExtraType = "PERCENT" | "FIXED" | "YEARLY";
+
+// The showroom's Extra amount for a 1, 2 and 3 year term (YEARLY type).
+export interface YearlyExtraAmounts {
+  year1: number | null;
+  year2: number | null;
+  year3: number | null;
+}
+
+/**
+ * The Extra amount for a loan term, or null when the showroom didn't enter
+ * one for that year (or the term isn't 12/24/36 months). Loan terms are the
+ * year choice: 12 months = 1 year, 24 = 2 years, 36 = 3 years.
+ */
+export function yearlyExtraForTenure(amounts: YearlyExtraAmounts, tenureMonths: number): number | null {
+  const byMonths: Record<number, number | null> = { 12: amounts.year1, 24: amounts.year2, 36: amounts.year3 };
+  return byMonths[tenureMonths] ?? null;
+}
+
+/**
+ * Loan terms a buyer can pick. For a YEARLY extra only the years the
+ * showroom actually priced are offered — a 2-year term with no 2-year Extra
+ * would otherwise silently calculate with an Extra of 0.
+ */
+export function selectableTenuresForExtra(type: ExtraType, amounts: YearlyExtraAmounts, tenureOptionsMonths: number[]): number[] {
+  if (type !== "YEARLY") return tenureOptionsMonths;
+  return tenureOptionsMonths.filter((months) => yearlyExtraForTenure(amounts, months) != null);
+}
+
 export interface FinanceCalculatorInputs {
   price: number;
   downPaymentType: "PERCENT" | "FIXED";
@@ -16,9 +45,11 @@ export interface FinanceCalculatorInputs {
   // formula input" semantics as downPaymentType FIXED) rather than a %/year
   // rate scaled by loan amount and tenure — optional/defaults to PERCENT so
   // every existing PERCENT-only caller keeps working unchanged.
-  interestRateType?: "PERCENT" | "FIXED";
+  interestRateType?: ExtraType;
   interestRatePercentPerYear: number;
   interestRateAmount?: number | null;
+  // Used when interestRateType is YEARLY — the amount for tenureMonths is picked.
+  interestYearlyAmounts?: YearlyExtraAmounts;
   insurancePercent: number | null;
   trackerFee: number;
   // The selected tracker plan's OWN duration in months (e.g. a "3 Years"
@@ -60,7 +91,9 @@ export function calculateFinanceEstimate(inputs: FinanceCalculatorInputs): Finan
   const totalInterest =
     inputs.interestRateType === "FIXED"
       ? Math.max(0, inputs.interestRateAmount ?? 0)
-      : loanAmount * (Math.max(0, inputs.interestRatePercentPerYear) / 100) * (Math.max(1, inputs.tenureMonths) / 12);
+      : inputs.interestRateType === "YEARLY"
+        ? Math.max(0, (inputs.interestYearlyAmounts ? yearlyExtraForTenure(inputs.interestYearlyAmounts, inputs.tenureMonths) : null) ?? 0)
+        : loanAmount * (Math.max(0, inputs.interestRatePercentPerYear) / 100) * (Math.max(1, inputs.tenureMonths) / 12);
   const insurance = inputs.price * (Math.max(0, inputs.insurancePercent ?? 0) / 100);
   const trackerFee = Math.max(0, inputs.trackerFee);
   const trackerDurationMonths = Math.max(0, inputs.trackerDurationMonths ?? 0);

@@ -36,6 +36,10 @@ const TRACKER_OPTIONS = [
 let showroomId: string;
 let vehicleId: string;
 let vehiclePath: string;
+let yearlyVehicleId: string;
+let yearlyVehiclePath: string;
+
+const YEARLY_EXTRA = { year1: 30_000, year2: 55_000, year3: 80_000 };
 
 test.beforeAll(async () => {
   const supabase = admin();
@@ -96,11 +100,39 @@ test.beforeAll(async () => {
   if (vehicleError || !vehicle) throw vehicleError ?? new Error("vehicle not created");
   vehicleId = vehicle.id;
   vehiclePath = `/e2efinance${unique}/gamma-${vehicleId}`;
+
+  // Second vehicle: a YEARLY extra, with a separate amount per 1/2/3 year
+  // term (loan terms 12/24/36 months).
+  const { data: yearlyVehicle, error: yearlyError } = await supabase
+    .from("vehicles")
+    .insert({
+      showroom_id: showroomId,
+      title: `E2E Finance Yearly Vehicle ${unique}`,
+      make: `E2efinance${unique}`,
+      model: "Delta",
+      year: 2023,
+      price: PRICE,
+      status: "ACTIVE",
+      installment_enabled: true,
+      financing_down_payment_type: "PERCENT",
+      financing_down_payment_percent: DOWN_PAYMENT_PERCENT,
+      financing_interest_rate_type: "YEARLY",
+      financing_interest_amount_1yr: YEARLY_EXTRA.year1,
+      financing_interest_amount_2yr: YEARLY_EXTRA.year2,
+      financing_interest_amount_3yr: YEARLY_EXTRA.year3,
+      financing_tenure_options_months: [12, 24, 36],
+    })
+    .select("id")
+    .single();
+  if (yearlyError || !yearlyVehicle) throw yearlyError ?? new Error("yearly vehicle not created");
+  yearlyVehicleId = yearlyVehicle.id;
+  yearlyVehiclePath = `/e2efinance${unique}/delta-${yearlyVehicleId}`;
 });
 
 test.afterAll(async () => {
   const supabase = admin();
   await supabase.from("vehicles").delete().eq("id", vehicleId);
+  await supabase.from("vehicles").delete().eq("id", yearlyVehicleId);
   await supabase.from("showrooms").delete().eq("id", showroomId);
 });
 
@@ -282,5 +314,38 @@ test("the Financing Calculator section is hidden entirely (not an empty state) w
     await expect(dialog.locator("#financing-interest-rate")).toBeVisible();
   } finally {
     await supabase.from("vehicles").delete().eq("id", installmentOffVehicle.id);
+  }
+});
+
+test("a Yearly extra shows the amount for the selected 1, 2 or 3 year loan term", async ({ page }) => {
+  await page.goto(yearlyVehiclePath);
+  await expect(page.getByRole("heading", { name: "Financing Calculator" })).toBeVisible();
+
+  const termSelect = page.getByLabel("Loan term");
+  await expect(termSelect.locator("option")).toHaveText(["1 year (12 months)", "2 years (24 months)", "3 years (36 months)"]);
+
+  const extraRow = page.getByText("Extra", { exact: true }).first().locator("xpath=ancestor::div[contains(@class,'justify-between')][1]");
+  const expectedTotal = (months: number, extra: number) =>
+    calculateFinanceEstimate({
+      price: PRICE,
+      downPaymentType: "PERCENT",
+      downPaymentPercent: DOWN_PAYMENT_PERCENT,
+      downPaymentAmount: null,
+      interestRateType: "YEARLY",
+      interestRatePercentPerYear: 0,
+      interestYearlyAmounts: YEARLY_EXTRA,
+      insurancePercent: null,
+      trackerFee: 0,
+      tenureMonths: months,
+    }).totalInterest === extra;
+
+  for (const [months, extra] of [
+    [12, YEARLY_EXTRA.year1],
+    [24, YEARLY_EXTRA.year2],
+    [36, YEARLY_EXTRA.year3],
+  ] as const) {
+    await termSelect.selectOption(String(months));
+    await expect(extraRow).toContainText(extra.toLocaleString("en-KE"));
+    expect(expectedTotal(months, extra)).toBe(true);
   }
 });

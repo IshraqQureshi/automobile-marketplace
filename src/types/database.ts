@@ -1110,6 +1110,9 @@ export type Database = {
           financing_insurance_percent_psv: number | null
           financing_interest_rate: number | null
           financing_interest_rate_amount: number | null
+          financing_interest_amount_1yr: number | null
+          financing_interest_amount_2yr: number | null
+          financing_interest_amount_3yr: number | null
           financing_interest_rate_type: string
           financing_partner: string | null
           financing_tenure_options_months: number[] | null
@@ -1149,6 +1152,9 @@ export type Database = {
           financing_insurance_percent_psv?: number | null
           financing_interest_rate?: number | null
           financing_interest_rate_amount?: number | null
+          financing_interest_amount_1yr?: number | null
+          financing_interest_amount_2yr?: number | null
+          financing_interest_amount_3yr?: number | null
           financing_interest_rate_type?: string
           financing_partner?: string | null
           financing_tenure_options_months?: number[] | null
@@ -1188,6 +1194,9 @@ export type Database = {
           financing_insurance_percent_psv?: number | null
           financing_interest_rate?: number | null
           financing_interest_rate_amount?: number | null
+          financing_interest_amount_1yr?: number | null
+          financing_interest_amount_2yr?: number | null
+          financing_interest_amount_3yr?: number | null
           financing_interest_rate_type?: string
           financing_partner?: string | null
           financing_tenure_options_months?: number[] | null

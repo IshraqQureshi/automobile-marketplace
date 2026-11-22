@@ -9,11 +9,13 @@ import { useFieldValidation } from "@/features/auth/use-field-validation";
 import { createVehicleAction, updateVehicleAction, updateVehicleStatusAction } from "@/features/vehicle/actions";
 import {
   DOWN_PAYMENT_TYPES,
+  EXTRA_TYPES,
   FUEL_TYPES,
   LOAN_TENURE_OPTIONS_MONTHS,
   TRANSMISSIONS,
   vehicleFieldSchemas,
   type DownPaymentType,
+  type ExtraTypeOption,
 } from "@/features/vehicle/schemas";
 import {
   OWNER_STATUS_OPTIONS,
@@ -58,9 +60,13 @@ interface VehicleFormState {
   financingDownPaymentType: DownPaymentType;
   financingDownPaymentPercent: string;
   financingDownPaymentAmount: string;
-  financingInterestRateType: DownPaymentType;
-  financingInterestRate: string;
+  financingInterestRateType: ExtraTypeOption;
   financingInterestRateAmount: string;
+  financingInterestAmount1Year: string;
+  financingInterestAmount2Years: string;
+  financingInterestAmount3Years: string;
+  // Display-only: the old %/year rate a legacy listing still carries. Never submitted.
+  legacyExtraPercent: string;
   financingInsurancePercentPsv: string;
   financingInsurancePercentPrivate: string;
   financingPartner: string;
@@ -99,9 +105,12 @@ function emptyForm(): VehicleFormState {
     financingDownPaymentType: "PERCENT",
     financingDownPaymentPercent: "",
     financingDownPaymentAmount: "",
-    financingInterestRateType: "PERCENT",
-    financingInterestRate: "",
+    financingInterestRateType: "FIXED",
     financingInterestRateAmount: "",
+    financingInterestAmount1Year: "",
+    financingInterestAmount2Years: "",
+    financingInterestAmount3Years: "",
+    legacyExtraPercent: "",
     financingInsurancePercentPsv: "",
     financingInsurancePercentPrivate: "",
     financingPartner: "",
@@ -145,9 +154,15 @@ function formFromVehicle(vehicle: VehicleListItem, brands: CatalogOption[]): Veh
     financingDownPaymentType: vehicle.financingDownPaymentType,
     financingDownPaymentPercent: vehicle.financingDownPaymentPercent != null ? String(vehicle.financingDownPaymentPercent) : "",
     financingDownPaymentAmount: vehicle.financingDownPaymentAmount != null ? String(vehicle.financingDownPaymentAmount) : "",
-    financingInterestRateType: vehicle.financingInterestRateType,
-    financingInterestRate: vehicle.financingInterestRate != null ? String(vehicle.financingInterestRate) : "",
+    // A legacy %/year listing opens as Fixed with nothing filled in — the
+    // showroom has to choose Fixed or Yearly (the old % is no longer offered).
+    financingInterestRateType: vehicle.financingInterestRateType === "YEARLY" ? "YEARLY" : "FIXED",
     financingInterestRateAmount: vehicle.financingInterestRateAmount != null ? String(vehicle.financingInterestRateAmount) : "",
+    financingInterestAmount1Year: vehicle.financingInterestAmount1Year != null ? String(vehicle.financingInterestAmount1Year) : "",
+    financingInterestAmount2Years: vehicle.financingInterestAmount2Years != null ? String(vehicle.financingInterestAmount2Years) : "",
+    financingInterestAmount3Years: vehicle.financingInterestAmount3Years != null ? String(vehicle.financingInterestAmount3Years) : "",
+    legacyExtraPercent:
+      vehicle.financingInterestRateType === "PERCENT" && vehicle.financingInterestRate != null ? String(vehicle.financingInterestRate) : "",
     financingInsurancePercentPsv: vehicle.financingInsurancePercentPsv != null ? String(vehicle.financingInsurancePercentPsv) : "",
     financingInsurancePercentPrivate: vehicle.financingInsurancePercentPrivate != null ? String(vehicle.financingInsurancePercentPrivate) : "",
     financingPartner: vehicle.financingPartner ?? "",
@@ -185,8 +200,10 @@ const VALIDATED_FIELDS = [
 const FINANCING_VALIDATED_FIELDS = [
   "financingDownPaymentPercent",
   "financingDownPaymentAmount",
-  "financingInterestRate",
   "financingInterestRateAmount",
+  "financingInterestAmount1Year",
+  "financingInterestAmount2Years",
+  "financingInterestAmount3Years",
   "financingInsurancePercentPsv",
   "financingInsurancePercentPrivate",
   "financingTracker1YearPrice",
@@ -293,8 +310,10 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
     formData.set("financingDownPaymentPercent", form.financingDownPaymentPercent);
     formData.set("financingDownPaymentAmount", form.financingDownPaymentAmount);
     formData.set("financingInterestRateType", form.financingInterestRateType);
-    formData.set("financingInterestRate", form.financingInterestRate);
     formData.set("financingInterestRateAmount", form.financingInterestRateAmount);
+    formData.set("financingInterestAmount1Year", form.financingInterestAmount1Year);
+    formData.set("financingInterestAmount2Years", form.financingInterestAmount2Years);
+    formData.set("financingInterestAmount3Years", form.financingInterestAmount3Years);
     formData.set("financingInsurancePercentPsv", form.financingInsurancePercentPsv);
     formData.set("financingInsurancePercentPrivate", form.financingInsurancePercentPrivate);
     formData.set("financingPartner", form.financingPartner);
@@ -677,33 +696,22 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
               )}
             </div>
 
-            <div>
+            <div className={form.financingInterestRateType === "YEARLY" ? "sm:col-span-3" : undefined}>
               <FieldLabel htmlFor="vehicle-interest-rate-value">Extra</FieldLabel>
               <div className="flex gap-2">
                 <select
                   aria-label="Extra type"
                   value={form.financingInterestRateType}
-                  onChange={(e) => setField("financingInterestRateType", e.target.value as DownPaymentType)}
+                  onChange={(e) => setField("financingInterestRateType", e.target.value as ExtraTypeOption)}
                   className={`${selectClassName} w-28 shrink-0`}
                 >
-                  {DOWN_PAYMENT_TYPES.map((type) => (
+                  {EXTRA_TYPES.map((type) => (
                     <option key={type} value={type}>
-                      {type === "PERCENT" ? "%/year" : "Fixed (KES)"}
+                      {type === "YEARLY" ? "Yearly" : "Fixed (KES)"}
                     </option>
                   ))}
                 </select>
-                {form.financingInterestRateType === "PERCENT" ? (
-                  <Input
-                    id="vehicle-interest-rate-value"
-                    inputMode="decimal"
-                    value={form.financingInterestRate}
-                    onChange={(e) => setField("financingInterestRate", e.target.value)}
-                    onBlur={(e) => validate("financingInterestRate", e.target.value)}
-                    placeholder="e.g. 14"
-                    error={!!errorFor("financingInterestRate")}
-                    className="min-w-0 flex-1"
-                  />
-                ) : (
+                {form.financingInterestRateType === "FIXED" && (
                   <Input
                     id="vehicle-interest-rate-value"
                     inputMode="decimal"
@@ -716,9 +724,44 @@ export function VehicleForm({ mode, vehicleId, initialValues, brands, models, bo
                   />
                 )}
               </div>
-              {(errorFor("financingInterestRate") || errorFor("financingInterestRateAmount")) && (
-                <p className="mt-1 text-sm text-red-600">{errorFor("financingInterestRate") || errorFor("financingInterestRateAmount")}</p>
+
+              {form.financingInterestRateType === "YEARLY" && (
+                <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                  {(
+                    [
+                      ["financingInterestAmount1Year", "1 year (KES)"],
+                      ["financingInterestAmount2Years", "2 years (KES)"],
+                      ["financingInterestAmount3Years", "3 years (KES)"],
+                    ] as const
+                  ).map(([field, label]) => (
+                    <div key={field}>
+                      <label htmlFor={`vehicle-${field}`} className="mb-1 block text-xs text-neutral-500">
+                        {label}
+                      </label>
+                      <Input
+                        id={`vehicle-${field}`}
+                        inputMode="decimal"
+                        value={form[field]}
+                        onChange={(e) => setField(field, e.target.value)}
+                        onBlur={(e) => validate(field, e.target.value)}
+                        placeholder="e.g. 50000"
+                        error={!!errorFor(field)}
+                      />
+                      {errorFor(field) && <p className="mt-1 text-sm text-red-600">{errorFor(field)}</p>}
+                    </div>
+                  ))}
+                  <p className="text-xs text-neutral-500 sm:col-span-3">
+                    The buyer picks a 1, 2 or 3 year loan term and sees the matching amount. Only years you fill in (and enable under Loan term) are offered.
+                  </p>
+                </div>
               )}
+
+              {form.legacyExtraPercent && !form.financingInterestRateAmount && form.financingInterestRateType === "FIXED" && (
+                <p className="mt-1 text-xs text-amber-700">
+                  This listing used a {form.legacyExtraPercent}%/year rate, which is no longer offered. Enter a fixed amount or choose Yearly — saving without one removes the extra.
+                </p>
+              )}
+              {errorFor("financingInterestRateAmount") && <p className="mt-1 text-sm text-red-600">{errorFor("financingInterestRateAmount")}</p>}
             </div>
 
             {/* Reordered (moved up from after Insurance) so all three

@@ -35,7 +35,7 @@ function readVehicleFormData(formData: FormData) {
   // block saving, or the server would reject a submission the user has no
   // visible field left to fix (confirmed live: an invalid financing value +
   // installment unchecked silently failed to save before this blanking was
-  // added). Down payment/interest/tenure/insurance/tracker are shared
+  // added). Down payment/extra/tenure/insurance/tracker are shared
   // config for BOTH installment and bank finance, not installment-only —
   // keying this off installmentEnabled alone wiped them to blank on every
   // save while installment was off, even with bank finance still enabled,
@@ -70,9 +70,11 @@ function readVehicleFormData(formData: FormData) {
     financingDownPaymentType: String(formData.get("financingDownPaymentType") ?? "PERCENT"),
     financingDownPaymentPercent: financingFieldsActive ? String(formData.get("financingDownPaymentPercent") ?? "") : "",
     financingDownPaymentAmount: financingFieldsActive ? String(formData.get("financingDownPaymentAmount") ?? "") : "",
-    financingInterestRateType: String(formData.get("financingInterestRateType") ?? "PERCENT"),
-    financingInterestRate: financingFieldsActive ? String(formData.get("financingInterestRate") ?? "") : "",
+    financingInterestRateType: String(formData.get("financingInterestRateType") ?? "FIXED"),
     financingInterestRateAmount: financingFieldsActive ? String(formData.get("financingInterestRateAmount") ?? "") : "",
+    financingInterestAmount1Year: financingFieldsActive ? String(formData.get("financingInterestAmount1Year") ?? "") : "",
+    financingInterestAmount2Years: financingFieldsActive ? String(formData.get("financingInterestAmount2Years") ?? "") : "",
+    financingInterestAmount3Years: financingFieldsActive ? String(formData.get("financingInterestAmount3Years") ?? "") : "",
     financingInsurancePercentPsv: financingFieldsActive ? String(formData.get("financingInsurancePercentPsv") ?? "") : "",
     financingInsurancePercentPrivate: financingFieldsActive ? String(formData.get("financingInsurancePercentPrivate") ?? "") : "",
     financingPartner: financingFieldsActive ? String(formData.get("financingPartner") ?? "") : "",
@@ -108,8 +110,12 @@ function vehicleRowFromParsed(parsed: ReturnType<typeof vehicleSchema.parse>) {
     financing_down_payment_percent: parsed.financingDownPaymentPercent ?? null,
     financing_down_payment_amount: parsed.financingDownPaymentAmount ?? null,
     financing_interest_rate_type: parsed.financingInterestRateType,
-    financing_interest_rate: parsed.financingInterestRate ?? null,
+    // The legacy %/year rate is retired — always cleared when a showroom saves.
+    financing_interest_rate: null,
     financing_interest_rate_amount: parsed.financingInterestRateAmount ?? null,
+    financing_interest_amount_1yr: parsed.financingInterestAmount1Year ?? null,
+    financing_interest_amount_2yr: parsed.financingInterestAmount2Years ?? null,
+    financing_interest_amount_3yr: parsed.financingInterestAmount3Years ?? null,
     financing_insurance_percent_psv: parsed.financingInsurancePercentPsv ?? null,
     financing_insurance_percent_private: parsed.financingInsurancePercentPrivate ?? null,
     financing_partner: parsed.financingPartner ?? null,

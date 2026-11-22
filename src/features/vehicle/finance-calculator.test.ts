@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateFinanceEstimate, trackerDurationToMonths } from "./finance-calculator";
+import { calculateFinanceEstimate, selectableTenuresForExtra, trackerDurationToMonths, yearlyExtraForTenure } from "./finance-calculator";
 
 const BASE = {
   price: 2_000_000,
@@ -155,5 +155,58 @@ describe("trackerDurationToMonths", () => {
 
   it("returns 0 for an unrecognized label rather than throwing", () => {
     expect(trackerDurationToMonths("lifetime")).toBe(0);
+  });
+});
+
+describe("yearly extra", () => {
+  const AMOUNTS = { year1: 30_000, year2: 55_000, year3: 80_000 };
+
+  it("maps 12/24/36 month terms to the 1/2/3 year amounts, and nothing else", () => {
+    expect(yearlyExtraForTenure(AMOUNTS, 12)).toBe(30_000);
+    expect(yearlyExtraForTenure(AMOUNTS, 24)).toBe(55_000);
+    expect(yearlyExtraForTenure(AMOUNTS, 36)).toBe(80_000);
+    expect(yearlyExtraForTenure(AMOUNTS, 18)).toBeNull();
+    expect(yearlyExtraForTenure({ year1: null, year2: 1, year3: null }, 12)).toBeNull();
+  });
+
+  it("uses the amount for the selected term as the extra (not a rate)", () => {
+    for (const [tenureMonths, expected] of [
+      [12, 30_000],
+      [24, 55_000],
+      [36, 80_000],
+    ] as const) {
+      const result = calculateFinanceEstimate({ ...BASE, interestRateType: "YEARLY", interestYearlyAmounts: AMOUNTS, tenureMonths });
+      expect(result.totalInterest).toBe(expected);
+    }
+  });
+
+  it("changes the monthly payment and total payable with the chosen year", () => {
+    const one = calculateFinanceEstimate({ ...BASE, interestRateType: "YEARLY", interestYearlyAmounts: AMOUNTS, tenureMonths: 12 });
+    const three = calculateFinanceEstimate({ ...BASE, interestRateType: "YEARLY", interestYearlyAmounts: AMOUNTS, tenureMonths: 36 });
+    expect(three.totalPayable - one.totalPayable).toBe(80_000 - 30_000);
+  });
+
+  it("treats a year with no amount as an extra of 0, never NaN", () => {
+    const result = calculateFinanceEstimate({
+      ...BASE,
+      interestRateType: "YEARLY",
+      interestYearlyAmounts: { year1: 10_000, year2: null, year3: null },
+      tenureMonths: 24,
+    });
+    expect(result.totalInterest).toBe(0);
+    expect(Number.isFinite(result.monthlyPayment)).toBe(true);
+  });
+
+  it("only offers terms the showroom priced for a yearly extra, and every term otherwise", () => {
+    const partial = { year1: 30_000, year2: null, year3: 80_000 };
+    expect(selectableTenuresForExtra("YEARLY", partial, [12, 24, 36])).toEqual([12, 36]);
+    expect(selectableTenuresForExtra("YEARLY", partial, [24])).toEqual([]);
+    expect(selectableTenuresForExtra("FIXED", partial, [12, 24, 36])).toEqual([12, 24, 36]);
+    expect(selectableTenuresForExtra("PERCENT", partial, [12, 24])).toEqual([12, 24]);
+  });
+
+  it("keeps legacy PERCENT listings calculating exactly as before", () => {
+    const result = calculateFinanceEstimate({ ...BASE, interestRateType: "PERCENT" });
+    expect(result.totalInterest).toBe(448_000);
   });
 });

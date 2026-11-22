@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { calculateFinanceEstimate, trackerDurationToMonths } from "@/features/vehicle/finance-calculator";
+import {
+  calculateFinanceEstimate,
+  selectableTenuresForExtra,
+  trackerDurationToMonths,
+  type ExtraType,
+  type YearlyExtraAmounts,
+} from "@/features/vehicle/finance-calculator";
 import { currencyFormatter } from "@/features/vehicle/types";
 
 export interface FinancingCalculatorProps {
@@ -9,9 +15,11 @@ export interface FinancingCalculatorProps {
   downPaymentType: "PERCENT" | "FIXED";
   downPaymentPercent: number | null;
   downPaymentAmount: number | null;
-  interestRateType: "PERCENT" | "FIXED";
+  interestRateType: ExtraType;
   interestRatePercentPerYear: number;
   interestRateAmount: number | null;
+  // Amount per 1/2/3 year term — used when interestRateType is YEARLY.
+  interestYearlyAmounts: YearlyExtraAmounts;
   insurancePercentPsv: number | null;
   insurancePercentPrivate: number | null;
   trackerOptions: { duration: string; price: number }[];
@@ -35,12 +43,19 @@ export function FinancingCalculator({
   interestRateType,
   interestRatePercentPerYear,
   interestRateAmount,
+  interestYearlyAmounts,
   insurancePercentPsv,
   insurancePercentPrivate,
   trackerOptions,
   tenureOptionsMonths,
 }: FinancingCalculatorProps) {
-  const [tenureMonths, setTenureMonths] = useState(tenureOptionsMonths[0]!);
+  // For a Yearly extra the loan term IS the year choice, so only the years
+  // the showroom priced can be selected.
+  const selectableTenures = useMemo(
+    () => selectableTenuresForExtra(interestRateType, interestYearlyAmounts, tenureOptionsMonths),
+    [interestRateType, interestYearlyAmounts, tenureOptionsMonths],
+  );
+  const [tenureMonths, setTenureMonths] = useState(selectableTenures[0]!);
   const [trackerIndex, setTrackerIndex] = useState(trackerOptions.length > 0 ? 0 : -1);
   // Defaults to whichever type the showroom actually configured — PSV takes
   // priority when both are set, same "first available option" convention as
@@ -61,6 +76,7 @@ export function FinancingCalculator({
         interestRateType,
         interestRatePercentPerYear,
         interestRateAmount,
+        interestYearlyAmounts,
         insurancePercent,
         trackerFee: selectedTracker?.price ?? 0,
         trackerDurationMonths: trackerDurationToMonths(selectedTracker?.duration),
@@ -74,6 +90,7 @@ export function FinancingCalculator({
       interestRateType,
       interestRatePercentPerYear,
       interestRateAmount,
+      interestYearlyAmounts,
       insurancePercent,
       selectedTracker,
       tenureMonths,
@@ -83,7 +100,11 @@ export function FinancingCalculator({
   const downPaymentLabel =
     downPaymentType === "PERCENT" ? `Deposit (${downPaymentPercent}%)` : "Deposit (fixed)";
   const interestSub =
-    interestRateType === "PERCENT" ? `${interestRatePercentPerYear}% per year, over the loan term` : "Fixed amount";
+    interestRateType === "PERCENT"
+      ? `${interestRatePercentPerYear}% per year, over the loan term`
+      : interestRateType === "YEARLY"
+        ? `For a ${tenureMonths / 12}-year term`
+        : "Fixed amount";
 
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
@@ -151,9 +172,9 @@ export function FinancingCalculator({
               aria-label="Loan term"
               className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-semibold text-neutral-900 outline-none"
             >
-              {tenureOptionsMonths.map((months) => (
+              {selectableTenures.map((months) => (
                 <option key={months} value={months}>
-                  {months} months
+                  {interestRateType === "YEARLY" ? `${months / 12} ${months === 12 ? "year" : "years"} (${months} months)` : `${months} months`}
                 </option>
               ))}
             </select>

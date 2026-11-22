@@ -384,6 +384,24 @@ test("specification and financing fields save and reload correctly", async ({ pa
   await page.reload();
   await expect(page.getByLabel("Extra type")).toHaveValue("FIXED");
   await expect(page.locator("#vehicle-interest-rate-value")).toHaveValue("50000");
+
+  // Yearly: a separate Extra amount for 1, 2 and 3 years (replaces the old
+  // %/year option, which is no longer offered).
+  await expect(page.getByLabel("Extra type").locator("option")).toHaveText(["Fixed (KES)", "Yearly"]);
+  await expect(async () => {
+    await page.getByLabel("Extra type").selectOption("YEARLY");
+    await expect(page.getByLabel("Extra type")).toHaveValue("YEARLY");
+  }).toPass({ timeout: 10_000 });
+  await page.locator("#vehicle-financingInterestAmount1Year").fill("30000");
+  await page.locator("#vehicle-financingInterestAmount2Years").fill("55000");
+  await page.locator("#vehicle-financingInterestAmount3Years").fill("80000");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Vehicle updated.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Extra type")).toHaveValue("YEARLY");
+  await expect(page.locator("#vehicle-financingInterestAmount1Year")).toHaveValue("30000");
+  await expect(page.locator("#vehicle-financingInterestAmount2Years")).toHaveValue("55000");
+  await expect(page.locator("#vehicle-financingInterestAmount3Years")).toHaveValue("80000");
 });
 
 // Client feedback (direct follow-up, reverting an earlier fix's UI choice):

@@ -34,9 +34,11 @@ const validFullVehicle = {
   financingDownPaymentType: "PERCENT",
   financingDownPaymentPercent: "20",
   financingDownPaymentAmount: "",
-  financingInterestRateType: "PERCENT",
-  financingInterestRate: "12.5",
-  financingInterestRateAmount: "",
+  financingInterestRateType: "FIXED",
+  financingInterestRateAmount: "50000",
+  financingInterestAmount1Year: "",
+  financingInterestAmount2Years: "",
+  financingInterestAmount3Years: "",
   financingInsurancePercentPsv: "4.5",
   financingInsurancePercentPrivate: "3",
   financingPartner: "KCB Bank",
@@ -170,8 +172,10 @@ describe("vehicleSchema (full object)", () => {
       bankFinanceEnabled: "",
       financingDownPaymentPercent: "",
       financingDownPaymentAmount: "",
-      financingInterestRate: "",
       financingInterestRateAmount: "",
+      financingInterestAmount1Year: "",
+      financingInterestAmount2Years: "",
+      financingInterestAmount3Years: "",
       financingInsurancePercentPsv: "",
       financingInsurancePercentPrivate: "",
       financingPartner: "",
@@ -203,17 +207,61 @@ describe("vehicleSchema (full object)", () => {
     }
   });
 
-  it("accepts a fixed interest amount and drops the unused percent field", () => {
+  it("accepts a fixed extra amount and clears the yearly amounts", () => {
     const result = vehicleSchema.safeParse({
       ...validFullVehicle,
       financingInterestRateType: "FIXED",
       financingInterestRateAmount: "50000",
+      financingInterestAmount1Year: "99999",
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.financingInterestRateAmount).toBe(50000);
-      expect(result.data.financingInterestRate).toBeUndefined();
+      expect(result.data.financingInterestAmount1Year).toBeUndefined();
     }
+  });
+
+  it("accepts yearly extra amounts and drops the unused fixed amount", () => {
+    const result = vehicleSchema.safeParse({
+      ...validFullVehicle,
+      financingInterestRateType: "YEARLY",
+      financingInterestRateAmount: "50000",
+      financingInterestAmount1Year: "30000",
+      financingInterestAmount2Years: "55000",
+      financingInterestAmount3Years: "",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.financingInterestAmount1Year).toBe(30000);
+      expect(result.data.financingInterestAmount2Years).toBe(55000);
+      expect(result.data.financingInterestAmount3Years).toBeUndefined();
+      expect(result.data.financingInterestRateAmount).toBeUndefined();
+    }
+  });
+
+  it("rejects a yearly extra with no amount while financing is on", () => {
+    const result = vehicleSchema.safeParse({ ...validFullVehicle, financingInterestRateType: "YEARLY" });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe("Enter an extra amount for at least one year");
+  });
+
+  it("does not require yearly amounts when financing is off", () => {
+    const result = vehicleSchema.safeParse({
+      ...validFullVehicle,
+      installmentEnabled: "false",
+      bankFinanceEnabled: "false",
+      financingInterestRateType: "YEARLY",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects negative or invalid yearly amounts", () => {
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, financingInterestRateType: "YEARLY", financingInterestAmount1Year: "-5" }).success).toBe(false);
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, financingInterestRateType: "YEARLY", financingInterestAmount2Years: "abc" }).success).toBe(false);
+  });
+
+  it("no longer accepts the retired PERCENT extra type on save", () => {
+    expect(vehicleSchema.safeParse({ ...validFullVehicle, financingInterestRateType: "PERCENT" }).success).toBe(false);
   });
 
   it("rejects an invalid loan tenure option", () => {
