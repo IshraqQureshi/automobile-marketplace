@@ -44,7 +44,6 @@ export function VehicleFilters({ filters, options, action = "/listing" }: Vehicl
 
       <FilterSelect label="Brand" name="make" value={filters.make} options={options.makes} />
       <FilterSelect label="Model" name="model" value={filters.model} options={options.models} />
-      <FilterSelect label="Body Type" name="bodyType" value={filters.bodyType} options={options.bodyTypes} />
       <FilterSelect label="Fuel Type" name="fuelType" value={filters.fuelType} options={options.fuelTypes} />
 
       <PriceRangeSlider min={options.minPriceBound} max={options.maxPriceBound} defaultMinPrice={filters.minPrice} defaultMaxPrice={filters.maxPrice} />

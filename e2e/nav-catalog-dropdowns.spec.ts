@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-// The public header's Brands/Model/Type nav dropdowns read straight from
+// The public header's Brands/Model nav dropdowns read straight from
 // the real seeded catalog tables (brands/models/vehicle_types) — the same
 // migration-seeded data other specs already rely on being present (see
 // dashboard-vehicles.spec.ts's own "real seeded catalog (Toyota/Camry)"
@@ -26,19 +26,12 @@ test("Model dropdown labels items with their brand and navigates to the SEO-frie
   await expect(page.getByRole("heading", { name: "Toyota Camry for Sale in Kenya" })).toBeVisible();
 });
 
-test("Type dropdown routes a body shape through /listing/type and a fuel type through /listing/fuel", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Type", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Sedan" }).click();
-  await page.waitForURL(/\/listing\/type\/sedan$/);
-
-  await page.goto("/");
-  await page.getByRole("button", { name: "Type", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Diesel" }).click();
-  // Diesel is one of FUEL_TYPES, not a body shape — must route through
-  // /listing/fuel (a different vehicles column, fuel_type) rather than
-  // /listing/type (body_type), or it would silently match zero vehicles.
-  await page.waitForURL(/\/listing\/fuel\/diesel$/);
+test("the header no longer has a Type dropdown, and the listing filters have no Body Type select", async ({ page }) => {
+  await page.goto("/listing", { waitUntil: "networkidle" });
+  const nav = page.getByRole("navigation", { name: "Vehicle categories" });
+  await expect(nav.getByRole("button", { name: "Brands", exact: true })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Type", exact: true })).toHaveCount(0);
+  await expect(page.locator("#vehicle-filter-bodyType")).toHaveCount(0);
 });
 
 test("pressing Escape closes an open nav dropdown", async ({ page }) => {

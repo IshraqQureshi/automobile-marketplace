@@ -8,7 +8,6 @@ import { signOutAction } from "@/features/auth/actions";
 import {
   buildBrandCatalogLinks,
   buildModelCatalogLinks,
-  buildTypeCatalogLinks,
   EMPTY_NAV_CATALOG,
   type CatalogLinkItem,
   type NavCatalog,
@@ -39,10 +38,9 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
   const { open: profileMenuOpen, setOpen: setProfileMenuOpen, ref: profileMenuRef } = useDropdown();
 
   // Link-building itself lives in nav-catalog-links.ts, shared with the
-  // footer's own Brands/Model/Type columns — only the memoization is local.
+  // footer's own columns — only the memoization is local.
   const brandItems = useMemo(() => buildBrandCatalogLinks(navCatalog.brands), [navCatalog.brands]);
   const modelItems = useMemo(() => buildModelCatalogLinks(navCatalog.models), [navCatalog.models]);
-  const typeItems = useMemo(() => buildTypeCatalogLinks(navCatalog.types), [navCatalog.types]);
 
   return (
     <header className="relative z-20 border-b border-neutral-200 bg-white">
@@ -55,7 +53,6 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
           <nav aria-label="Vehicle categories" className="hidden items-center gap-6 md:flex">
             <NavDropdown label="Brands" items={brandItems} />
             <NavDropdown label="Model" items={modelItems} />
-            <NavDropdown label="Type" items={typeItems} />
           </nav>
         </div>
 
@@ -134,7 +131,6 @@ export function Header({ user = null, navCatalog = EMPTY_NAV_CATALOG }: HeaderPr
         <div className="flex flex-col gap-1 px-4 py-3">
           <MobileNavGroup label="Brands" items={brandItems} onNavigate={() => setMobileMenuOpen(false)} />
           <MobileNavGroup label="Model" items={modelItems} onNavigate={() => setMobileMenuOpen(false)} />
-          <MobileNavGroup label="Type" items={typeItems} onNavigate={() => setMobileMenuOpen(false)} />
           {user ? (
             <>
               <Link
