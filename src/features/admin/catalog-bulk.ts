@@ -32,6 +32,21 @@ export function catalogBulkTemplate(kind: CatalogBulkKind): string {
   return `${header}\n${example}\n`;
 }
 
+export const NOT_CSV_MESSAGE =
+  "This doesn't look like a CSV file — it may be an Excel workbook (.xlsx) renamed to .csv. In Excel choose File → Save As → \"CSV UTF-8 (Comma delimited)\", then upload that.";
+
+/**
+ * True when text read from a "CSV" is really binary (an .xlsx/.zip/.pdf
+ * saved with a .csv name): zip signature, NUL bytes, or replacement
+ * characters from failed UTF-8 decoding.
+ */
+export function looksLikeBinary(text: string): boolean {
+  if (text.startsWith("PK\u0003\u0004") || text.includes("\u0000")) return true;
+  const sample = text.slice(0, 2000);
+  const replacements = (sample.match(/\uFFFD/g) ?? []).length;
+  return replacements > 5;
+}
+
 /**
  * Minimal RFC-4180 style parser: quoted fields, escaped quotes ("") and
  * commas/newlines inside quotes. No dependency — the catalog only needs
@@ -83,6 +98,7 @@ export function parseCsv(text: string): string[][] {
  * collapsed (case-insensitive) rather than reported as errors.
  */
 export function parseCatalogCsv(text: string, kind: CatalogBulkKind): CatalogBulkParseResult {
+  if (looksLikeBinary(text)) return { rows: [], issues: [{ line: 0, message: NOT_CSV_MESSAGE }] };
   const records = parseCsv(text);
   const rows: CatalogBulkRow[] = [];
   const issues: CatalogBulkIssue[] = [];

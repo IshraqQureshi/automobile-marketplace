@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_BULK_ROWS, parseCatalogCsv, parseCsv } from "./catalog-bulk";
+import { looksLikeBinary, MAX_BULK_ROWS, NOT_CSV_MESSAGE, parseCatalogCsv, parseCsv } from "./catalog-bulk";
 
 describe("parseCsv", () => {
   it("handles quotes, escaped quotes, embedded commas/newlines, CRLF and a BOM", () => {
@@ -47,5 +47,22 @@ describe("parseCatalogCsv", () => {
     const result = parseCatalogCsv(text, "brands");
     expect(result.rows).toEqual([]);
     expect(result.issues[0]?.message).toMatch(/at most/);
+  });
+});
+
+describe("binary / Excel files renamed to .csv", () => {
+  const xlsxLike = "PK\u0003\u0004\u0014\u0000\u0000\u0000docProps/app.xml";
+
+  it("detects zip signatures, NUL bytes and mojibake, but not normal CSV", () => {
+    expect(looksLikeBinary(xlsxLike)).toBe(true);
+    expect(looksLikeBinary("a\u0000b")).toBe(true);
+    expect(looksLikeBinary("\uFFFD".repeat(10))).toBe(true);
+    expect(looksLikeBinary("brand,name\nToyota,Corolla")).toBe(false);
+  });
+
+  it("returns a single clear issue instead of per-line errors", () => {
+    const result = parseCatalogCsv(xlsxLike, "models");
+    expect(result.rows).toEqual([]);
+    expect(result.issues).toEqual([{ line: 0, message: NOT_CSV_MESSAGE }]);
   });
 });

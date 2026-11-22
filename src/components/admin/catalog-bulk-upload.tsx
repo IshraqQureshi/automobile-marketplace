@@ -7,6 +7,8 @@ import { bulkImportCatalogAction, type BulkImportResult } from "@/features/admin
 import {
   BULK_KIND_CONFIG,
   catalogBulkTemplate,
+  looksLikeBinary,
+  NOT_CSV_MESSAGE,
   parseCatalogCsv,
   type CatalogBulkKind,
   type CatalogBulkParseResult,
@@ -43,7 +45,14 @@ export function CatalogBulkUpload() {
       setFileError("File is too large (max 1 MB).");
       return;
     }
-    setText(await file.text());
+    const content = await file.text();
+    if (looksLikeBinary(content)) {
+      // Don't dump binary into the textarea — tell the admin what's wrong.
+      setText("");
+      setFileError(NOT_CSV_MESSAGE);
+      return;
+    }
+    setText(content);
   }
 
   function downloadTemplate() {
@@ -60,9 +69,15 @@ export function CatalogBulkUpload() {
     if (parsed.rows.length === 0) return;
     startTransition(async () => {
       const res = await bulkImportCatalogAction(kind, parsed.rows);
-      setResult(res);
-      if (res.error) toast.error(res.error);
-      else toast.success(`${res.added} added, ${res.skippedDuplicates} duplicate${res.skippedDuplicates === 1 ? "" : "s"} skipped.`);
+      if (res.error) {
+        // Keep the dialog open so the admin can fix the input and retry.
+        setResult(res);
+        toast.error(res.error);
+        return;
+      }
+      const rejected = res.rejected.length > 0 ? `, ${res.rejected.length} rejected` : "";
+      toast.success(`${res.added} added, ${res.skippedDuplicates} skipped${rejected}.`);
+      close();
     });
   }
 
